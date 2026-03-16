@@ -42,12 +42,10 @@ curl -sSfL "$CHECKSUM_URL" -o "${TMPDIR}/checksums.txt"
 
 # Verify checksum
 cd "$TMPDIR"
-if command -v sha256sum > /dev/null 2>&1; then
-  grep "$ARCHIVE" checksums.txt | sha256sum -c --quiet
-elif command -v shasum > /dev/null 2>&1; then
+if [ "$OS" = "darwin" ]; then
   grep "$ARCHIVE" checksums.txt | shasum -a 256 -c --quiet
 else
-  echo "Warning: could not verify checksum (no sha256sum or shasum found)" >&2
+  grep "$ARCHIVE" checksums.txt | sha256sum -c --quiet
 fi
 
 tar -xzf "$ARCHIVE"
