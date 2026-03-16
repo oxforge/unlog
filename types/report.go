@@ -8,6 +8,7 @@ type AnalysisReport struct {
 	UnlogVersion       string      `json:"unlog_version"`
 	ModelUsed          string      `json:"model_used,omitempty"`
 	AnalysisDurationMs int64       `json:"analysis_duration_ms"`
+	AIDurationMs       int64       `json:"ai_duration_ms,omitempty"`
 	Stats              FilterStats `json:"stats"`
 	Timeline           string      `json:"timeline,omitempty"`
 	RootCause          string      `json:"root_cause,omitempty"`

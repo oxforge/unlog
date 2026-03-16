@@ -3,7 +3,10 @@
 // leaf dependency, never imported by other packages.
 package analyze
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // Provider sends a prompt to an LLM and streams back text chunks.
 type Provider interface {
@@ -19,6 +22,7 @@ type AnalysisResult struct {
 	RootCause       string
 	Recommendations string
 	ModelUsed       string
+	Duration        time.Duration
 }
 
 // Pass identifies which analysis pass is running.

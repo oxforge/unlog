@@ -94,7 +94,7 @@ func buildFilterOpts(cmd *cobra.Command, flagLevel, flagSince, flagUntil, flagNo
 	return opts, nil
 }
 
-func printStats(w io.Writer, result *pipeline.Result, showDetailed bool) {
+func printStats(w io.Writer, result *pipeline.Result, ar *analyze.AnalysisResult, showDetailed bool) {
 	fs := result.Stats
 	_, _ = fmt.Fprintln(w, "\n--- Filter Stats ---")
 	_, _ = fmt.Fprintf(w, "Ingested:           %d\n", fs.TotalIngested)
@@ -102,6 +102,9 @@ func printStats(w io.Writer, result *pipeline.Result, showDetailed bool) {
 	_, _ = fmt.Fprintf(w, "Survived:           %d\n", fs.TotalSurvived)
 	_, _ = fmt.Fprintf(w, "Unique signatures:  %d\n", fs.UniqueSignatures)
 	_, _ = fmt.Fprintf(w, "Duration:           %dms\n", fs.FilterDurationMs)
+	if ar != nil {
+		_, _ = fmt.Fprintf(w, "AI analysis:        %.1fs\n", ar.Duration.Seconds())
+	}
 
 	if showDetailed {
 		ds := result.DetailedStats

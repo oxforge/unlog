@@ -58,4 +58,7 @@ func (r *MarkdownRenderer) renderStatsTable(w io.Writer, opts Options) {
 	_, _ = fmt.Fprintf(w, "| Survived | %s |\n", FmtIntComma(fs.TotalSurvived))
 	_, _ = fmt.Fprintf(w, "| Unique signatures | %d |\n", fs.UniqueSignatures)
 	_, _ = fmt.Fprintf(w, "| Duration | %dms |\n", opts.Result.Duration.Milliseconds())
+	if opts.Analysis != nil {
+		_, _ = fmt.Fprintf(w, "| AI analysis | %.1fs |\n", opts.Analysis.Duration.Seconds())
+	}
 }

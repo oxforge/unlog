@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 )
 
 const (
@@ -27,9 +28,11 @@ type StreamCallback func(pass Pass, token string)
 // Run performs LLM analysis on the compacted summary. Multi-pass by default
 // (timeline -> root cause -> recommendations); single pass with opts.Fast.
 func Run(ctx context.Context, provider Provider, summary string, opts Options, cb StreamCallback) (*AnalysisResult, error) {
+	start := time.Now()
 	result := &AnalysisResult{
 		ModelUsed: provider.Model(),
 	}
+	defer func() { result.Duration = time.Since(start) }()
 
 	if opts.Fast {
 		output, err := runPass(ctx, provider, fastPrompt, summary, PassTimeline, cb)

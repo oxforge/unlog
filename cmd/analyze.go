@@ -171,7 +171,7 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	if effectiveFormat == "text" {
-		printStats(os.Stderr, result, verbose)
+		printStats(os.Stderr, result, ar, verbose)
 	}
 
 	return nil
