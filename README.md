@@ -89,12 +89,6 @@ Get filter statistics without the full summary:
 unlog stats /var/log/app/
 ```
 
-Detect log formats in a directory:
-
-```bash
-unlog formats /var/log/
-```
-
 ### With AI
 
 Set your API key and run:
@@ -133,7 +127,6 @@ unlog --ai-provider openai --format markdown --output report.md logs/
 |---------|-------------|
 | `analyze` | Run the full pipeline and produce an incident summary (**default** -- runs when no subcommand is given) |
 | `stats` | Show filter statistics (stages 1-2 only, no AI) |
-| `formats` | Detect and display log formats found in input files |
 | `version` | Print the version |
 
 ## Flags
