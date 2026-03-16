@@ -24,7 +24,6 @@ var (
 	outputFlag     string
 	aiProviderFlag string
 	modelFlag      string
-	fastFlag       bool
 )
 
 var analyzeCmd = &cobra.Command{
@@ -43,7 +42,6 @@ func registerAnalyzeFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&outputFlag, "output", "", "Write output to file instead of stdout")
 	cmd.Flags().StringVar(&aiProviderFlag, "ai-provider", "", "Enable LLM analysis with provider: openai, anthropic, ollama")
 	cmd.Flags().StringVar(&modelFlag, "model", "", "LLM model override (default per provider)")
-	cmd.Flags().BoolVar(&fastFlag, "fast", false, "Single-pass LLM analysis (faster, less detailed)")
 }
 
 func init() {
@@ -98,21 +96,12 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 
 		var streamCB analyze.StreamCallback
 		if effectiveFormat == "text" && outputFlag == "" {
-			lastPass := analyze.Pass(-1)
-			streamCB = func(pass analyze.Pass, token string) {
-				if pass != lastPass {
-					if lastPass >= 0 {
-						_, _ = fmt.Fprintln(os.Stdout)
-					}
-					_, _ = fmt.Fprintf(os.Stdout, "\n--- %s ---\n", passHeader(pass))
-					lastPass = pass
-				}
+			streamCB = func(token string) {
 				_, _ = fmt.Fprint(os.Stdout, token)
 			}
 		}
 
-		analyzeOpts := analyze.Options{Fast: fastFlag}
-		ar, err = analyze.Run(ctx, provider, result.Summary, analyzeOpts, streamCB)
+		ar, err = analyze.Run(ctx, provider, result.Summary, streamCB)
 		if err != nil {
 			return fmt.Errorf("cmd: analyze: %w", err)
 		}
@@ -184,18 +173,4 @@ func isTerminal(f *os.File) bool {
 		return false
 	}
 	return fi.Mode()&os.ModeCharDevice != 0
-}
-
-// passHeader returns a human-readable header for each analysis pass.
-func passHeader(p analyze.Pass) string {
-	switch p {
-	case analyze.PassTimeline:
-		return "Timeline"
-	case analyze.PassRootCause:
-		return "Root Cause"
-	case analyze.PassRecommendations:
-		return "Recommendations"
-	default:
-		return "Analysis"
-	}
 }

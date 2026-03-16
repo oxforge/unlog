@@ -55,23 +55,13 @@ func (r *TerminalRenderer) renderNoAI(w io.Writer, opts Options, c colorizer) {
 }
 
 func (r *TerminalRenderer) renderAI(w io.Writer, opts Options, c colorizer) {
-	sections := []struct {
-		header string
-		body   string
-	}{
-		{"Timeline", opts.Analysis.Timeline},
-		{"Root Cause", opts.Analysis.RootCause},
-		{"Recommendations", opts.Analysis.Recommendations},
+	body := opts.Analysis.Analysis
+	if body == "" {
+		return
 	}
-
-	for _, s := range sections {
-		if s.body == "" {
-			continue
-		}
-		_, _ = fmt.Fprintf(w, "\n%s\n", c.wrap(ansiBoldCyan, "--- "+s.header+" ---"))
-		_, _ = fmt.Fprintln(w, c.highlightLevels(strings.TrimRight(s.body, "\n")))
-		_, _ = fmt.Fprintln(w)
-	}
+	_, _ = fmt.Fprintf(w, "\n%s\n", c.wrap(ansiBoldCyan, "--- Analysis ---"))
+	_, _ = fmt.Fprintln(w, c.highlightLevels(strings.TrimRight(body, "\n")))
+	_, _ = fmt.Fprintln(w)
 }
 
 type colorizer struct {

@@ -30,7 +30,7 @@ unlog --ai-provider openai logs/
 - **Rate spike detection** -- Per-source sliding window detects anomalous event rates.
 - **Error chain detection** -- 10 built-in patterns (DB exhaustion, OOM cascade, circuit breaker, disk full, cert expiry, DNS failure, etc.).
 - **Token-budgeted compaction** -- Priority-scored entries fit within LLM context windows.
-- **Multi-pass LLM analysis** -- Timeline, root cause, and recommendations in three chained passes. Single-pass fast mode available.
+- **LLM analysis** -- Timeline, root cause, and recommendations in a single pass via OpenAI, Anthropic, or Ollama.
 - **Streaming output** -- LLM responses stream to the terminal token-by-token.
 - **Multiple output formats** -- Colored terminal, JSON, and Markdown.
 - **Stdin support** -- Pipe logs from any source.
@@ -114,12 +114,6 @@ unlog --ai-provider anthropic logs/
 unlog --ai-provider ollama --model llama3 logs/
 ```
 
-Fast mode (single LLM pass, quicker but less detailed):
-
-```bash
-unlog --ai-provider openai --fast logs/
-```
-
 ### Output formats
 
 ```bash
@@ -158,7 +152,6 @@ unlog --ai-provider openai --format markdown --output report.md logs/
 |------|-------------|
 | `--ai-provider` | Enable LLM analysis with provider: `openai`, `anthropic`, `ollama` |
 | `--model` | Override the default model for the chosen provider |
-| `--fast` | Single-pass LLM analysis (faster, less detailed) |
 | `--format` | Output format: `text`, `json`, `markdown` |
 | `--output` | Write output to a file instead of stdout |
 | `--level` | Minimum log level: `trace`, `debug`, `info`, `warn`, `error`, `fatal` (default: `warn`) |
@@ -245,7 +238,7 @@ Files/stdin --> [Ingest] --> [Filter] --> [Enrich] --> [Compact] --> [Analyze*] 
 | 2. Filter | `filter/` | Level filter, time window, noise removal, dedup, spike detection |
 | 3. Enrich | `enrich/` | Error chain detection, deployment events, field extraction |
 | 4. Compact | `compact/` | Priority scoring, token-budgeted compaction |
-| 5. Analyze | `internal/analyze/` | Optional LLM multi-pass analysis |
+| 5. Analyze | `internal/analyze/` | Optional single-pass LLM analysis |
 | 6. Render | `internal/render/` | Terminal, JSON, and Markdown output |
 
 Stages 1-4 are pure Go with no network calls. Stage 5 is optional (enabled with `--ai-provider`). Stages 1-4 are public packages importable as a Go library.
@@ -292,7 +285,7 @@ When using `--format json`, the output includes:
 }
 ```
 
-When AI analysis is included, the output adds `timeline`, `root_cause`, and `recommendations` fields.
+When AI analysis is included, the output adds an `analysis` field and `ai_duration_ms` timing.
 
 ## Development
 

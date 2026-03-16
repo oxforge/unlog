@@ -10,9 +10,7 @@ type AnalysisReport struct {
 	AnalysisDurationMs int64       `json:"analysis_duration_ms"`
 	AIDurationMs       int64       `json:"ai_duration_ms,omitempty"`
 	Stats              FilterStats `json:"stats"`
-	Timeline           string      `json:"timeline,omitempty"`
-	RootCause          string      `json:"root_cause,omitempty"`
-	Recommendations    string      `json:"recommendations,omitempty"`
+	Analysis           string      `json:"analysis,omitempty"`
 	CompactedSummary   string      `json:"compacted_summary"`
 }
 

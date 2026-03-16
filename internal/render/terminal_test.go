@@ -31,10 +31,8 @@ func sampleResult() *pipeline.Result {
 
 func sampleAnalysis() *analyze.AnalysisResult {
 	return &analyze.AnalysisResult{
-		Timeline:        "10:00 — DB connection pool saturated\n10:01 — Requests started timing out",
-		RootCause:       "Connection leak in payment service caused pool exhaustion",
-		Recommendations: "1. Add connection pool monitoring\n2. Set max connection lifetime",
-		ModelUsed:       "gpt-4o",
+		Analysis:  "10:00 — DB connection pool saturated\n10:01 — Requests started timing out\nConnection leak in payment service caused pool exhaustion\n1. Add connection pool monitoring\n2. Set max connection lifetime",
+		ModelUsed: "gpt-4o",
 	}
 }
 
@@ -72,11 +70,9 @@ func TestTerminalRenderWithAI(t *testing.T) {
 	require.NoError(t, err)
 
 	out := buf.String()
-	assert.Contains(t, out, "--- Timeline ---")
+	assert.Contains(t, out, "--- Analysis ---")
 	assert.Contains(t, out, "DB connection pool saturated")
-	assert.Contains(t, out, "--- Root Cause ---")
 	assert.Contains(t, out, "Connection leak")
-	assert.Contains(t, out, "--- Recommendations ---")
 	assert.Contains(t, out, "connection pool monitoring")
 	// AI mode should NOT print the compacted summary sections.
 	assert.NotContains(t, out, "## Incident Overview")
@@ -119,8 +115,8 @@ func TestTerminalRenderNoColor(t *testing.T) {
 	out := buf.String()
 	assert.NotContains(t, out, "\033[", "expected no ANSI escape codes when NoColor is true")
 	// Content should still be present.
-	assert.Contains(t, out, "Timeline")
-	assert.Contains(t, out, "Root Cause")
+	assert.Contains(t, out, "--- Analysis ---")
+	assert.Contains(t, out, "DB connection pool saturated")
 }
 
 // failWriter is an io.Writer that always returns an error.

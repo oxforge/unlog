@@ -42,9 +42,7 @@ func TestRenderJSON(t *testing.T) {
 	assert.Equal(t, result.Stats.UniqueSignatures, report.Stats.UniqueSignatures)
 	assert.Equal(t, result.Duration.Milliseconds(), report.AnalysisDurationMs)
 	assert.Empty(t, report.ModelUsed, "no AI result, model_used should be empty")
-	assert.Empty(t, report.Timeline)
-	assert.Empty(t, report.RootCause)
-	assert.Empty(t, report.Recommendations)
+	assert.Empty(t, report.Analysis)
 	assert.False(t, report.GeneratedAt.IsZero(), "GeneratedAt should be set")
 }
 
@@ -86,10 +84,8 @@ func TestJSONRendererInterface(t *testing.T) {
 		Duration: 100 * time.Millisecond,
 	}
 	ar := &analyze.AnalysisResult{
-		Timeline:        "timeline text",
-		RootCause:       "root cause text",
-		Recommendations: "recommendations text",
-		ModelUsed:       "gpt-4o",
+		Analysis:  "timeline text\nroot cause text\nrecommendations text",
+		ModelUsed: "gpt-4o",
 	}
 
 	var r render.Renderer = &render.JSONRenderer{}
@@ -104,9 +100,7 @@ func TestJSONRendererInterface(t *testing.T) {
 	var report types.AnalysisReport
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &report))
 
-	assert.Equal(t, "timeline text", report.Timeline)
-	assert.Equal(t, "root cause text", report.RootCause)
-	assert.Equal(t, "recommendations text", report.Recommendations)
+	assert.Contains(t, report.Analysis, "timeline text")
 	assert.Equal(t, "gpt-4o", report.ModelUsed)
 	assert.Equal(t, "1.0.0", report.UnlogVersion)
 }

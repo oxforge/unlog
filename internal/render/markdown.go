@@ -22,9 +22,7 @@ func (r *MarkdownRenderer) Render(w io.Writer, opts Options) error {
 	_, _ = fmt.Fprintln(ew, meta)
 
 	if opts.Analysis != nil {
-		writeMDSection(ew, "Timeline", opts.Analysis.Timeline)
-		writeMDSection(ew, "Root Cause", opts.Analysis.RootCause)
-		writeMDSection(ew, "Recommendations", opts.Analysis.Recommendations)
+		writeMDSection(ew, "Analysis", opts.Analysis.Analysis)
 	}
 
 	if opts.Result != nil && opts.Result.Summary != "" {

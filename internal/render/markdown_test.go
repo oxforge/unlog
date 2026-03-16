@@ -64,10 +64,8 @@ func TestMarkdownRenderWithAI(t *testing.T) {
 			Duration: 1230 * time.Millisecond,
 		},
 		Analysis: &analyze.AnalysisResult{
-			Timeline:        "10:00 — Incident began",
-			RootCause:       "Connection leak in service X",
-			Recommendations: "1. Monitor pool usage",
-			ModelUsed:       "gpt-4o",
+			Analysis:  "10:00 — Incident began\nConnection leak in service X\n1. Monitor pool usage",
+			ModelUsed: "gpt-4o",
 		},
 		Version: "1.0.0",
 	})
@@ -75,11 +73,9 @@ func TestMarkdownRenderWithAI(t *testing.T) {
 
 	out := buf.String()
 	assert.Contains(t, out, "# Incident Analysis")
-	assert.Contains(t, out, "## Timeline")
+	assert.Contains(t, out, "## Analysis")
 	assert.Contains(t, out, "10:00 — Incident began")
-	assert.Contains(t, out, "## Root Cause")
 	assert.Contains(t, out, "Connection leak")
-	assert.Contains(t, out, "## Recommendations")
 	assert.Contains(t, out, "Monitor pool usage")
 	assert.Contains(t, out, "## Summary")
 	assert.Contains(t, out, "## Statistics")

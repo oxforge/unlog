@@ -16,33 +16,9 @@ type Provider interface {
 	Model() string
 }
 
-// AnalysisResult holds the three-section output from LLM analysis.
+// AnalysisResult holds the single-pass output from LLM analysis.
 type AnalysisResult struct {
-	Timeline        string
-	RootCause       string
-	Recommendations string
-	ModelUsed       string
-	Duration        time.Duration
-}
-
-// Pass identifies which analysis pass is running.
-type Pass int
-
-const (
-	PassTimeline Pass = iota
-	PassRootCause
-	PassRecommendations
-)
-
-func (p Pass) String() string {
-	switch p {
-	case PassTimeline:
-		return "timeline"
-	case PassRootCause:
-		return "root_cause"
-	case PassRecommendations:
-		return "recommendations"
-	default:
-		return "unknown"
-	}
+	Analysis  string
+	ModelUsed string
+	Duration  time.Duration
 }

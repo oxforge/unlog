@@ -28,9 +28,7 @@ func RenderJSON(w io.Writer, result *pipeline.Result, ar *analyze.AnalysisResult
 	}
 
 	if ar != nil {
-		report.Timeline = ar.Timeline
-		report.RootCause = ar.RootCause
-		report.Recommendations = ar.Recommendations
+		report.Analysis = ar.Analysis
 		report.ModelUsed = ar.ModelUsed
 		report.AIDurationMs = ar.Duration.Milliseconds()
 	}

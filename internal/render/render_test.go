@@ -37,10 +37,8 @@ func makeResult() *pipeline.Result {
 
 func makeAnalysis() *analyze.AnalysisResult {
 	return &analyze.AnalysisResult{
-		Timeline:        "10:00 — DB pool saturated\n10:01 — Timeouts began",
-		RootCause:       "Connection leak in payment service",
-		Recommendations: "1. Add pool monitoring\n2. Set max lifetime",
-		ModelUsed:       "gpt-4o",
+		Analysis:  "## Timeline\n10:00 — DB pool saturated\n10:01 — Timeouts began\n\n## Root Cause\nConnection leak in payment service\n\n## Recommendations\n1. Add pool monitoring\n2. Set max lifetime",
+		ModelUsed: "gpt-4o",
 	}
 }
 
@@ -82,7 +80,7 @@ func TestRenderersWithAI(t *testing.T) {
 			check: func(t *testing.T, out string) {
 				var report types.AnalysisReport
 				require.NoError(t, json.Unmarshal([]byte(out), &report), "output must be valid JSON")
-				assert.Equal(t, "10:00 — DB pool saturated\n10:01 — Timeouts began", report.Timeline)
+				assert.Contains(t, report.Analysis, "DB pool saturated")
 			},
 		},
 		{
@@ -90,7 +88,7 @@ func TestRenderersWithAI(t *testing.T) {
 			r:       &render.TerminalRenderer{},
 			noColor: true,
 			check: func(t *testing.T, out string) {
-				assert.Contains(t, out, "--- Timeline ---")
+				assert.Contains(t, out, "--- Analysis ---")
 				assert.NotContains(t, out, "\033[", "expected no ANSI escapes")
 			},
 		},
@@ -107,7 +105,7 @@ func TestRenderersWithAI(t *testing.T) {
 			r:       &render.MarkdownRenderer{},
 			noColor: true,
 			check: func(t *testing.T, out string) {
-				assert.Contains(t, out, "## Timeline")
+				assert.Contains(t, out, "## Analysis")
 				assert.Contains(t, out, "| Metric |")
 				// Verify no stray ANSI codes in markdown.
 				assert.NotContains(t, out, "\033[")
