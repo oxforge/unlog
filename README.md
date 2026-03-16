@@ -250,55 +250,6 @@ Files/stdin --> [Ingest] --> [Filter] --> [Enrich] --> [Compact] --> [Analyze*] 
 
 Stages 1-4 are pure Go with no network calls. Stage 5 is optional (enabled with `--ai-provider`). Stages 1-4 are public packages importable as a Go library.
 
-## Using as a library
-
-The public packages (`types/`, `ingest/`, `filter/`, `enrich/`, `compact/`) can be imported directly:
-
-```go
-package main
-
-import (
-    "context"
-    "fmt"
-
-    "github.com/oxforge/unlog/compact"
-    "github.com/oxforge/unlog/enrich"
-    "github.com/oxforge/unlog/filter"
-    "github.com/oxforge/unlog/ingest"
-    "github.com/oxforge/unlog/types"
-)
-
-func main() {
-    ctx := context.Background()
-
-    ingestCh := make(chan types.LogEntry, 100_000)
-    filterCh := make(chan types.FilteredEntry, 100_000)
-    enrichCh := make(chan types.EnrichedEntry, 100_000)
-
-    // Stage 1: Ingest
-    go func() {
-        ing := ingest.NewIngester(ingestCh, ingest.IngestOptions{})
-        ing.Run(ctx, []string{"/var/log/app/"})
-    }()
-
-    // Stage 2: Filter
-    go func() {
-        fp := filter.NewFilterPipeline(ingestCh, filterCh, filter.DefaultFilterOptions(), nil)
-        fp.Run(ctx)
-    }()
-
-    // Stage 3: Enrich
-    go func() {
-        ep := enrich.NewEnricher(filterCh, enrichCh, enrich.DefaultOptions())
-        ep.Run(ctx)
-    }()
-
-    // Stage 4: Compact
-    summary, _ := compact.Run(ctx, enrichCh, compact.Options{TokenBudget: 4096})
-    fmt.Println(summary)
-}
-```
-
 ## Custom noise patterns
 
 Create a text file with one pattern per line (case-insensitive substring match). Lines starting with `#` are comments.
@@ -365,33 +316,6 @@ go test ./filter/ -bench=. -benchmem   # Benchmarks for one package
 ### Generating test data
 
 Use `testdata/big/generate.go` to create synthetic log files for benchmarking and manual testing. See its [README](testdata/big/README.md) for usage, flags, and examples.
-
-### Project structure
-
-```
-cmd/                    CLI commands (Cobra)
-types/                  Shared types (LogEntry, Level, FilterStats)
-ingest/                 Stage 1: file reading, format detection, parsing
-filter/                 Stage 2: level filter, dedup, noise, spike detection
-enrich/                 Stage 3: error chains, deployment events, correlation
-compact/                Stage 4: priority scoring, token budgeting
-internal/
-  analyze/              Stage 5: LLM providers (OpenAI, Anthropic, Ollama)
-  render/               Stage 6: terminal, JSON, markdown renderers
-  pipeline/             Channel wiring and orchestration
-  config/               TOML config loading with env overlay
-noise/                  Embedded default noise patterns
-testdata/               Test fixtures (log samples, incident scenarios)
-```
-
-## Requirements
-
-- Go 1.22+ (build)
-- No CGO required
-- No runtime dependencies beyond the Go standard library and three small modules:
-  - `github.com/spf13/cobra` -- CLI framework
-  - `github.com/BurntSushi/toml` -- config file parsing
-  - `golang.org/x/sync` -- errgroup for goroutine management
 
 ## License
 
