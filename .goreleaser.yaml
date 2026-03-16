@@ -1,3 +1,5 @@
+version: 2
+
 project_name: unlog
 
 before:
@@ -20,7 +22,7 @@ builds:
 archives:
   - format_overrides:
       - goos: windows
-        format: zip
+        formats: [zip]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
 checksum:
@@ -34,15 +36,12 @@ changelog:
       - "^test:"
       - "^ci:"
 
-brews:
+homebrew_casks:
   - repository:
       owner: oxforge
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     homepage: https://github.com/oxforge/unlog
     description: "Unravel your logs — CLI log analysis tool"
-    license: MIT
-    install: |
-      bin.install "unlog"
-    test: |
-      system "#{bin}/unlog", "version"
+    binaries:
+      - unlog
