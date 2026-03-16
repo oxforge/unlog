@@ -11,7 +11,6 @@ import (
 	"github.com/oxforge/unlog/filter"
 	"github.com/oxforge/unlog/internal/analyze"
 	"github.com/oxforge/unlog/internal/pipeline"
-	"github.com/oxforge/unlog/internal/render"
 	"github.com/oxforge/unlog/types"
 )
 
@@ -121,43 +120,6 @@ func printStats(w io.Writer, result *pipeline.Result, ar *analyze.AnalysisResult
 				_, _ = fmt.Fprintf(w, "  %s: %d\n", src, cnt)
 			}
 		}
-	}
-}
-
-func printStatsText(w io.Writer, fs types.FilterStats, result *pipeline.Result) {
-	fileCount := fs.FileCount
-	if fileCount == 0 {
-		fileCount = len(fs.SourceBreakdown)
-	}
-
-	bytes := fs.BytesProcessed
-	var bytesStr string
-	switch {
-	case bytes >= 1<<20:
-		bytesStr = fmt.Sprintf("%.1f MB", float64(bytes)/(1<<20))
-	case bytes >= 1<<10:
-		bytesStr = fmt.Sprintf("%.1f KB", float64(bytes)/(1<<10))
-	default:
-		bytesStr = fmt.Sprintf("%d B", bytes)
-	}
-
-	_, _ = fmt.Fprintf(w, "Files:          %d\n", fileCount)
-	if bytes > 0 {
-		_, _ = fmt.Fprintf(w, "Bytes:          %s\n", bytesStr)
-	}
-	_, _ = fmt.Fprintf(w, "Ingested:           %s\n", render.FmtIntComma(fs.TotalIngested))
-	_, _ = fmt.Fprintf(w, "Dropped:            %s\n", render.FmtIntComma(fs.TotalDropped))
-	_, _ = fmt.Fprintf(w, "Survived:           %s\n", render.FmtIntComma(fs.TotalSurvived))
-	_, _ = fmt.Fprintf(w, "Unique signatures:  %d\n", fs.UniqueSignatures)
-	_, _ = fmt.Fprintf(w, "Duration:           %dms\n", result.Duration.Milliseconds())
-
-	if !fs.TimeWindowStart.IsZero() {
-		winStart := fs.TimeWindowStart.Format("2006-01-02 15:04:05")
-		winEnd := fs.TimeWindowEnd.Format("15:04:05")
-		if !fs.TimeWindowEnd.IsZero() && fs.TimeWindowEnd.Format("2006-01-02") != fs.TimeWindowStart.Format("2006-01-02") {
-			winEnd = fs.TimeWindowEnd.Format("2006-01-02 15:04:05")
-		}
-		_, _ = fmt.Fprintf(w, "Time window:    %s — %s\n", winStart, winEnd)
 	}
 }
 

@@ -83,12 +83,6 @@ Pipe from another command:
 kubectl logs deployment/api --since=1h | unlog
 ```
 
-Get filter statistics without the full summary:
-
-```bash
-unlog stats /var/log/app/
-```
-
 ### With AI
 
 Set your API key and run:
@@ -126,7 +120,6 @@ unlog --ai-provider openai --format markdown --output report.md logs/
 | Command | Description |
 |---------|-------------|
 | `analyze` | Run the full pipeline and produce an incident summary (**default** -- runs when no subcommand is given) |
-| `stats` | Show filter statistics (stages 1-2 only, no AI) |
 | `version` | Print the version |
 
 ## Flags

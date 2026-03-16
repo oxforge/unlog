@@ -96,21 +96,3 @@ func TestIntegrationJSONOutput(t *testing.T) {
 	assert.Equal(t, result.Stats.TotalIngested, report.Stats.TotalIngested)
 	assert.False(t, report.GeneratedAt.IsZero())
 }
-
-func TestIntegrationStatsOnly(t *testing.T) {
-	dir := testdataDir(t, "db_connection")
-
-	p := pipeline.New(pipeline.Options{
-		StopAfter: pipeline.StopAfterFilter,
-	})
-	result, err := p.Run(context.Background(), []string{dir})
-	require.NoError(t, err)
-	require.NotNil(t, result)
-
-	// Summary must be empty when stopping after filter.
-	assert.Empty(t, result.Summary, "summary should be empty for StopAfterFilter")
-
-	// Stats must be populated.
-	assert.Greater(t, result.Stats.TotalIngested, int64(0), "stats should be populated")
-	assert.GreaterOrEqual(t, result.Stats.TotalSurvived, int64(0))
-}

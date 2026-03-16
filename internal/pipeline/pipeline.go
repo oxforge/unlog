@@ -1,8 +1,6 @@
 // Package pipeline orchestrates stages 1-4 of the unlog pipeline.
 // It wires ingest → filter → enrich → compact via buffered channels,
 // using errgroup for goroutine lifecycle management.
-//
-// The builder pattern allows M7 to extend with .WithAnalyzer(a).
 package pipeline
 
 import (
@@ -21,28 +19,17 @@ import (
 
 const chanBuffer = 100_000
 
-// StopAfter controls how far the pipeline runs.
-type StopAfter int
-
-const (
-	// StopAfterCompact runs all 4 stages (default).
-	StopAfterCompact StopAfter = iota
-	// StopAfterFilter runs stages 1-2 only (used by the stats command).
-	StopAfterFilter
-)
-
 // Options configures the pipeline.
 type Options struct {
 	IngestOpts  ingest.IngestOptions
 	FilterOpts  filter.FilterOptions
 	EnrichOpts  enrich.EnrichOptions
 	CompactOpts compact.Options
-	StopAfter   StopAfter
 }
 
 // Result holds everything the pipeline produces.
 type Result struct {
-	Summary       string // empty when StopAfter == StopAfterFilter
+	Summary       string
 	Stats         types.FilterStats
 	DetailedStats filter.DetailedStats
 	Duration      time.Duration
@@ -62,6 +49,7 @@ func (p *Pipeline) Run(ctx context.Context, sources []string) (*Result, error) {
 
 	ingestCh := make(chan types.LogEntry, chanBuffer)
 	filterCh := make(chan types.FilteredEntry, chanBuffer)
+	enrichCh := make(chan types.EnrichedEntry, chanBuffer)
 
 	g, gCtx := errgroup.WithContext(ctx)
 
@@ -89,48 +77,23 @@ func (p *Pipeline) Run(ctx context.Context, sources []string) (*Result, error) {
 		return nil
 	})
 
-	var summary string
-
-	if p.opts.StopAfter == StopAfterFilter {
-		g.Go(func() error {
-			for range filterCh {
-			}
-			return nil
-		})
-	} else {
-		enrichCh := make(chan types.EnrichedEntry, chanBuffer)
-		ep := enrich.NewEnricher(filterCh, enrichCh, p.opts.EnrichOpts)
-		g.Go(func() error {
-			if err := ep.Run(gCtx); err != nil {
-				return fmt.Errorf("pipeline: enrich: %w", err)
-			}
-			return nil
-		})
-
-		compactOutCh := make(chan string, 1)
-		g.Go(func() error {
-			s, err := compact.Run(gCtx, enrichCh, p.opts.CompactOpts)
-			compactOutCh <- s
-			if err != nil {
-				return fmt.Errorf("pipeline: compact: %w", err)
-			}
-			return nil
-		})
-
-		if err := g.Wait(); err != nil {
-			return nil, err
+	ep := enrich.NewEnricher(filterCh, enrichCh, p.opts.EnrichOpts)
+	g.Go(func() error {
+		if err := ep.Run(gCtx); err != nil {
+			return fmt.Errorf("pipeline: enrich: %w", err)
 		}
+		return nil
+	})
 
-		summary = <-compactOutCh
-
-		fo := <-filterOutCh
-		return &Result{
-			Summary:       summary,
-			Stats:         fo.stats,
-			DetailedStats: fo.detailed,
-			Duration:      time.Since(start),
-		}, nil
-	}
+	compactOutCh := make(chan string, 1)
+	g.Go(func() error {
+		s, err := compact.Run(gCtx, enrichCh, p.opts.CompactOpts)
+		compactOutCh <- s
+		if err != nil {
+			return fmt.Errorf("pipeline: compact: %w", err)
+		}
+		return nil
+	})
 
 	if err := g.Wait(); err != nil {
 		return nil, err
@@ -138,7 +101,7 @@ func (p *Pipeline) Run(ctx context.Context, sources []string) (*Result, error) {
 
 	fo := <-filterOutCh
 	return &Result{
-		Summary:       "",
+		Summary:       <-compactOutCh,
 		Stats:         fo.stats,
 		DetailedStats: fo.detailed,
 		Duration:      time.Since(start),

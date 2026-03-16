@@ -46,21 +46,6 @@ func TestPipelineEndToEnd(t *testing.T) {
 	assert.Greater(t, result.Duration, time.Duration(0))
 }
 
-func TestPipelineStopAfterFilter(t *testing.T) {
-	path := writeTempLog(t, syntheticLogs())
-
-	p := pipeline.New(pipeline.Options{
-		StopAfter: pipeline.StopAfterFilter,
-	})
-	result, err := p.Run(context.Background(), []string{path})
-
-	require.NoError(t, err)
-	require.NotNil(t, result)
-
-	assert.Empty(t, result.Summary, "summary should be empty when StopAfterFilter")
-	assert.Greater(t, result.Stats.TotalIngested, int64(0), "stats should be populated")
-}
-
 func TestPipelineCancellation(t *testing.T) {
 	// Write a large enough log to give the pipeline some work to do.
 	var lines []byte
