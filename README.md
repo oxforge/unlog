@@ -38,6 +38,18 @@ unlog --ai-provider openai logs/
 
 ## Installation
 
+### Homebrew
+
+```bash
+brew install oxforge/tap/unlog
+```
+
+### Shell script
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/oxforge/unlog/main/install.sh | sh
+```
+
 ### From source
 
 Requires Go 1.22+.
