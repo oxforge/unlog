@@ -350,7 +350,7 @@ go build -o bin/unlog .                              # Build binary
 go test ./... -race                                  # Run all tests with race detector
 golangci-lint run                                    # Lint
 go test ./internal/... -bench=. -benchmem            # Run benchmarks
-go run scripts/generate_testdata.go                  # Generate synthetic test data
+go run testdata/big/generate.go -h                   # Generate synthetic test data
 go install .                                         # Install to $GOPATH/bin
 ```
 
@@ -361,6 +361,36 @@ go test ./... -race                    # Full suite
 go test ./ingest/ -run TestIngester    # Specific package/test
 go test ./filter/ -bench=. -benchmem   # Benchmarks for one package
 ```
+
+### Generating test data
+
+The `testdata/big/generate.go` script creates synthetic log files of arbitrary size for benchmarking and manual testing. It supports multiple formats and produces realistic incident patterns including error chain sequences and rate spikes.
+
+```bash
+# Generate a 100MB JSON log file
+go run testdata/big/generate.go -size 100MB -format json -output testdata/big/large.log
+
+# Generate a 1GB syslog file with a higher error rate
+go run testdata/big/generate.go -size 1GB -format syslog -error-rate 0.1 -output testdata/big/syslog.log
+
+# Generate a compressed .gz file
+go run testdata/big/generate.go -size 50MB -format logfmt -output testdata/big/logfmt.log.gz
+
+# Generate a .tar.gz archive
+go run testdata/big/generate.go -size 200MB -format generic -output testdata/big/generic.tar.gz
+
+# Stream to stdout (e.g., pipe into unlog)
+go run testdata/big/generate.go -size 10MB -format json | ./bin/unlog
+```
+
+Flags:
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-size` | `100MB` | Target file size (e.g., `10MB`, `1GB`) |
+| `-format` | `json` | Log format: `json`, `logfmt`, `syslog`, `clf`, `generic` |
+| `-error-rate` | `0.05` | Fraction of entries that are ERROR/FATAL (0.0-1.0) |
+| `-output` | stdout | Output file path (`.gz` and `.tar.gz`/`.tgz` are compressed automatically) |
 
 ### Project structure
 
