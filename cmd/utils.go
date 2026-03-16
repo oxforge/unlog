@@ -11,6 +11,7 @@ import (
 	"github.com/oxforge/unlog/filter"
 	"github.com/oxforge/unlog/internal/analyze"
 	"github.com/oxforge/unlog/internal/pipeline"
+	"github.com/oxforge/unlog/internal/render"
 	"github.com/oxforge/unlog/types"
 )
 
@@ -21,10 +22,10 @@ var supportedFormats = map[string]bool{
 }
 
 // resolveFormat merges the --format flag with config and validates.
-func resolveFormat(cmd *cobra.Command, flagVal string) (string, error) {
+func resolveFormat(cmd *cobra.Command) (string, error) {
 	ef := cfg.Format
 	if cmd.Flags().Changed("format") {
-		ef = flagVal
+		ef = formatFlag
 	}
 	if ef == "" {
 		ef = "text"
@@ -36,10 +37,10 @@ func resolveFormat(cmd *cobra.Command, flagVal string) (string, error) {
 }
 
 // buildFilterOpts merges CLI flags over config and returns pipeline-ready filter options.
-func buildFilterOpts(cmd *cobra.Command, flagLevel, flagSince, flagUntil, flagNoise string, args []string) (filter.FilterOptions, error) {
+func buildFilterOpts(cmd *cobra.Command, args []string) (filter.FilterOptions, error) {
 	effectiveLevel := cfg.Level
 	if cmd.Flags().Changed("level") {
-		effectiveLevel = flagLevel
+		effectiveLevel = levelFlag
 	}
 	if effectiveLevel == "" {
 		effectiveLevel = "warn"
@@ -47,17 +48,17 @@ func buildFilterOpts(cmd *cobra.Command, flagLevel, flagSince, flagUntil, flagNo
 
 	effectiveSince := cfg.Since
 	if cmd.Flags().Changed("since") {
-		effectiveSince = flagSince
+		effectiveSince = sinceFlag
 	}
 
 	effectiveUntil := cfg.Until
 	if cmd.Flags().Changed("until") {
-		effectiveUntil = flagUntil
+		effectiveUntil = untilFlag
 	}
 
 	effectiveNoise := cfg.NoiseFile
 	if cmd.Flags().Changed("noise-file") {
-		effectiveNoise = flagNoise
+		effectiveNoise = noiseFileFlag
 	}
 
 	minLevel := types.ParseLevel(effectiveLevel)
@@ -93,6 +94,56 @@ func buildFilterOpts(cmd *cobra.Command, flagLevel, flagSince, flagUntil, flagNo
 	return opts, nil
 }
 
+// resolveProviderName returns the effective AI provider name (empty means no AI).
+func resolveProviderName(cmd *cobra.Command) string {
+	if cmd.Flags().Changed("ai-provider") {
+		return aiProviderFlag
+	}
+	return cfg.AIProvider
+}
+
+// resolveModelName returns the effective model name override.
+func resolveModelName(cmd *cobra.Command) string {
+	if cmd.Flags().Changed("model") {
+		return modelFlag
+	}
+	return cfg.Model
+}
+
+// newProvider creates an LLM provider from a provider name and optional model override.
+func newProvider(name, model string) (analyze.Provider, error) {
+	switch name {
+	case "openai":
+		key := os.Getenv("OPENAI_API_KEY")
+		if key == "" {
+			return nil, fmt.Errorf("cmd: OPENAI_API_KEY not set")
+		}
+		return analyze.NewOpenAI(key, model, "")
+	case "anthropic":
+		key := os.Getenv("ANTHROPIC_API_KEY")
+		if key == "" {
+			return nil, fmt.Errorf("cmd: ANTHROPIC_API_KEY not set")
+		}
+		return analyze.NewAnthropic(key, model, "")
+	case "ollama":
+		return analyze.NewOllama("", model), nil
+	default:
+		return nil, fmt.Errorf("cmd: unknown AI provider: %q (valid: openai, anthropic, ollama)", name)
+	}
+}
+
+// newRenderer returns a renderer for the given format.
+func newRenderer(format string) render.Renderer {
+	switch format {
+	case "json":
+		return &render.JSONRenderer{}
+	case "markdown":
+		return &render.MarkdownRenderer{}
+	default:
+		return &render.TerminalRenderer{}
+	}
+}
+
 func printStats(w io.Writer, result *pipeline.Result, ar *analyze.AnalysisResult, showDetailed bool) {
 	fs := result.Stats
 	_, _ = fmt.Fprintln(w, "\n--- Filter Stats ---")
@@ -123,25 +174,13 @@ func printStats(w io.Writer, result *pipeline.Result, ar *analyze.AnalysisResult
 	}
 }
 
-func resolveProvider(providerName, model string) (analyze.Provider, error) {
-	switch providerName {
-	case "openai":
-		key := os.Getenv("OPENAI_API_KEY")
-		if key == "" {
-			return nil, fmt.Errorf("cmd: OPENAI_API_KEY not set")
-		}
-		return analyze.NewOpenAI(key, model, "")
-	case "anthropic":
-		key := os.Getenv("ANTHROPIC_API_KEY")
-		if key == "" {
-			return nil, fmt.Errorf("cmd: ANTHROPIC_API_KEY not set")
-		}
-		return analyze.NewAnthropic(key, model, "")
-	case "ollama":
-		return analyze.NewOllama("", model), nil
-	default:
-		return nil, fmt.Errorf("cmd: unknown AI provider: %q (valid: openai, anthropic, ollama)", providerName)
+// isTerminal reports whether f is connected to a terminal.
+func isTerminal(f *os.File) bool {
+	fi, err := f.Stat()
+	if err != nil {
+		return false
 	}
+	return fi.Mode()&os.ModeCharDevice != 0
 }
 
 // parseTimeFlag parses a relative duration ("2h") or ISO 8601 timestamp.

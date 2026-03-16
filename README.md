@@ -115,24 +115,7 @@ unlog --format json logs/
 unlog --ai-provider openai --format markdown --output report.md logs/
 ```
 
-## Commands
-
-| Command | Description |
-|---------|-------------|
-| `analyze` | Run the full pipeline and produce an incident summary (**default** -- runs when no subcommand is given) |
-| `version` | Print the version |
-
 ## Flags
-
-### Global flags
-
-| Flag | Description |
-|------|-------------|
-| `--verbose`, `-v` | Show detailed output including per-filter drop counts |
-| `--no-color` | Disable colored output (also respects `NO_COLOR` env var) |
-| `--config` | Config file path (default: `~/.unlog/config.toml`) |
-
-### Analyze flags (available on root and `analyze` subcommand)
 
 | Flag | Description |
 |------|-------------|
@@ -144,6 +127,9 @@ unlog --ai-provider openai --format markdown --output report.md logs/
 | `--since` | Start time filter (ISO 8601 or relative: `2h`, `30m`) |
 | `--until` | End time filter (ISO 8601 or relative: `2h`, `30m`) |
 | `--noise-file` | Path to a custom noise patterns file |
+| `--verbose`, `-v` | Show detailed output including per-filter drop counts |
+| `--no-color` | Disable colored output (also respects `NO_COLOR` env var) |
+| `--config` | Config file path (default: `~/.unlog/config.toml`) |
 
 ## Configuration
 

@@ -11,16 +11,27 @@ import (
 )
 
 var (
+	// Global state.
 	verbose    bool
 	noColor    bool
 	configFile string
 	cfg        config.Config
+
+	// Analyze flags.
+	levelFlag      string
+	sinceFlag      string
+	untilFlag      string
+	noiseFileFlag  string
+	formatFlag     string
+	outputFlag     string
+	aiProviderFlag string
+	modelFlag      string
 )
 
 var rootCmd = &cobra.Command{
 	Use:   "unlog [files...]",
-	Short: "Unravel your logs — runs 'analyze' by default",
-	Long:  "CLI tool that ingests raw log files, preprocesses them to extract signal from noise,\nthen uses LLM APIs to produce structured incident timelines and root cause analysis.\n\nRunning 'unlog [files...]' is equivalent to 'unlog analyze [files...]'.",
+	Short: "Unravel your logs",
+	Long:  "CLI tool that ingests raw log files, preprocesses them to extract signal from noise,\nthen optionally uses LLM APIs to produce incident timelines and root cause analysis.",
 	Args:  cobra.ArbitraryArgs,
 	RunE:  runAnalyze,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -66,9 +77,18 @@ func Execute() {
 }
 
 func init() {
+	// Global flags.
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Show detailed output")
 	rootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "Disable colored output")
 	rootCmd.PersistentFlags().StringVar(&configFile, "config", "", "Config file path (default: ~/.unlog/config.toml)")
 
-	registerAnalyzeFlags(rootCmd)
+	// Analyze flags.
+	rootCmd.Flags().StringVar(&levelFlag, "level", "", "Minimum log level: trace, debug, info, warn, error, fatal")
+	rootCmd.Flags().StringVar(&sinceFlag, "since", "", "Start time filter (ISO 8601 or relative: \"2h\", \"30m\")")
+	rootCmd.Flags().StringVar(&untilFlag, "until", "", "End time filter (ISO 8601 or relative: \"2h\", \"30m\")")
+	rootCmd.Flags().StringVar(&noiseFileFlag, "noise-file", "", "Path to custom noise patterns file")
+	rootCmd.Flags().StringVar(&formatFlag, "format", "", "Output format: text, json, markdown (default: text)")
+	rootCmd.Flags().StringVar(&outputFlag, "output", "", "Write output to file instead of stdout")
+	rootCmd.Flags().StringVar(&aiProviderFlag, "ai-provider", "", "Enable LLM analysis with provider: openai, anthropic, ollama")
+	rootCmd.Flags().StringVar(&modelFlag, "model", "", "LLM model override (default per provider)")
 }

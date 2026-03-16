@@ -14,41 +14,6 @@ import (
 	"github.com/oxforge/unlog/internal/render"
 )
 
-var (
-	// analyze-specific flags
-	levelFlag      string
-	sinceFlag      string
-	untilFlag      string
-	noiseFileFlag  string
-	formatFlag     string
-	outputFlag     string
-	aiProviderFlag string
-	modelFlag      string
-)
-
-var analyzeCmd = &cobra.Command{
-	Use:   "analyze [files...]",
-	Short: "Analyze log files and produce an incident timeline with root cause analysis. Default mode",
-	RunE:  runAnalyze,
-}
-
-// registerAnalyzeFlags adds analyze-specific flags to the given command.
-func registerAnalyzeFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&levelFlag, "level", "", "Minimum log level: trace, debug, info, warn, error, fatal")
-	cmd.Flags().StringVar(&sinceFlag, "since", "", "Start time filter (ISO 8601 or relative: \"2h\", \"30m\")")
-	cmd.Flags().StringVar(&untilFlag, "until", "", "End time filter (ISO 8601 or relative: \"2h\", \"30m\")")
-	cmd.Flags().StringVar(&noiseFileFlag, "noise-file", "", "Path to custom noise patterns file")
-	cmd.Flags().StringVar(&formatFlag, "format", "", "Output format: text, json, markdown (default: text)")
-	cmd.Flags().StringVar(&outputFlag, "output", "", "Write output to file instead of stdout")
-	cmd.Flags().StringVar(&aiProviderFlag, "ai-provider", "", "Enable LLM analysis with provider: openai, anthropic, ollama")
-	cmd.Flags().StringVar(&modelFlag, "model", "", "LLM model override (default per provider)")
-}
-
-func init() {
-	registerAnalyzeFlags(analyzeCmd)
-	rootCmd.AddCommand(analyzeCmd)
-}
-
 func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 	if len(args) == 0 && isTerminal(os.Stdin) {
 		return cmd.Help()
@@ -57,39 +22,25 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
-	effectiveFormat, err := resolveFormat(cmd, formatFlag)
+	effectiveFormat, err := resolveFormat(cmd)
 	if err != nil {
 		return err
 	}
 
-	filterOpts, err := buildFilterOpts(cmd, levelFlag, sinceFlag, untilFlag, noiseFileFlag, args)
+	filterOpts, err := buildFilterOpts(cmd, args)
 	if err != nil {
 		return err
 	}
 
-	opts := pipeline.Options{
-		FilterOpts: filterOpts,
-	}
-
-	result, err := pipeline.New(opts).Run(ctx, args)
+	result, err := pipeline.New(pipeline.Options{FilterOpts: filterOpts}).Run(ctx, args)
 	if err != nil {
 		return fmt.Errorf("cmd: pipeline: %w", err)
 	}
 
-	effectiveProvider := cfg.AIProvider
-	if cmd.Flags().Changed("ai-provider") {
-		effectiveProvider = aiProviderFlag
-	}
-
 	var ar *analyze.AnalysisResult
 
-	if effectiveProvider != "" {
-		effectiveModel := cfg.Model
-		if cmd.Flags().Changed("model") {
-			effectiveModel = modelFlag
-		}
-
-		provider, err := resolveProvider(effectiveProvider, effectiveModel)
+	if effectiveProvider := resolveProviderName(cmd); effectiveProvider != "" {
+		provider, err := newProvider(effectiveProvider, resolveModelName(cmd))
 		if err != nil {
 			return err
 		}
@@ -133,16 +84,7 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 		effectiveNoColor = !isTerminal(os.Stdout)
 	}
 
-	var r render.Renderer
-	switch effectiveFormat {
-	case "json":
-		r = &render.JSONRenderer{}
-	case "markdown":
-		r = &render.MarkdownRenderer{}
-	default:
-		r = &render.TerminalRenderer{}
-	}
-
+	r := newRenderer(effectiveFormat)
 	renderOpts := render.Options{
 		Result:   result,
 		Analysis: ar,
@@ -152,7 +94,7 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	if effectiveFormat == "text" && ar != nil && outputFlag == "" {
-		// AI sections already streamed to stdout.
+		// AI output already streamed to stdout.
 	} else {
 		if err := r.Render(out, renderOpts); err != nil {
 			return fmt.Errorf("cmd: render: %w", err)
@@ -164,13 +106,4 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	return nil
-}
-
-// isTerminal reports whether f is connected to a terminal.
-func isTerminal(f *os.File) bool {
-	fi, err := f.Stat()
-	if err != nil {
-		return false
-	}
-	return fi.Mode()&os.ModeCharDevice != 0
 }
