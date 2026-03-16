@@ -20,11 +20,11 @@ func (r *JSONRenderer) Render(w io.Writer, opts Options) error {
 // RenderJSON writes a complete AnalysisReport as indented JSON to w.
 func RenderJSON(w io.Writer, result *pipeline.Result, ar *analyze.AnalysisResult, version string) error {
 	report := types.AnalysisReport{
-		GeneratedAt:      time.Now().UTC(),
-		UnlogVersion:     version,
-		AnalysisDuration: result.Duration,
-		Stats:            result.Stats,
-		CompactedSummary: result.Summary,
+		GeneratedAt:        time.Now().UTC(),
+		UnlogVersion:       version,
+		AnalysisDurationMs: result.Duration.Milliseconds(),
+		Stats:              result.Stats,
+		CompactedSummary:   result.Summary,
 	}
 
 	if ar != nil {

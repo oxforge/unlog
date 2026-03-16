@@ -57,5 +57,5 @@ func (r *MarkdownRenderer) renderStatsTable(w io.Writer, opts Options) {
 	_, _ = fmt.Fprintf(w, "| Dropped | %s |\n", FmtIntComma(fs.TotalDropped))
 	_, _ = fmt.Fprintf(w, "| Survived | %s |\n", FmtIntComma(fs.TotalSurvived))
 	_, _ = fmt.Fprintf(w, "| Unique signatures | %d |\n", fs.UniqueSignatures)
-	_, _ = fmt.Fprintf(w, "| Duration | %s |\n", opts.Result.Duration.Round(time.Millisecond))
+	_, _ = fmt.Fprintf(w, "| Duration | %dms |\n", opts.Result.Duration.Milliseconds())
 }

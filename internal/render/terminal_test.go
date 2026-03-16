@@ -23,7 +23,7 @@ func sampleResult() *pipeline.Result {
 			TotalDropped:     800,
 			TotalSurvived:    200,
 			UniqueSignatures: 15,
-			FilterDuration:   50 * time.Millisecond,
+			FilterDurationMs: 50,
 		},
 		Duration: 200 * time.Millisecond,
 	}

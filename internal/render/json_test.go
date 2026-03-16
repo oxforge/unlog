@@ -22,7 +22,7 @@ func TestRenderJSON(t *testing.T) {
 			TotalDropped:     80,
 			TotalSurvived:    20,
 			UniqueSignatures: 5,
-			FilterDuration:   50 * time.Millisecond,
+			FilterDurationMs: 50,
 		},
 		Duration: 123 * time.Millisecond,
 	}
@@ -40,7 +40,7 @@ func TestRenderJSON(t *testing.T) {
 	assert.Equal(t, result.Stats.TotalIngested, report.Stats.TotalIngested)
 	assert.Equal(t, result.Stats.TotalSurvived, report.Stats.TotalSurvived)
 	assert.Equal(t, result.Stats.UniqueSignatures, report.Stats.UniqueSignatures)
-	assert.Equal(t, result.Duration, report.AnalysisDuration)
+	assert.Equal(t, result.Duration.Milliseconds(), report.AnalysisDurationMs)
 	assert.Empty(t, report.ModelUsed, "no AI result, model_used should be empty")
 	assert.Empty(t, report.Timeline)
 	assert.Empty(t, report.RootCause)

@@ -327,11 +327,11 @@ When using `--format json`, the output includes:
 {
   "generated_at": "2024-01-15T12:00:00Z",
   "unlog_version": "1.0.0",
-  "analysis_duration": 1234567,
+  "analysis_duration_ms": 1234,
   "stats": {
-    "total_ingested": 50000,
-    "total_dropped": 49500,
-    "total_survived": 500,
+    "ingested": 50000,
+    "dropped": 49500,
+    "survived": 500,
     "unique_signatures": 42,
     "time_window_start": "2024-01-15T10:00:00Z",
     "time_window_end": "2024-01-15T10:05:00Z",

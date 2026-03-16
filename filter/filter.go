@@ -310,7 +310,7 @@ func (p *FilterPipeline) Run(ctx context.Context) (types.FilterStats, DetailedSt
 		TimeWindowEnd:      winEnd,
 		AutoDetectedWindow: autoDetected,
 		SourceBreakdown:    sourceBreakdown,
-		FilterDuration:     time.Since(start),
+		FilterDurationMs:   time.Since(start).Milliseconds(),
 	}
 
 	return fs, detailed, nil

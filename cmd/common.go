@@ -97,11 +97,11 @@ func buildFilterOpts(cmd *cobra.Command, flagLevel, flagSince, flagUntil, flagNo
 func printStats(w io.Writer, result *pipeline.Result, showDetailed bool) {
 	fs := result.Stats
 	_, _ = fmt.Fprintln(w, "\n--- Filter Stats ---")
-	_, _ = fmt.Fprintf(w, "Ingested:    %d\n", fs.TotalIngested)
-	_, _ = fmt.Fprintf(w, "Dropped:     %d\n", fs.TotalDropped)
-	_, _ = fmt.Fprintf(w, "Survived:    %d\n", fs.TotalSurvived)
-	_, _ = fmt.Fprintf(w, "Unique sigs: %d\n", fs.UniqueSignatures)
-	_, _ = fmt.Fprintf(w, "Duration:    %s\n", fs.FilterDuration.Round(time.Millisecond))
+	_, _ = fmt.Fprintf(w, "Ingested:           %d\n", fs.TotalIngested)
+	_, _ = fmt.Fprintf(w, "Dropped:            %d\n", fs.TotalDropped)
+	_, _ = fmt.Fprintf(w, "Survived:           %d\n", fs.TotalSurvived)
+	_, _ = fmt.Fprintf(w, "Unique signatures:  %d\n", fs.UniqueSignatures)
+	_, _ = fmt.Fprintf(w, "Duration:           %dms\n", fs.FilterDurationMs)
 
 	if showDetailed {
 		ds := result.DetailedStats
@@ -142,11 +142,11 @@ func printStatsText(w io.Writer, fs types.FilterStats, result *pipeline.Result) 
 	if bytes > 0 {
 		_, _ = fmt.Fprintf(w, "Bytes:          %s\n", bytesStr)
 	}
-	_, _ = fmt.Fprintf(w, "Ingested:       %s\n", render.FmtIntComma(fs.TotalIngested))
-	_, _ = fmt.Fprintf(w, "Dropped:        %s\n", render.FmtIntComma(fs.TotalDropped))
-	_, _ = fmt.Fprintf(w, "Survived:       %s\n", render.FmtIntComma(fs.TotalSurvived))
-	_, _ = fmt.Fprintf(w, "Unique sigs:    %d\n", fs.UniqueSignatures)
-	_, _ = fmt.Fprintf(w, "Duration:       %.2fs\n", result.Duration.Seconds())
+	_, _ = fmt.Fprintf(w, "Ingested:           %s\n", render.FmtIntComma(fs.TotalIngested))
+	_, _ = fmt.Fprintf(w, "Dropped:            %s\n", render.FmtIntComma(fs.TotalDropped))
+	_, _ = fmt.Fprintf(w, "Survived:           %s\n", render.FmtIntComma(fs.TotalSurvived))
+	_, _ = fmt.Fprintf(w, "Unique signatures:  %d\n", fs.UniqueSignatures)
+	_, _ = fmt.Fprintf(w, "Duration:           %dms\n", result.Duration.Milliseconds())
 
 	if !fs.TimeWindowStart.IsZero() {
 		winStart := fs.TimeWindowStart.Format("2006-01-02 15:04:05")
