@@ -1,0 +1,14 @@
+2024-01-15T14:01:55Z INFO  deployment started: app-deployment to version 3.3.0
+2024-01-15T14:02:00Z INFO  rolling update initiated: 3 pods, max-surge=1, max-unavailable=0
+2024-01-15T14:02:05Z INFO  pod app-pod-1 updated successfully
+2024-01-15T14:02:10Z WARN  pod app-pod-2 readiness probe failing
+2024-01-15T14:02:15Z ERROR pod app-pod-2 failed readiness probe: HTTP 503
+2024-01-15T14:02:20Z ERROR pod app-pod-3 failed readiness probe: HTTP 503
+2024-01-15T14:02:25Z ERROR deployment health check failed: insufficient healthy pods
+2024-01-15T14:02:30Z ERROR deployment stalled: 1/3 pods healthy, required 2/3
+2024-01-15T14:02:35Z ERROR deployment failure threshold exceeded: initiating rollback
+2024-01-15T14:02:40Z WARN  rollback initiated: reverting to version 3.2.1
+2024-01-15T14:03:00Z INFO  pod app-pod-2 reverted to 3.2.1
+2024-01-15T14:03:05Z INFO  pod app-pod-3 reverted to 3.2.1
+2024-01-15T14:03:10Z INFO  deployment rollback complete: all pods running 3.2.1
+2024-01-15T14:03:15Z INFO  deployment status: FAILED (rollback successful)

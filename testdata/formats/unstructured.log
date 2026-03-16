@@ -1,0 +1,8 @@
+Application starting up
+Loading configuration from /etc/app/config.yaml
+Connecting to database at db-primary:5432
+Warning: connection pool size is low
+Error: failed to authenticate with database
+Retrying connection in 5 seconds
+Error: second attempt also failed
+Fatal: cannot start without database, exiting

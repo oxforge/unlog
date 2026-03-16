@@ -1,0 +1,18 @@
+Jan 15 10:29:55 db-01 postgres[1234]: LOG:  database system is ready to accept connections
+Jan 15 10:30:00 db-01 postgres[1234]: LOG:  checkpoint starting: time
+Jan 15 10:30:30 db-01 postgres[1234]: WARNING:  connection pool nearing capacity: 40/50 connections
+Jan 15 10:30:45 db-01 postgres[1234]: WARNING:  connection pool nearing capacity: 47/50 connections
+Jan 15 10:31:00 db-01 postgres[1234]: ERROR:  max_connections limit reached: 50/50
+Jan 15 10:31:01 db-01 postgres[1234]: ERROR:  max_connections limit reached: 50/50
+Jan 15 10:31:02 db-01 postgres[1234]: ERROR:  max_connections limit reached: 50/50
+Jan 15 10:31:03 db-01 postgres[1234]: ERROR:  connection rejected: max_connections limit reached
+Jan 15 10:31:05 db-01 postgres[1234]: ERROR:  connection rejected: max_connections limit reached
+Jan 15 10:31:08 db-01 postgres[1234]: ERROR:  connection rejected: max_connections limit reached
+Jan 15 10:31:10 db-01 postgres[1234]: FATAL:  out of memory: shared buffers exhausted
+Jan 15 10:31:12 db-01 postgres[1234]: ERROR:  autovacuum worker terminated due to low memory
+Jan 15 10:31:15 db-01 postgres[1234]: ERROR:  WAL writer process failed: out of memory
+Jan 15 10:31:20 db-01 postgres[1234]: FATAL:  the database system is in recovery mode
+Jan 15 10:31:25 db-01 postgres[1234]: LOG:  recovery in progress
+Jan 15 10:32:00 db-01 postgres[1234]: LOG:  database system is ready to accept connections
+Jan 15 10:32:05 db-01 postgres[1234]: WARNING:  connection pool recovered: 5/50 connections in use
+Jan 15 10:32:10 db-01 postgres[1234]: LOG:  checkpoint complete: wrote 256 buffers

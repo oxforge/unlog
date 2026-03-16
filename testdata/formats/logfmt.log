@@ -1,0 +1,6 @@
+ts=2024-01-15T10:00:00Z level=info msg="Application starting" service=api version=1.2.3
+ts=2024-01-15T10:00:01Z level=info msg="Connected to database" service=api host=db-primary latency=45ms
+ts=2024-01-15T10:00:05Z level=warn msg="Slow query detected" service=api query_ms=2500 table=users
+ts=2024-01-15T10:00:10Z level=error msg="Connection pool exhausted" service=api active=100 max=100
+ts=2024-01-15T10:00:11Z level=error msg="Request failed" service=api endpoint=/api/users status=503
+ts=2024-01-15T10:00:15Z level=error msg="Circuit breaker opened" service=api target=db-primary failures=10

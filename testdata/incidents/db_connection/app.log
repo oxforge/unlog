@@ -1,0 +1,22 @@
+time="2024-01-15T10:30:00Z" level=info msg="service started" source=app version=2.1.4
+time="2024-01-15T10:30:05Z" level=info msg="health check passed" source=app
+time="2024-01-15T10:30:10Z" level=info msg="request processed" source=app method=GET path=/api/users status=200 latency_ms=12
+time="2024-01-15T10:30:15Z" level=info msg="request processed" source=app method=POST path=/api/orders status=201 latency_ms=45
+time="2024-01-15T10:30:20Z" level=info msg="request processed" source=app method=GET path=/api/products status=200 latency_ms=8
+time="2024-01-15T10:31:00Z" level=warn msg="database connection slow" source=app latency_ms=850
+time="2024-01-15T10:31:05Z" level=warn msg="database connection slow" source=app latency_ms=1200
+time="2024-01-15T10:31:10Z" level=error msg="database connection timeout: context deadline exceeded" source=app db=postgres pool_size=50 active=50
+time="2024-01-15T10:31:11Z" level=error msg="database connection timeout: context deadline exceeded" source=app db=postgres pool_size=50 active=50
+time="2024-01-15T10:31:12Z" level=error msg="database connection timeout: context deadline exceeded" source=app db=postgres pool_size=50 active=50
+time="2024-01-15T10:31:13Z" level=error msg="database connection timeout: context deadline exceeded" source=app db=postgres pool_size=50 active=50
+time="2024-01-15T10:31:15Z" level=error msg="request failed: could not acquire database connection" source=app method=GET path=/api/orders status=500
+time="2024-01-15T10:31:16Z" level=error msg="request failed: could not acquire database connection" source=app method=POST path=/api/users status=500
+time="2024-01-15T10:31:17Z" level=error msg="request failed: could not acquire database connection" source=app method=GET path=/api/products status=500
+time="2024-01-15T10:31:20Z" level=error msg="circuit breaker opened: database" source=app threshold=5 failures=5
+time="2024-01-15T10:31:25Z" level=error msg="all requests rejected: circuit breaker open" source=app
+time="2024-01-15T10:31:30Z" level=error msg="all requests rejected: circuit breaker open" source=app
+time="2024-01-15T10:31:35Z" level=error msg="all requests rejected: circuit breaker open" source=app
+time="2024-01-15T10:32:00Z" level=warn msg="attempting database reconnection" source=app attempt=1
+time="2024-01-15T10:32:10Z" level=warn msg="attempting database reconnection" source=app attempt=2
+time="2024-01-15T10:32:20Z" level=error msg="max reconnect attempts exceeded, giving up" source=app
+time="2024-01-15T10:32:25Z" level=fatal msg="connection pool exhausted, shutting down" source=app active_connections=50 max=50

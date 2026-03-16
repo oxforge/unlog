@@ -1,0 +1,6 @@
+2024-01-15 10:00:00 INFO Application starting
+2024-01-15 10:00:01 INFO Connected to database
+2024-01-15 10:00:05 WARN High memory usage: 85%
+2024-01-15 10:00:10 ERROR Connection refused: db-primary:5432
+2024-01-15 10:00:11 ERROR Retry failed
+2024-01-15 10:00:15 FATAL Shutting down

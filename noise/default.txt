@@ -1,0 +1,29 @@
+# Health checks
+GET /healthz
+GET /health
+GET /ready
+GET /readyz
+GET /livez
+GET /live
+GET /ping
+GET /status
+health check passed
+# Prometheus
+/metrics
+prometheus scrape
+# Kubernetes internals
+leader election
+lease renewed
+Successfully synced
+BackOff restarting
+# TLS noise
+TLS handshake complete
+certificate verified
+# Connection pool
+connection pool stats
+pool size
+idle connections
+# AWS SDK
+retrying request
+request retry
+SDK retry

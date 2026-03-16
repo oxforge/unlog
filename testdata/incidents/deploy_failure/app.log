@@ -1,0 +1,18 @@
+{"timestamp":"2024-01-15T14:00:00Z","level":"info","msg":"service starting","version":"3.2.1","source":"app"}
+{"timestamp":"2024-01-15T14:00:05Z","level":"info","msg":"health check passed","source":"app"}
+{"timestamp":"2024-01-15T14:00:10Z","level":"info","msg":"request processed","method":"GET","path":"/api/health","status":200,"latency_ms":5,"source":"app"}
+{"timestamp":"2024-01-15T14:02:00Z","level":"info","msg":"rolling update started","from_version":"3.2.1","to_version":"3.3.0","source":"app"}
+{"timestamp":"2024-01-15T14:02:10Z","level":"warn","msg":"health check degraded: pod restarting","pod":"app-pod-2","source":"app"}
+{"timestamp":"2024-01-15T14:02:15Z","level":"error","msg":"health check failed: connection refused","pod":"app-pod-2","source":"app"}
+{"timestamp":"2024-01-15T14:02:16Z","level":"error","msg":"health check failed: connection refused","pod":"app-pod-3","source":"app"}
+{"timestamp":"2024-01-15T14:02:20Z","level":"error","msg":"request timeout: upstream unavailable","method":"GET","path":"/api/orders","status":503,"latency_ms":30000,"source":"app"}
+{"timestamp":"2024-01-15T14:02:21Z","level":"error","msg":"request timeout: upstream unavailable","method":"POST","path":"/api/users","status":503,"latency_ms":30000,"source":"app"}
+{"timestamp":"2024-01-15T14:02:25Z","level":"error","msg":"deployment probe failed: readiness check timeout","pod":"app-pod-2","check":"readiness","source":"app"}
+{"timestamp":"2024-01-15T14:02:30Z","level":"error","msg":"deployment probe failed: readiness check timeout","pod":"app-pod-3","check":"readiness","source":"app"}
+{"timestamp":"2024-01-15T14:02:35Z","level":"error","msg":"too many probe failures, pod CrashLoopBackOff","pod":"app-pod-2","restarts":3,"source":"app"}
+{"timestamp":"2024-01-15T14:02:40Z","level":"error","msg":"too many probe failures, pod CrashLoopBackOff","pod":"app-pod-3","restarts":3,"source":"app"}
+{"timestamp":"2024-01-15T14:03:00Z","level":"warn","msg":"rolling back deployment","from_version":"3.3.0","to_version":"3.2.1","source":"app"}
+{"timestamp":"2024-01-15T14:03:10Z","level":"info","msg":"rollback complete","version":"3.2.1","source":"app"}
+{"timestamp":"2024-01-15T14:03:15Z","level":"info","msg":"health check passed","source":"app"}
+{"timestamp":"2024-01-15T14:03:20Z","level":"info","msg":"service recovered","version":"3.2.1","source":"app"}
+{"timestamp":"2024-01-15T14:03:25Z","level":"info","msg":"request processed","method":"GET","path":"/api/health","status":200,"latency_ms":6,"source":"app"}

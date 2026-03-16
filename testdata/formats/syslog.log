@@ -1,0 +1,6 @@
+<134>Jan 15 10:00:00 web-1 nginx[1234]: Starting worker process
+<134>Jan 15 10:00:01 web-1 nginx[1234]: Listening on 0.0.0.0:80
+<132>Jan 15 10:00:05 db-1 postgres[5678]: LOG: checkpoint starting
+<131>Jan 15 10:00:10 db-1 postgres[5678]: WARNING: connection pool nearly full
+<131>Jan 15 10:00:11 app-1 myapp[9012]: ERROR: unable to acquire connection
+<130>Jan 15 10:00:15 app-1 myapp[9012]: CRITICAL: service unavailable

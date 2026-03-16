@@ -1,0 +1,7 @@
+{"log":"Starting server\n","stream":"stdout","time":"2024-01-15T10:00:00.000000000Z"}
+{"log":"Listening on port 8080\n","stream":"stdout","time":"2024-01-15T10:00:01.000000000Z"}
+{"log":"Connected to Redis\n","stream":"stdout","time":"2024-01-15T10:00:02.000000000Z"}
+{"log":"WARN: high memory usage (85%)\n","stream":"stderr","time":"2024-01-15T10:00:05.000000000Z"}
+{"log":"ERROR: connection to db lost\n","stream":"stderr","time":"2024-01-15T10:00:10.000000000Z"}
+{"log":"Attempting reconnection...\n","stream":"stderr","time":"2024-01-15T10:00:11.000000000Z"}
+{"log":"FATAL: max retries exceeded, shutting down\n","stream":"stderr","time":"2024-01-15T10:00:15.000000000Z"}

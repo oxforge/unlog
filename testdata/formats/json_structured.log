@@ -1,0 +1,7 @@
+{"level":"info","msg":"Starting application","ts":"2024-01-15T10:00:00Z","service":"api"}
+{"level":"info","msg":"Listening on port 8080","ts":"2024-01-15T10:00:01Z","service":"api"}
+{"level":"warn","msg":"High memory usage","ts":"2024-01-15T10:00:05Z","service":"api","memory_mb":1800}
+{"level":"error","msg":"Connection to database failed","ts":"2024-01-15T10:00:10Z","service":"api","host":"db-primary"}
+{"level":"error","msg":"Retry attempt 1 failed","ts":"2024-01-15T10:00:11Z","service":"api"}
+{"level":"error","msg":"Retry attempt 2 failed","ts":"2024-01-15T10:00:12Z","service":"api"}
+{"level":"fatal","msg":"Unable to connect to database, shutting down","ts":"2024-01-15T10:00:15Z","service":"api"}

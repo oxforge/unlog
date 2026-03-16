@@ -1,0 +1,6 @@
+2024-01-15T10:00:00.000000000Z stdout F Starting application
+2024-01-15T10:00:01.000000000Z stdout F Listening on port 8080
+2024-01-15T10:00:02.000000000Z stdout F Health check endpoint ready
+2024-01-15T10:00:05.000000000Z stderr F WARN: memory usage at 80%
+2024-01-15T10:00:10.000000000Z stderr F ERROR: failed to connect to database
+2024-01-15T10:00:15.000000000Z stderr F FATAL: shutting down
