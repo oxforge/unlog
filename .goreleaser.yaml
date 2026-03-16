@@ -38,6 +38,7 @@ brews:
   - repository:
       owner: oxforge
       name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     homepage: https://github.com/oxforge/unlog
     description: "Unravel your logs — CLI log analysis tool"
     license: MIT
