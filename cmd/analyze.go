@@ -29,7 +29,7 @@ var (
 
 var analyzeCmd = &cobra.Command{
 	Use:   "analyze [files...]",
-	Short: "Analyze log files and produce an incident timeline with root cause analysis",
+	Short: "Analyze log files and produce an incident timeline with root cause analysis. Default mode",
 	RunE:  runAnalyze,
 }
 
@@ -52,6 +52,10 @@ func init() {
 }
 
 func runAnalyze(cmd *cobra.Command, args []string) (err error) {
+	if len(args) == 0 && isTerminal(os.Stdin) {
+		return cmd.Help()
+	}
+
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 

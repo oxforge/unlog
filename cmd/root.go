@@ -19,8 +19,8 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:   "unlog [files...]",
-	Short: "Unravel your logs",
-	Long:  "CLI tool that ingests raw log files, preprocesses them to extract signal from noise, then uses LLM APIs to produce structured incident timelines and root cause analysis.\n\nWhen invoked without a subcommand, runs analyze by default.",
+	Short: "Unravel your logs — runs 'analyze' by default",
+	Long:  "CLI tool that ingests raw log files, preprocesses them to extract signal from noise,\nthen uses LLM APIs to produce structured incident timelines and root cause analysis.\n\nRunning 'unlog [files...]' is equivalent to 'unlog analyze [files...]'.",
 	Args:  cobra.ArbitraryArgs,
 	RunE:  runAnalyze,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
