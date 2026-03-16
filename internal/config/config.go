@@ -21,15 +21,16 @@ import (
 // Config holds all unlog configuration. Flat structure — all fields can be
 // set via TOML file or environment variable.
 type Config struct {
-	Level      string `toml:"level"`       // min log level: trace, debug, info, warn, error, fatal
-	Format     string `toml:"format"`      // output format: text, json
-	NoColor    bool   `toml:"no_color"`    // disable colored output
-	NoiseFile  string `toml:"noise_file"`  // custom noise patterns path
-	Since      string `toml:"since"`       // time filter start (ISO 8601 or relative)
-	Until      string `toml:"until"`       // time filter end (ISO 8601 or relative)
-	AIProvider string `toml:"ai_provider"` // LLM provider: openai, anthropic, ollama (empty = no AI)
-	Model      string `toml:"model"`       // LLM model override
-	Verbose    bool   `toml:"verbose"`     // verbose output
+	Level        string `toml:"level"`         // min log level: trace, debug, info, warn, error, fatal
+	Format       string `toml:"format"`        // output format: text, json
+	NoColor      bool   `toml:"no_color"`      // disable colored output
+	NoiseFile    string `toml:"noise_file"`    // custom noise patterns path
+	Since        string `toml:"since"`         // time filter start (ISO 8601 or relative)
+	Until        string `toml:"until"`         // time filter end (ISO 8601 or relative)
+	AIProvider   string `toml:"ai_provider"`   // LLM provider: openai, anthropic, ollama (empty = no AI)
+	Model        string `toml:"model"`         // LLM model override
+	SystemPrompt string `toml:"system_prompt"` // custom LLM system prompt
+	Verbose      bool   `toml:"verbose"`       // verbose output
 }
 
 // Load reads the TOML file at path (if it exists), then overlays env vars.
@@ -80,6 +81,9 @@ func overlayEnv(cfg *Config) {
 	}
 	if v := os.Getenv("UNLOG_MODEL"); v != "" {
 		cfg.Model = v
+	}
+	if v := os.Getenv("UNLOG_SYSTEM_PROMPT"); v != "" {
+		cfg.SystemPrompt = v
 	}
 	if v := os.Getenv("UNLOG_VERBOSE"); v != "" {
 		if b, ok := parseBool(v, "UNLOG_VERBOSE"); ok {

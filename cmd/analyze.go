@@ -52,7 +52,7 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 			}
 		}
 
-		ar, err = analyze.Run(ctx, provider, result.Summary, streamCB)
+		ar, err = analyze.Run(ctx, provider, result.Summary, cfg.SystemPrompt, streamCB)
 		if err != nil {
 			return fmt.Errorf("cmd: analyze: %w", err)
 		}

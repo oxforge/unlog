@@ -65,7 +65,7 @@ func TestIntegrationOllama(t *testing.T) {
 	defer srv.Close()
 
 	p := NewOllama(srv.URL, "llama3")
-	result, err := Run(context.Background(), p, testSummary, nil)
+	result, err := Run(context.Background(), p, testSummary, "", nil)
 	require.NoError(t, err)
 
 	assert.Contains(t, result.Analysis, "Timeline:")
@@ -81,7 +81,7 @@ func TestIntegrationOpenAI(t *testing.T) {
 	p, err := NewOpenAI("test-key", "gpt-4o", srv.URL)
 	require.NoError(t, err)
 
-	result, err := Run(context.Background(), p, testSummary, nil)
+	result, err := Run(context.Background(), p, testSummary, "", nil)
 	require.NoError(t, err)
 
 	assert.Contains(t, result.Analysis, "Timeline:")
@@ -113,7 +113,7 @@ func TestIntegrationAnthropic(t *testing.T) {
 	p, err := NewAnthropic("test-key", "claude-sonnet-4-20250514", srv.URL)
 	require.NoError(t, err)
 
-	result, err := Run(context.Background(), p, testSummary, nil)
+	result, err := Run(context.Background(), p, testSummary, "", nil)
 	require.NoError(t, err)
 
 	assert.Contains(t, result.Analysis, "Timeline:")
@@ -131,7 +131,7 @@ func TestIntegrationProviderError(t *testing.T) {
 	p, err := NewOpenAI("test-key", "gpt-4o", srv.URL)
 	require.NoError(t, err)
 
-	result, err := Run(context.Background(), p, testSummary, nil)
+	result, err := Run(context.Background(), p, testSummary, "", nil)
 	require.Error(t, err)
 	assert.NotNil(t, result)
 }

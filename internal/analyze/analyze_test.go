@@ -75,7 +75,7 @@ func (m *mockProvider) Analyze(ctx context.Context, system, prompt string) (<-ch
 func TestRun(t *testing.T) {
 	mp := newMockProvider("analysis output here")
 
-	result, err := Run(context.Background(), mp, "log summary", nil)
+	result, err := Run(context.Background(), mp, "log summary", "", nil)
 	require.NoError(t, err)
 
 	assert.Equal(t, "analysis output here", result.Analysis)
@@ -95,7 +95,7 @@ func TestRunStreamCallback(t *testing.T) {
 		mu.Unlock()
 	}
 
-	result, err := Run(context.Background(), mp, "summary", cb)
+	result, err := Run(context.Background(), mp, "summary", "", cb)
 	require.NoError(t, err)
 
 	mu.Lock()
@@ -109,7 +109,7 @@ func TestRunProviderError(t *testing.T) {
 	mp := newMockProvider("")
 	mp.fail = true
 
-	result, err := Run(context.Background(), mp, "summary", nil)
+	result, err := Run(context.Background(), mp, "summary", "", nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "analyze:")
 	assert.NotNil(t, result)
@@ -118,7 +118,7 @@ func TestRunProviderError(t *testing.T) {
 func TestRunDuration(t *testing.T) {
 	mp := newMockProvider("output")
 
-	result, err := Run(context.Background(), mp, "summary", nil)
+	result, err := Run(context.Background(), mp, "summary", "", nil)
 	require.NoError(t, err)
 	assert.True(t, result.Duration > 0, "Duration should be positive")
 }
@@ -132,7 +132,7 @@ func TestRunContextCancel(t *testing.T) {
 		cancel()
 	}()
 
-	result, err := Run(ctx, bp, "summary", nil)
+	result, err := Run(ctx, bp, "summary", "", nil)
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, context.Canceled), "expected context.Canceled, got: %v", err)
 	assert.NotNil(t, result)

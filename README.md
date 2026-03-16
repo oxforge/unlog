@@ -144,6 +144,7 @@ level = "warn"
 format = "text"
 ai_provider = ""       # set to "openai", "anthropic", or "ollama" to enable AI
 model = ""
+system_prompt = ""     # custom LLM system prompt (empty = built-in default)
 noise_file = ""
 verbose = false
 no_color = false
@@ -159,6 +160,7 @@ Every config option can be set via `UNLOG_*` environment variables:
 | `UNLOG_FORMAT` | Output format |
 | `UNLOG_AI_PROVIDER` | LLM provider (empty = no AI) |
 | `UNLOG_MODEL` | Model override |
+| `UNLOG_SYSTEM_PROMPT` | Custom LLM system prompt |
 | `UNLOG_NOISE_FILE` | Custom noise patterns path |
 | `UNLOG_VERBOSE` | Verbose output (`true`/`false`) |
 | `NO_COLOR` | Disable color (any value, per [no-color.org](https://no-color.org)) |
