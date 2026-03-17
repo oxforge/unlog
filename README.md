@@ -14,7 +14,7 @@ Files/stdin → [Ingest] → [Filter] → [Enrich] → [Compact] → [Analyze*] 
                         (N workers)                       (* optional)
 ```
 
-Stages 1-4 are pure Go with zero network calls, making the core useful without any AI provider. Stage 5 adds optional LLM analysis via OpenAI, Anthropic, or Ollama.
+Stages 1-4 are pure Go with zero network calls, making the core useful without any AI provider. Stage 5 adds optional LLM analysis via OpenAI, Anthropic, Google Gemini, or Ollama.
 
 ```
 cat /var/log/app/*.log | unlog
@@ -30,7 +30,7 @@ unlog --ai-provider openai logs/
 - **Rate spike detection** -- Per-source sliding window detects anomalous event rates.
 - **Error chain detection** -- 10 built-in patterns (DB exhaustion, OOM cascade, circuit breaker, disk full, cert expiry, DNS failure, etc.).
 - **Token-budgeted compaction** -- Priority-scored entries fit within LLM context windows.
-- **LLM analysis** -- Timeline, root cause, and recommendations in a single pass via OpenAI, Anthropic, or Ollama.
+- **LLM analysis** -- Timeline, root cause, and recommendations in a single pass via OpenAI, Anthropic, Google Gemini, or Ollama.
 - **Streaming output** -- LLM responses stream to the terminal token-by-token.
 - **Multiple output formats** -- Colored terminal, JSON, and Markdown.
 - **Stdin support** -- Pipe logs from any source.
@@ -100,6 +100,9 @@ Use a different provider:
 export ANTHROPIC_API_KEY=sk-ant-...
 unlog --ai-provider anthropic logs/
 
+export GEMINI_API_KEY=AIza...
+unlog --ai-provider gemini logs/
+
 # Local models via Ollama (no API key needed)
 unlog --ai-provider ollama --model llama3 logs/
 ```
@@ -121,7 +124,7 @@ unlog --ai-provider openai --format markdown --output report.md logs/
 
 | Flag | Description |
 |------|-------------|
-| `--ai-provider` | Enable LLM analysis with provider: `openai`, `anthropic`, `ollama` |
+| `--ai-provider` | Enable LLM analysis with provider: `openai`, `anthropic`, `gemini`, `ollama` |
 | `--model` | Override the default model for the chosen provider |
 | `--format` | Output format: `text`, `json`, `markdown` |
 | `--output` | Write output to a file instead of stdout |
@@ -144,7 +147,7 @@ Create `~/.unlog/config.toml`:
 ```toml
 level = "warn"
 format = "text"
-ai_provider = ""       # set to "openai", "anthropic", or "ollama" to enable AI
+ai_provider = ""       # set to "openai", "anthropic", "gemini", or "ollama" to enable AI
 model = ""
 system_prompt = ""     # custom LLM system prompt (empty = built-in default)
 noise_file = ""
@@ -173,6 +176,7 @@ Every config option can be set via `UNLOG_*` environment variables:
 |----------|---------------------|
 | OpenAI | `OPENAI_API_KEY` |
 | Anthropic | `ANTHROPIC_API_KEY` |
+| Gemini | `GEMINI_API_KEY` |
 | Ollama | None required (connects to `localhost:11434`) |
 
 ## Supported log formats

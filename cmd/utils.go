@@ -125,10 +125,16 @@ func newProvider(name, model string) (analyze.Provider, error) {
 			return nil, fmt.Errorf("cmd: ANTHROPIC_API_KEY not set")
 		}
 		return analyze.NewAnthropic(key, model, "")
+	case "gemini":
+		key := os.Getenv("GEMINI_API_KEY")
+		if key == "" {
+			return nil, fmt.Errorf("cmd: GEMINI_API_KEY not set")
+		}
+		return analyze.NewGemini(key, model, "")
 	case "ollama":
 		return analyze.NewOllama("", model), nil
 	default:
-		return nil, fmt.Errorf("cmd: unknown AI provider: %q (valid: openai, anthropic, ollama)", name)
+		return nil, fmt.Errorf("cmd: unknown AI provider: %q (valid: openai, anthropic, gemini, ollama)", name)
 	}
 }
 

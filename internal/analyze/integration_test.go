@@ -122,6 +122,45 @@ func TestIntegrationAnthropic(t *testing.T) {
 	assert.True(t, result.Duration > 0)
 }
 
+func TestIntegrationGemini(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Contains(t, r.URL.Path, "/v1beta/models/gemini-2.5-flash:streamGenerateContent")
+		assert.Equal(t, "test-key", r.URL.Query().Get("key"))
+
+		resp := "Timeline: pool exhaustion. Root cause: connection leak. Recommendation: add pool limits."
+		w.Header().Set("Content-Type", "text/event-stream")
+		flusher := w.(http.Flusher)
+		for _, word := range strings.Fields(resp) {
+			chunk := map[string]any{
+				"candidates": []map[string]any{
+					{
+						"content": map[string]any{
+							"parts": []map[string]any{
+								{"text": word + " "},
+							},
+						},
+					},
+				},
+			}
+			data, _ := json.Marshal(chunk)
+			_, _ = fmt.Fprintf(w, "data: %s\n\n", data)
+			flusher.Flush()
+		}
+	}))
+	defer srv.Close()
+
+	p, err := NewGemini("test-key", "gemini-2.5-flash", srv.URL)
+	require.NoError(t, err)
+
+	result, err := Run(context.Background(), p, testSummary, "", nil)
+	require.NoError(t, err)
+
+	assert.Contains(t, result.Analysis, "Timeline:")
+	assert.Contains(t, result.Analysis, "Root cause:")
+	assert.Equal(t, "gemini-2.5-flash", result.ModelUsed)
+	assert.True(t, result.Duration > 0)
+}
+
 func TestIntegrationProviderError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
