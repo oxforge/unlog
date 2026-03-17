@@ -41,7 +41,9 @@ unlog --ai-provider openai logs/
 ### Homebrew
 
 ```bash
-brew install oxforge/tap/unlog
+brew tap oxforge/tap
+
+brew install unlog
 ```
 
 ### Shell script
