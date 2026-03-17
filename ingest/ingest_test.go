@@ -30,6 +30,29 @@ func TestIngesterFile(t *testing.T) {
 	assert.Contains(t, entries[6].Message, "shutting down")
 }
 
+func TestIngesterCSVFile(t *testing.T) {
+	output := make(chan types.LogEntry, 1000)
+	ingester := NewIngester(output, IngestOptions{
+		SampleLines: 100,
+	})
+
+	err := ingester.Run(context.Background(), []string{"../testdata/formats/csv_structured.log"})
+	assert.NoError(t, err)
+
+	var entries []types.LogEntry
+	for e := range output {
+		entries = append(entries, e)
+	}
+
+	// 6 data lines (header is skipped).
+	assert.Len(t, entries, 6)
+	assert.Equal(t, types.LevelInfo, entries[0].Level)
+	assert.Equal(t, "Application starting", entries[0].Message)
+	assert.Equal(t, "api", entries[0].Metadata["service"])
+	assert.Equal(t, types.LevelFatal, entries[5].Level)
+	assert.Contains(t, entries[5].Message, "shutting down")
+}
+
 func TestIngesterStdin(t *testing.T) {
 	output := make(chan types.LogEntry, 1000)
 	ingester := NewIngester(output, IngestOptions{

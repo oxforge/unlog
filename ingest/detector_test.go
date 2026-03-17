@@ -77,6 +77,15 @@ func TestDetectFormat(t *testing.T) {
 			FormatLogfmt,
 		},
 		{
+			"csv with header",
+			[]string{
+				`timestamp,level,message,service,host`,
+				`2024-01-15T10:00:00Z,INFO,Starting application,api,server-1`,
+				`2024-01-15T10:00:01Z,ERROR,Connection failed,api,server-1`,
+			},
+			FormatCSV,
+		},
+		{
 			"generic timestamp",
 			[]string{
 				`2024-01-15 10:00:00 INFO Starting application`,

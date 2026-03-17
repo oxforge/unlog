@@ -15,6 +15,7 @@ const (
 	FormatSyslog3164
 	FormatCLF
 	FormatLogfmt
+	FormatCSV
 	FormatGeneric
 	FormatRaw
 )
@@ -37,6 +38,8 @@ func (f Format) String() string {
 		return "clf"
 	case FormatLogfmt:
 		return "logfmt"
+	case FormatCSV:
+		return "csv"
 	case FormatGeneric:
 		return "generic"
 	case FormatRaw:

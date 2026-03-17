@@ -20,6 +20,7 @@ var logExtensions = map[string]bool{
 	".log":  true,
 	".txt":  true,
 	".json": true,
+	".csv":  true,
 	".out":  true,
 	"":      true, // extensionless files (e.g. /var/log/syslog, /var/log/messages)
 }

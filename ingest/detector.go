@@ -13,6 +13,8 @@ var (
 	reCLF        = regexp.MustCompile(`^\S+\s+\S+\s+\S+\s+\[`)
 	reLogfmtPair = regexp.MustCompile(`\b\w+=(?:"[^"]*"|\S+)`)
 	reGenericTS  = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}`)
+	reCSVHeader  = regexp.MustCompile(`(?i)^(timestamp|time|ts|date),\s*(level|severity|lvl),\s*(message|msg|log)`)
+	reCSVData    = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}[^,]*,\s*(TRACE|DEBUG|INFO|WARN|WARNING|ERROR|FATAL|ERR|trace|debug|info|warn|warning|error|fatal|err)\s*,`)
 )
 
 // classifyLine returns the most specific Format that matches line.
@@ -62,6 +64,10 @@ func classifyLine(line string) Format {
 
 	if reCLF.MatchString(line) {
 		return FormatCLF
+	}
+
+	if reCSVHeader.MatchString(line) || reCSVData.MatchString(line) {
+		return FormatCSV
 	}
 
 	if matches := reLogfmtPair.FindAllString(line, -1); len(matches) >= 3 {
@@ -136,6 +142,8 @@ func parserForFormat(format Format) Parser {
 		return &clfParser{}
 	case FormatLogfmt:
 		return &logfmtParser{}
+	case FormatCSV:
+		return &csvParser{}
 	case FormatGeneric:
 		return &genericParser{}
 	default:
@@ -171,6 +179,10 @@ func lineCheckerForFormat(format Format) LineChecker {
 	case FormatLogfmt:
 		return func(line string) bool {
 			return len(reLogfmtPair.FindAllString(line, 3)) >= 3
+		}
+	case FormatCSV:
+		return func(line string) bool {
+			return len(line) > 0
 		}
 	case FormatGeneric:
 		return func(line string) bool {

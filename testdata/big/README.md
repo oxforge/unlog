@@ -14,6 +14,9 @@ go run testdata/big/generate.go --size 1GB --format json --error-rate 0.1 --outp
 # Generate logfmt format
 go run testdata/big/generate.go --size 500MB --format logfmt --output testdata/big/logfmt.log
 
+# Generate CSV format (includes header row)
+go run testdata/big/generate.go --size 500MB --format csv --output testdata/big/csv.log
+
 # Generate to stdout and pipe to unlog
 go run testdata/big/generate.go --size 50MB --format json | ./bin/unlog analyze -
 ```
@@ -23,7 +26,7 @@ go run testdata/big/generate.go --size 50MB --format json | ./bin/unlog analyze 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--size` | `100MB` | Target file size (B, KB, MB, GB) |
-| `--format` | `json` | Log format: `json`, `logfmt`, `syslog`, `clf`, `generic` |
+| `--format` | `json` | Log format: `json`, `logfmt`, `syslog`, `clf`, `csv`, `generic` |
 | `--error-rate` | `0.05` | Fraction of ERROR/FATAL entries (0.0-1.0) |
 | `--output` | stdout | Output file path |
 

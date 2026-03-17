@@ -1,0 +1,7 @@
+timestamp,level,message,service,host
+2024-01-15T10:00:00Z,INFO,Application starting,api,server-1
+2024-01-15T10:00:01Z,INFO,Connected to database,api,db-primary
+2024-01-15T10:00:05Z,WARN,Slow query detected,api,server-1
+2024-01-15T10:00:10Z,ERROR,Connection pool exhausted,api,server-1
+2024-01-15T10:00:11Z,ERROR,Request failed with status 503,api,server-1
+2024-01-15T10:00:15Z,FATAL,Unable to connect to database shutting down,api,server-1

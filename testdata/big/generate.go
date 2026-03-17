@@ -17,7 +17,7 @@ import (
 
 var (
 	sizeFlag      = flag.String("size", "100MB", "Target file size (e.g., 10MB, 100MB, 1GB)")
-	formatFlag    = flag.String("format", "json", "Log format: json, logfmt, syslog, clf, generic")
+	formatFlag    = flag.String("format", "json", "Log format: json, logfmt, syslog, clf, csv, generic")
 	errorRateFlag = flag.Float64("error-rate", 0.05, "Fraction of entries that are ERROR/FATAL (0.0-1.0)")
 	outputFlag    = flag.String("output", "", "Output file path (default: stdout)")
 )
@@ -87,6 +87,11 @@ func main() {
 
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	ts := time.Date(2025, 6, 15, 10, 0, 0, 0, time.UTC)
+
+	// Emit CSV header if format is csv.
+	if *formatFlag == "csv" {
+		fmt.Fprintln(out, "timestamp,level,message,service")
+	}
 
 	var written int64
 	lineNum := 0
@@ -253,10 +258,17 @@ func formatLine(format string, ts time.Time, level, source, msg string) string {
 	case "clf":
 		return fmt.Sprintf(`%s - - [%s] "GET /api/data HTTP/1.1" %s 1234`,
 			source, ts.Format("02/Jan/2006:15:04:05 -0700"), clfStatus(level))
+	case "csv":
+		return fmt.Sprintf(`%s,%s,"%s",%s`,
+			ts.Format(time.RFC3339Nano), level, escapeCSV(msg), source)
 	default: // generic
 		return fmt.Sprintf(`%s %s [%s] %s`,
 			ts.Format("2006-01-02 15:04:05.000"), source, level, msg)
 	}
+}
+
+func escapeCSV(s string) string {
+	return strings.ReplaceAll(s, `"`, `""`)
 }
 
 func escapeJSON(s string) string {
