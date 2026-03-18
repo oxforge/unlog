@@ -17,8 +17,8 @@ type AnthropicProvider struct {
 	client  *http.Client
 }
 
-// NewAnthropic creates an Anthropic provider. Pass "" for default baseURL.
-func NewAnthropic(apiKey, model, baseURL string) (*AnthropicProvider, error) {
+// NewAnthropic creates an Anthropic provider. Pass "" for default baseURL, 0 for default timeout.
+func NewAnthropic(apiKey, model, baseURL string, timeout time.Duration) (*AnthropicProvider, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("analyze: anthropic: API key is required")
 	}
@@ -28,11 +28,14 @@ func NewAnthropic(apiKey, model, baseURL string) (*AnthropicProvider, error) {
 	if baseURL == "" {
 		baseURL = "https://api.anthropic.com"
 	}
+	if timeout <= 0 {
+		timeout = 5 * time.Minute
+	}
 	return &AnthropicProvider{
 		apiKey:  apiKey,
 		model:   model,
 		baseURL: baseURL,
-		client:  &http.Client{Timeout: 5 * time.Minute},
+		client:  &http.Client{Timeout: timeout},
 	}, nil
 }
 

@@ -17,8 +17,8 @@ type OpenAIProvider struct {
 	client  *http.Client
 }
 
-// NewOpenAI creates an OpenAI provider. Pass "" for default baseURL.
-func NewOpenAI(apiKey, model, baseURL string) (*OpenAIProvider, error) {
+// NewOpenAI creates an OpenAI provider. Pass "" for default baseURL, 0 for default timeout.
+func NewOpenAI(apiKey, model, baseURL string, timeout time.Duration) (*OpenAIProvider, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("analyze: openai: API key is required")
 	}
@@ -28,11 +28,14 @@ func NewOpenAI(apiKey, model, baseURL string) (*OpenAIProvider, error) {
 	if baseURL == "" {
 		baseURL = "https://api.openai.com"
 	}
+	if timeout <= 0 {
+		timeout = 5 * time.Minute
+	}
 	return &OpenAIProvider{
 		apiKey:  apiKey,
 		model:   model,
 		baseURL: baseURL,
-		client:  &http.Client{Timeout: 5 * time.Minute},
+		client:  &http.Client{Timeout: timeout},
 	}, nil
 }
 

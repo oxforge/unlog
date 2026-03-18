@@ -50,7 +50,7 @@ func TestOpenAIStreaming(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p, err := NewOpenAI("test-key", "gpt-4o", srv.URL)
+	p, err := NewOpenAI("test-key", "gpt-4o", srv.URL, 0)
 	require.NoError(t, err)
 
 	tokenCh, errCh := p.Analyze(context.Background(), "system", "prompt")
@@ -75,7 +75,7 @@ func TestOpenAIHTTPError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p, err := NewOpenAI("bad-key", "", srv.URL)
+	p, err := NewOpenAI("bad-key", "", srv.URL, 0)
 	require.NoError(t, err)
 
 	tokenCh, errCh := p.Analyze(context.Background(), "sys", "prompt")
@@ -88,7 +88,7 @@ func TestOpenAIHTTPError(t *testing.T) {
 }
 
 func TestOpenAIEmptyKey(t *testing.T) {
-	_, err := NewOpenAI("", "", "")
+	_, err := NewOpenAI("", "", "", 0)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "API key is required")
 }
@@ -118,7 +118,7 @@ func TestOpenAIContextCancel(t *testing.T) {
 	defer srv.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	p, err := NewOpenAI("test-key", "", srv.URL)
+	p, err := NewOpenAI("test-key", "", srv.URL, 0)
 	require.NoError(t, err)
 
 	tokenCh, errCh := p.Analyze(ctx, "sys", "prompt")

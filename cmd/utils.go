@@ -110,29 +110,48 @@ func resolveModelName(cmd *cobra.Command) string {
 	return cfg.Model
 }
 
+// resolveAITimeout returns the effective AI timeout duration.
+func resolveAITimeout(cmd *cobra.Command) (time.Duration, error) {
+	s := cfg.AITimeout
+	if cmd.Flags().Changed("ai-timeout") {
+		s = aiTimeoutFlag
+	}
+	if s == "" {
+		return 0, nil // 0 signals providers to use their default
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return 0, fmt.Errorf("cmd: invalid --ai-timeout value: %w", err)
+	}
+	if d <= 0 {
+		return 0, fmt.Errorf("cmd: --ai-timeout must be positive")
+	}
+	return d, nil
+}
+
 // newProvider creates an LLM provider from a provider name and optional model override.
-func newProvider(name, model string) (analyze.Provider, error) {
+func newProvider(name, model string, timeout time.Duration) (analyze.Provider, error) {
 	switch name {
 	case "openai":
 		key := os.Getenv("OPENAI_API_KEY")
 		if key == "" {
 			return nil, fmt.Errorf("cmd: OPENAI_API_KEY not set")
 		}
-		return analyze.NewOpenAI(key, model, "")
+		return analyze.NewOpenAI(key, model, "", timeout)
 	case "anthropic":
 		key := os.Getenv("ANTHROPIC_API_KEY")
 		if key == "" {
 			return nil, fmt.Errorf("cmd: ANTHROPIC_API_KEY not set")
 		}
-		return analyze.NewAnthropic(key, model, "")
+		return analyze.NewAnthropic(key, model, "", timeout)
 	case "gemini":
 		key := os.Getenv("GEMINI_API_KEY")
 		if key == "" {
 			return nil, fmt.Errorf("cmd: GEMINI_API_KEY not set")
 		}
-		return analyze.NewGemini(key, model, "")
+		return analyze.NewGemini(key, model, "", timeout)
 	case "ollama":
-		return analyze.NewOllama("", model), nil
+		return analyze.NewOllama("", model, timeout), nil
 	default:
 		return nil, fmt.Errorf("cmd: unknown AI provider: %q (valid: openai, anthropic, gemini, ollama)", name)
 	}

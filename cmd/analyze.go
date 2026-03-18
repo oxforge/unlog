@@ -27,15 +27,28 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 	go func() {
-		<-sigCh
-		slog.Debug("cmd: received signal, shutting down gracefully...")
-		cancel()
-		<-sigCh
-		slog.Debug("cmd: received second signal, forcing exit")
-		os.Exit(1)
+		select {
+		case <-sigCh:
+			slog.Debug("cmd: received signal, shutting down gracefully...")
+			cancel()
+		case <-ctx.Done():
+			return
+		}
+		select {
+		case <-sigCh:
+			slog.Debug("cmd: received second signal, forcing exit")
+			os.Exit(1)
+		case <-ctx.Done():
+		}
 	}()
+	defer signal.Stop(sigCh)
 
 	effectiveFormat, err := resolveFormat(cmd)
+	if err != nil {
+		return err
+	}
+
+	aiTimeout, err := resolveAITimeout(cmd)
 	if err != nil {
 		return err
 	}
@@ -53,7 +66,7 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 	var ar *analyze.AnalysisResult
 
 	if effectiveProvider := resolveProviderName(cmd); effectiveProvider != "" {
-		provider, err := newProvider(effectiveProvider, resolveModelName(cmd))
+		provider, err := newProvider(effectiveProvider, resolveModelName(cmd), aiTimeout)
 		if err != nil {
 			return err
 		}

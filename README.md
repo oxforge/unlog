@@ -126,6 +126,7 @@ unlog --ai-provider openai --format markdown --output report.md logs/
 |------|-------------|
 | `--ai-provider` | Enable LLM analysis with provider: `openai`, `anthropic`, `gemini`, `ollama` |
 | `--model` | Override the default model for the chosen provider |
+| `--ai-timeout` | Timeout for LLM API calls (e.g. `2m`, `30s`; default: `5m`) |
 | `--format` | Output format: `text`, `json`, `markdown` |
 | `--output` | Write output to a file instead of stdout |
 | `--level` | Minimum log level: `trace`, `debug`, `info`, `warn`, `error`, `fatal` (default: `warn`) |
@@ -150,6 +151,7 @@ format = "text"
 ai_provider = ""       # set to "openai", "anthropic", "gemini", or "ollama" to enable AI
 model = ""
 system_prompt = ""     # custom LLM system prompt (empty = built-in default)
+ai_timeout = ""        # timeout for LLM API calls (e.g. "2m", "30s"; default: 5m)
 noise_file = ""
 verbose = false
 no_color = false
@@ -166,6 +168,7 @@ Every config option can be set via `UNLOG_*` environment variables:
 | `UNLOG_AI_PROVIDER` | LLM provider (empty = no AI) |
 | `UNLOG_MODEL` | Model override |
 | `UNLOG_SYSTEM_PROMPT` | Custom LLM system prompt |
+| `UNLOG_AI_TIMEOUT` | Timeout for LLM API calls (e.g. `2m`, `30s`) |
 | `UNLOG_NOISE_FILE` | Custom noise patterns path |
 | `UNLOG_VERBOSE` | Verbose output (`true`/`false`) |
 | `NO_COLOR` | Disable color (any value, per [no-color.org](https://no-color.org)) |

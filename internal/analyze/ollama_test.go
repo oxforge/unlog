@@ -38,7 +38,7 @@ func TestOllamaStreaming(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p := NewOllama(srv.URL, "llama3")
+	p := NewOllama(srv.URL, "llama3", 0)
 	tokenCh, errCh := p.Analyze(context.Background(), "system prompt", "user prompt")
 
 	var tokens []string
@@ -61,7 +61,7 @@ func TestOllamaHTTPError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p := NewOllama(srv.URL, "llama3")
+	p := NewOllama(srv.URL, "llama3", 0)
 	tokenCh, errCh := p.Analyze(context.Background(), "sys", "prompt")
 
 	// Drain tokens (should be none).
@@ -86,7 +86,7 @@ func TestOllamaContextCancel(t *testing.T) {
 	defer srv.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	p := NewOllama(srv.URL, "llama3")
+	p := NewOllama(srv.URL, "llama3", 0)
 	tokenCh, errCh := p.Analyze(ctx, "sys", "prompt")
 
 	// Read the first token.
@@ -112,7 +112,7 @@ func TestOllamaContextCancel(t *testing.T) {
 }
 
 func TestOllamaDefaultURL(t *testing.T) {
-	p := NewOllama("", "")
+	p := NewOllama("", "", 0)
 	assert.Equal(t, "http://localhost:11434", p.baseURL)
 	assert.Equal(t, "llama3", p.model)
 	assert.Equal(t, "ollama", p.Name())

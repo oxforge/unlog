@@ -17,7 +17,7 @@ func clearAllEnv(t *testing.T) {
 	for _, key := range []string{
 		"UNLOG_LEVEL", "UNLOG_FORMAT", "UNLOG_NO_COLOR",
 		"UNLOG_NOISE_FILE", "UNLOG_SINCE", "UNLOG_UNTIL", "UNLOG_AI_PROVIDER",
-		"UNLOG_VERBOSE",
+		"UNLOG_VERBOSE", "UNLOG_MODEL", "UNLOG_SYSTEM_PROMPT", "UNLOG_AI_TIMEOUT",
 	} {
 		t.Setenv(key, "")
 	}

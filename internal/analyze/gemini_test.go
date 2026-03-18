@@ -49,7 +49,7 @@ func TestGeminiStreaming(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p, err := NewGemini("test-key", "gemini-2.5-flash", srv.URL)
+	p, err := NewGemini("test-key", "gemini-2.5-flash", srv.URL, 0)
 	require.NoError(t, err)
 
 	tokenCh, errCh := p.Analyze(context.Background(), "system", "prompt")
@@ -74,7 +74,7 @@ func TestGeminiHTTPError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p, err := NewGemini("bad-key", "", srv.URL)
+	p, err := NewGemini("bad-key", "", srv.URL, 0)
 	require.NoError(t, err)
 
 	tokenCh, errCh := p.Analyze(context.Background(), "sys", "prompt")
@@ -87,7 +87,7 @@ func TestGeminiHTTPError(t *testing.T) {
 }
 
 func TestGeminiEmptyKey(t *testing.T) {
-	_, err := NewGemini("", "", "")
+	_, err := NewGemini("", "", "", 0)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "API key is required")
 }
@@ -117,7 +117,7 @@ func TestGeminiContextCancel(t *testing.T) {
 	defer srv.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	p, err := NewGemini("test-key", "", srv.URL)
+	p, err := NewGemini("test-key", "", srv.URL, 0)
 	require.NoError(t, err)
 
 	tokenCh, errCh := p.Analyze(ctx, "sys", "prompt")

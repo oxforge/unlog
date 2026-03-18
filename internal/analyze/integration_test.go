@@ -64,7 +64,7 @@ func TestIntegrationOllama(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p := NewOllama(srv.URL, "llama3")
+	p := NewOllama(srv.URL, "llama3", 0)
 	result, err := Run(context.Background(), p, testSummary, "", nil)
 	require.NoError(t, err)
 
@@ -78,7 +78,7 @@ func TestIntegrationOpenAI(t *testing.T) {
 	srv := mockOpenAIServer("Timeline: connection errors. Root cause: missing limits. Recommendation: set max_connections.")
 	defer srv.Close()
 
-	p, err := NewOpenAI("test-key", "gpt-4o", srv.URL)
+	p, err := NewOpenAI("test-key", "gpt-4o", srv.URL, 0)
 	require.NoError(t, err)
 
 	result, err := Run(context.Background(), p, testSummary, "", nil)
@@ -110,7 +110,7 @@ func TestIntegrationAnthropic(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p, err := NewAnthropic("test-key", "claude-sonnet-4-20250514", srv.URL)
+	p, err := NewAnthropic("test-key", "claude-sonnet-4-20250514", srv.URL, 0)
 	require.NoError(t, err)
 
 	result, err := Run(context.Background(), p, testSummary, "", nil)
@@ -149,7 +149,7 @@ func TestIntegrationGemini(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p, err := NewGemini("test-key", "gemini-2.5-flash", srv.URL)
+	p, err := NewGemini("test-key", "gemini-2.5-flash", srv.URL, 0)
 	require.NoError(t, err)
 
 	result, err := Run(context.Background(), p, testSummary, "", nil)
@@ -167,7 +167,7 @@ func TestIntegrationProviderError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p, err := NewOpenAI("test-key", "gpt-4o", srv.URL)
+	p, err := NewOpenAI("test-key", "gpt-4o", srv.URL, 0)
 	require.NoError(t, err)
 
 	result, err := Run(context.Background(), p, testSummary, "", nil)

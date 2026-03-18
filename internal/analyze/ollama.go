@@ -17,18 +17,21 @@ type OllamaProvider struct {
 	client  *http.Client
 }
 
-// NewOllama creates an Ollama provider with defaults for empty baseURL/model.
-func NewOllama(baseURL, model string) *OllamaProvider {
+// NewOllama creates an Ollama provider with defaults for empty baseURL/model, 0 for default timeout.
+func NewOllama(baseURL, model string, timeout time.Duration) *OllamaProvider {
 	if baseURL == "" {
 		baseURL = "http://localhost:11434"
 	}
 	if model == "" {
 		model = "llama3"
 	}
+	if timeout <= 0 {
+		timeout = 5 * time.Minute
+	}
 	return &OllamaProvider{
 		baseURL: baseURL,
 		model:   model,
-		client:  &http.Client{Timeout: 5 * time.Minute},
+		client:  &http.Client{Timeout: timeout},
 	}
 }
 

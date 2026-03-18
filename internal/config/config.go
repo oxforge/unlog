@@ -30,6 +30,7 @@ type Config struct {
 	AIProvider   string `toml:"ai_provider"`   // LLM provider: openai, anthropic, ollama (empty = no AI)
 	Model        string `toml:"model"`         // LLM model override
 	SystemPrompt string `toml:"system_prompt"` // custom LLM system prompt
+	AITimeout    string `toml:"ai_timeout"`    // timeout for LLM API calls (e.g. "2m", "30s")
 	Verbose      bool   `toml:"verbose"`       // verbose output
 }
 
@@ -84,6 +85,9 @@ func overlayEnv(cfg *Config) {
 	}
 	if v := os.Getenv("UNLOG_SYSTEM_PROMPT"); v != "" {
 		cfg.SystemPrompt = v
+	}
+	if v := os.Getenv("UNLOG_AI_TIMEOUT"); v != "" {
+		cfg.AITimeout = v
 	}
 	if v := os.Getenv("UNLOG_VERBOSE"); v != "" {
 		if b, ok := parseBool(v, "UNLOG_VERBOSE"); ok {

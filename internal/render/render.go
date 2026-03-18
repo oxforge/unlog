@@ -4,6 +4,7 @@ package render
 import (
 	"fmt"
 	"io"
+	"math"
 
 	"github.com/oxforge/unlog/internal/analyze"
 	"github.com/oxforge/unlog/internal/pipeline"
@@ -37,6 +38,9 @@ func (ew *errWriter) Write(p []byte) (int, error) {
 
 // FmtIntComma formats an int64 with comma separators (e.g., 10000 → "10,000").
 func FmtIntComma(n int64) string {
+	if n == math.MinInt64 {
+		return "-9,223,372,036,854,775,808"
+	}
 	if n < 0 {
 		return "-" + FmtIntComma(-n)
 	}

@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"golang.org/x/sync/errgroup"
@@ -84,6 +85,7 @@ func (ing *Ingester) Run(ctx context.Context, sources []string) error {
 	}
 
 	g, gCtx := errgroup.WithContext(ctx)
+	g.SetLimit(runtime.NumCPU())
 
 	for _, file := range files {
 		path := file
@@ -311,6 +313,7 @@ func walkLogDir(dir string) ([]string, error) {
 	var files []string
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
+			slog.Warn("ingest: skipping path", "path", path, "error", err)
 			return nil
 		}
 		if info.IsDir() {

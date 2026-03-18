@@ -75,7 +75,7 @@ func (p *syslogParser) parse3164(line string, lineNum int64, source string) (typ
 		// per-line time.Now() calls and ensure deterministic behavior.
 		if ts.Year() == 0 {
 			ts = ts.AddDate(p.refYear, 0, 0)
-			if ts.After(time.Date(p.refYear, 12, 31, 23, 59, 59, 0, time.UTC).Add(24 * time.Hour)) {
+			if ts.After(time.Date(p.refYear+1, 1, 1, 0, 0, 0, 0, time.UTC)) {
 				ts = ts.AddDate(-1, 0, 0)
 			}
 		}

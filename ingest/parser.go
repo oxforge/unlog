@@ -50,6 +50,8 @@ func (f Format) String() string {
 }
 
 // Parser extracts a LogEntry from a single logical line.
+// Implementations are not required to be goroutine-safe; callers must
+// create one Parser per source (this is already the pattern in processSource).
 type Parser interface {
 	Parse(line string, lineNum int64, source string) (types.LogEntry, bool)
 	Name() string

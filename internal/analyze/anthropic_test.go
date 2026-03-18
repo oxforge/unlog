@@ -42,7 +42,7 @@ func TestAnthropicStreaming(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p, err := NewAnthropic("test-key", "claude-sonnet-4-20250514", srv.URL)
+	p, err := NewAnthropic("test-key", "claude-sonnet-4-20250514", srv.URL, 0)
 	require.NoError(t, err)
 
 	tokenCh, errCh := p.Analyze(context.Background(), "system", "prompt")
@@ -67,7 +67,7 @@ func TestAnthropicHTTPError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p, err := NewAnthropic("bad-key", "", srv.URL)
+	p, err := NewAnthropic("bad-key", "", srv.URL, 0)
 	require.NoError(t, err)
 
 	tokenCh, errCh := p.Analyze(context.Background(), "sys", "prompt")
@@ -80,7 +80,7 @@ func TestAnthropicHTTPError(t *testing.T) {
 }
 
 func TestAnthropicEmptyKey(t *testing.T) {
-	_, err := NewAnthropic("", "", "")
+	_, err := NewAnthropic("", "", "", 0)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "API key is required")
 }
@@ -101,7 +101,7 @@ func TestAnthropicContextCancel(t *testing.T) {
 	defer srv.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	p, err := NewAnthropic("test-key", "", srv.URL)
+	p, err := NewAnthropic("test-key", "", srv.URL, 0)
 	require.NoError(t, err)
 
 	tokenCh, errCh := p.Analyze(ctx, "sys", "prompt")

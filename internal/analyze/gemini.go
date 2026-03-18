@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -17,8 +18,8 @@ type GeminiProvider struct {
 	client  *http.Client
 }
 
-// NewGemini creates a Google Gemini provider. Pass "" for default baseURL.
-func NewGemini(apiKey, model, baseURL string) (*GeminiProvider, error) {
+// NewGemini creates a Google Gemini provider. Pass "" for default baseURL, 0 for default timeout.
+func NewGemini(apiKey, model, baseURL string, timeout time.Duration) (*GeminiProvider, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("analyze: gemini: API key is required")
 	}
@@ -28,11 +29,20 @@ func NewGemini(apiKey, model, baseURL string) (*GeminiProvider, error) {
 	if baseURL == "" {
 		baseURL = "https://generativelanguage.googleapis.com"
 	}
+	if timeout <= 0 {
+		timeout = 5 * time.Minute
+	}
 	return &GeminiProvider{
 		apiKey:  apiKey,
 		model:   model,
 		baseURL: baseURL,
-		client:  &http.Client{Timeout: 5 * time.Minute},
+		client: &http.Client{
+			Timeout: timeout,
+			// Prevent redirects from leaking the API key to other hosts.
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		},
 	}, nil
 }
 
@@ -97,7 +107,7 @@ func (p *GeminiProvider) Analyze(ctx context.Context, system, prompt string) (<-
 
 		resp, err := p.client.Do(req)
 		if err != nil {
-			errCh <- fmt.Errorf("analyze: gemini: %w", err)
+			errCh <- fmt.Errorf("analyze: gemini: request failed: %s", redactGeminiErr(err, p.apiKey))
 			return
 		}
 		defer resp.Body.Close() //nolint:errcheck
@@ -130,4 +140,9 @@ func (p *GeminiProvider) Analyze(ctx context.Context, system, prompt string) (<-
 	}()
 
 	return tokenCh, errCh
+}
+
+// redactGeminiErr strips the API key from error messages to prevent leaking it in logs.
+func redactGeminiErr(err error, apiKey string) string {
+	return strings.ReplaceAll(err.Error(), apiKey, "REDACTED")
 }

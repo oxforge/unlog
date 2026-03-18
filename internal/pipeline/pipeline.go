@@ -88,6 +88,8 @@ func (p *Pipeline) Run(ctx context.Context, sources []string) (*Result, error) {
 	compactOutCh := make(chan string, 1)
 	g.Go(func() error {
 		s, err := compact.Run(gCtx, enrichCh, p.opts.CompactOpts)
+		// Always send the result (possibly empty) so the read below never
+		// blocks. On error g.Wait() returns early and the value is unused.
 		compactOutCh <- s
 		if err != nil {
 			return fmt.Errorf("pipeline: compact: %w", err)

@@ -283,7 +283,7 @@ func (p *FilterPipeline) Run(ctx context.Context) (types.FilterStats, DetailedSt
 		}
 	}
 
-	survived := int64(len(survivors)) + overflowEmitted.Load()
+	survived := int64(len(survivors)) + overflowEmitted.Load() + int64(len(summaries))
 	dropped := ingested - survived
 
 	sourceBreakdown := make(map[string]int64)

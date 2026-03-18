@@ -28,6 +28,7 @@ var (
 	outputFlag     string
 	aiProviderFlag string
 	modelFlag      string
+	aiTimeoutFlag  string
 )
 
 var rootCmd = &cobra.Command{
@@ -96,4 +97,5 @@ func init() {
 	rootCmd.Flags().StringVar(&outputFlag, "output", "", "Write output to file instead of stdout")
 	rootCmd.Flags().StringVar(&aiProviderFlag, "ai-provider", "", "Enable LLM analysis with provider: openai, anthropic, ollama")
 	rootCmd.Flags().StringVar(&modelFlag, "model", "", "LLM model override (default per provider)")
+	rootCmd.Flags().StringVar(&aiTimeoutFlag, "ai-timeout", "", "Timeout for LLM API calls (e.g. \"2m\", \"30s\"; default: 5m)")
 }
