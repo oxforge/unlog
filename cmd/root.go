@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -71,6 +73,9 @@ var rootCmd = &cobra.Command{
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
+		if errors.Is(err, context.Canceled) {
+			os.Exit(130)
+		}
 		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}

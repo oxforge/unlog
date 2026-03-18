@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/signal"
+	"syscall"
 
 	"github.com/spf13/cobra"
 
@@ -19,8 +21,19 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 		return cmd.Help()
 	}
 
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-sigCh
+		slog.Debug("cmd: received signal, shutting down gracefully...")
+		cancel()
+		<-sigCh
+		slog.Debug("cmd: received second signal, forcing exit")
+		os.Exit(1)
+	}()
 
 	effectiveFormat, err := resolveFormat(cmd)
 	if err != nil {
