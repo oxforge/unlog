@@ -110,21 +110,19 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 		effectiveNoColor = !isTerminal(os.Stdout)
 	}
 
+	aiStreamed := effectiveFormat == "text" && ar != nil && outputFlag == ""
 	r := newRenderer(effectiveFormat)
 	renderOpts := render.Options{
-		Result:   result,
-		Analysis: ar,
-		Version:  Version,
-		NoColor:  effectiveNoColor,
-		Verbose:  verbose,
+		Result:     result,
+		Analysis:   ar,
+		Version:    Version,
+		NoColor:    effectiveNoColor,
+		Verbose:    verbose,
+		AIStreamed: aiStreamed,
 	}
 
-	if effectiveFormat == "text" && ar != nil && outputFlag == "" {
-		// AI output already streamed to stdout.
-	} else {
-		if err := r.Render(out, renderOpts); err != nil {
-			return fmt.Errorf("cmd: render: %w", err)
-		}
+	if err := r.Render(out, renderOpts); err != nil {
+		return fmt.Errorf("cmd: render: %w", err)
 	}
 
 	if effectiveFormat == "text" {

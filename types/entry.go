@@ -19,8 +19,9 @@ type FilteredEntry struct {
 	OccurrenceCount int       `json:"occurrence_count"`
 	FirstSeen       time.Time `json:"first_seen"`
 	LastSeen        time.Time `json:"last_seen"`
-	IsSpike         bool      `json:"is_spike"`
-	Signature       string    `json:"signature"`
+	IsSpike        bool      `json:"is_spike"`
+	IsDedupSummary bool      `json:"is_dedup_summary,omitempty"`
+	Signature      string    `json:"signature"`
 }
 
 // EnrichedEntry is produced by Stage 3 (Enrich). Adds structural context.

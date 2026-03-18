@@ -30,16 +30,15 @@ func (r *TerminalRenderer) Render(w io.Writer, opts Options) error {
 	ew := &errWriter{w: w}
 	c := colorizer{enabled: !opts.NoColor}
 
-	if opts.Analysis != nil {
+	r.renderSummary(ew, opts, c)
+	if opts.Analysis != nil && !opts.AIStreamed {
 		r.renderAI(ew, opts, c)
-	} else {
-		r.renderNoAI(ew, opts, c)
 	}
 
 	return ew.err
 }
 
-func (r *TerminalRenderer) renderNoAI(w io.Writer, opts Options, c colorizer) {
+func (r *TerminalRenderer) renderSummary(w io.Writer, opts Options, c colorizer) {
 	if opts.Result == nil || opts.Result.Summary == "" {
 		return
 	}

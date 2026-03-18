@@ -159,7 +159,6 @@ func (p *FilterPipeline) Run(ctx context.Context) (types.FilterStats, DetailedSt
 	g, gctx := errgroup.WithContext(ctx)
 
 	for w := 0; w < p.opts.Workers; w++ {
-		w := w
 		g.Go(func() error {
 			ws := &allWorkerStats[w]
 			var locals []types.FilteredEntry
@@ -249,12 +248,24 @@ func (p *FilterPipeline) Run(ctx context.Context) (types.FilterStats, DetailedSt
 		survivors = append(survivors, s...)
 	}
 
+	return p.postProcess(ctx, survivors, dedup, ingested, overflowEmitted.Load(), overflow.Load(), &detailed, start)
+}
+
+// postProcess runs phase 2 (spike detection, auto-window, sort), emits results,
+// and computes final stats.
+func (p *FilterPipeline) postProcess(
+	ctx context.Context,
+	survivors []types.FilteredEntry,
+	dedup *DedupFilter,
+	ingested, overflowEmitted int64,
+	overflowed bool,
+	detailed *DetailedStats,
+	start time.Time,
+) (types.FilterStats, DetailedStats, error) {
 	// Phase 2 (skipped if overflow).
-	if !overflow.Load() {
-		// Spike detection.
+	if !overflowed {
 		detailed.SpikeCount = DetectSpikes(survivors, p.opts.SpikeMultiplier)
 
-		// Auto-window.
 		if p.opts.AutoWindow && !p.opts.IsStdin && p.opts.Since.IsZero() && p.opts.Until.IsZero() {
 			var awDropped int64
 			survivors, awDropped = DetectAutoWindow(survivors, p.opts.AutoWindowPadding)
@@ -276,6 +287,7 @@ func (p *FilterPipeline) Run(ctx context.Context) (types.FilterStats, DetailedSt
 
 	summaries := dedup.Summaries()
 	for i := range summaries {
+		summaries[i].IsDedupSummary = true
 		select {
 		case p.output <- summaries[i]:
 		case <-ctx.Done():
@@ -283,7 +295,7 @@ func (p *FilterPipeline) Run(ctx context.Context) (types.FilterStats, DetailedSt
 		}
 	}
 
-	survived := int64(len(survivors)) + overflowEmitted.Load() + int64(len(summaries))
+	survived := int64(len(survivors)) + overflowEmitted + int64(len(summaries))
 	dropped := ingested - survived
 
 	sourceBreakdown := make(map[string]int64)
@@ -313,5 +325,5 @@ func (p *FilterPipeline) Run(ctx context.Context) (types.FilterStats, DetailedSt
 		FilterDurationMs:   time.Since(start).Milliseconds(),
 	}
 
-	return fs, detailed, nil
+	return fs, *detailed, nil
 }

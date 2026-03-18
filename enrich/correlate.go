@@ -1,6 +1,7 @@
 package enrich
 
 import (
+	"log/slog"
 	"sort"
 	"time"
 
@@ -77,6 +78,7 @@ func (c *Correlator) Correlate(entry *types.EnrichedEntry) {
 	}
 
 	if len(c.recent) >= maxRecentEntries {
+		slog.Debug("enrich: correlator buffer truncated", "dropped", len(c.recent)/2, "remaining", len(c.recent)-len(c.recent)/2)
 		c.recent = c.recent[len(c.recent)/2:]
 	}
 	c.recent = append(c.recent, recentEntry{

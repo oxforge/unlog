@@ -62,8 +62,10 @@ func (e *Enricher) Run(ctx context.Context) error {
 
 			e.fields.Extract(&enriched)
 			e.deploy.Detect(&enriched)
-			enriched.ChainID = e.chains.Match(&enriched)
-			e.corr.Correlate(&enriched)
+			if !entry.IsDedupSummary {
+				enriched.ChainID = e.chains.Match(&enriched)
+				e.corr.Correlate(&enriched)
+			}
 
 			select {
 			case <-ctx.Done():

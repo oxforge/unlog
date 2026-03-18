@@ -87,8 +87,7 @@ func (ing *Ingester) Run(ctx context.Context, sources []string) error {
 	g, gCtx := errgroup.WithContext(ctx)
 	g.SetLimit(runtime.NumCPU())
 
-	for _, file := range files {
-		path := file
+	for _, path := range files {
 		g.Go(func() error {
 			f, err := os.Open(path)
 			if err != nil {

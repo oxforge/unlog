@@ -70,12 +70,12 @@ func TestTerminalRenderWithAI(t *testing.T) {
 	require.NoError(t, err)
 
 	out := buf.String()
+	// AI mode should also render the compacted summary.
+	assert.Contains(t, out, "## Incident Overview")
 	assert.Contains(t, out, "--- Analysis ---")
 	assert.Contains(t, out, "DB connection pool saturated")
 	assert.Contains(t, out, "Connection leak")
 	assert.Contains(t, out, "connection pool monitoring")
-	// AI mode should NOT print the compacted summary sections.
-	assert.NotContains(t, out, "## Incident Overview")
 }
 
 func TestTerminalRenderColored(t *testing.T) {

@@ -11,11 +11,12 @@ import (
 )
 
 type Options struct {
-	Result   *pipeline.Result
-	Analysis *analyze.AnalysisResult
-	Version  string
-	NoColor  bool
-	Verbose  bool
+	Result      *pipeline.Result
+	Analysis    *analyze.AnalysisResult
+	Version     string
+	NoColor     bool
+	Verbose     bool
+	AIStreamed  bool // AI output was already streamed to stdout; skip rendering it again.
 }
 
 type Renderer interface {
