@@ -158,6 +158,23 @@ func TestAllFormats(t *testing.T) {
 			},
 		},
 
+		// --- Docker Compose ---
+		{
+			// Docker compose: container prefix stripped, timestamp + level from remainder.
+			// 12 lines total, 3 are stack trace continuations merged into 1 error entry = 9 entries.
+			// 1 line has no timestamp ("Ready to accept connections") → still parsed with Unknown level.
+			name:   "docker compose",
+			file:   "../testdata/formats/docker_compose.log",
+			format: "docker-compose",
+			count:  9,
+			levels: map[types.Level]int{
+				types.LevelInfo:    3, // Starting, Connected, Retrying
+				types.LevelWarn:    3, // High memory, Client connection, 502 Bad Gateway
+				types.LevelError:   2, // Failed to process, Upstream unavailable
+				types.LevelUnknown: 1, // "Ready to accept connections" (no level keyword)
+			},
+		},
+
 		// --- Kubernetes ---
 		{
 			// Kube parser: stdout → Info, stderr → Error, then first-word scan.
@@ -170,6 +187,19 @@ func TestAllFormats(t *testing.T) {
 				types.LevelWarn:  1, // "WARN:" overrides stderr
 				types.LevelError: 1, // "ERROR:" (already Error from stderr)
 				types.LevelFatal: 1, // "FATAL:" overrides stderr
+			},
+		},
+		{
+			// Prefixed kube format: [pod/name/container] timestamp level message.
+			// Java-style comma milliseconds. 13 lines, all are entries.
+			name:   "kubernetes prefixed deployment",
+			file:   "../testdata/formats/k8s_deployment.log",
+			format: "kubernetes",
+			count:  13,
+			levels: map[types.Level]int{
+				types.LevelInfo:  4, // Processing, Calling, Processing refund, ACCESS_LOG
+				types.LevelWarn:  7, // Gateway slow, retries, 503s, refund cap
+				types.LevelError: 2, // Charge failed, Refund rejected
 			},
 		},
 		{

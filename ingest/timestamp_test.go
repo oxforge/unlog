@@ -18,6 +18,7 @@ func TestParseTimestamp(t *testing.T) {
 		{"ISO8601 millis Z", "2024-01-15T10:30:45.123Z", 2024, true},
 		{"ISO8601 no tz", "2024-01-15T10:30:45", 2024, true},
 		{"Space separated millis", "2024-01-15 10:30:45.123", 2024, true},
+		{"Space separated comma millis", "2026-03-19 12:29:30,963", 2026, true},
 		{"Space separated", "2024-01-15 10:30:45", 2024, true},
 		{"Apache CLF", "15/Jan/2024:10:30:45 -0700", 2024, true},
 		{"Syslog", "Jan 15 10:30:45", 0, true},

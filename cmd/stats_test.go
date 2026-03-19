@@ -122,6 +122,14 @@ func TestStatsOutput(t *testing.T) {
 			sourceLevels:  []string{"FATAL=1", "ERROR=2", "WARN=1", "INFO=3"},
 		},
 		{
+			name:          "docker compose",
+			file:          "../testdata/formats/docker_compose.log",
+			ingested:      9,
+			sourceFormat:  "format=docker-compose",
+			sourceEntries: 9,
+			sourceLevels:  []string{"ERROR=2", "WARN=3", "INFO=3", "unknown=1"},
+		},
+		{
 			name:          "docker mixed streams",
 			file:          "../testdata/formats/docker_mixed_streams.log",
 			ingested:      9,
@@ -136,6 +144,14 @@ func TestStatsOutput(t *testing.T) {
 			sourceFormat:  "format=kubernetes",
 			sourceEntries: 6,
 			sourceLevels:  []string{"FATAL=1", "ERROR=1", "WARN=1", "INFO=3"},
+		},
+		{
+			name:          "kubernetes prefixed deployment",
+			file:          "../testdata/formats/k8s_deployment.log",
+			ingested:      13,
+			sourceFormat:  "format=kubernetes",
+			sourceEntries: 13,
+			sourceLevels:  []string{"ERROR=2", "WARN=7", "INFO=4"},
 		},
 		{
 			name:          "kubernetes multiline",

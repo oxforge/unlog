@@ -1,0 +1,12 @@
+web-1     | 2024-01-15 10:00:00.100 INFO Starting application on port 8080
+web-1     | 2024-01-15 10:00:00.200 INFO Connected to database
+redis-1   | 2024-01-15 10:00:00.050 Ready to accept connections on port 6379
+web-1     | 2024-01-15 10:00:01.000 WARN High memory usage detected: 85%
+web-1     | 2024-01-15 10:00:02.000 ERROR Failed to process request: connection reset by peer
+web-1     | java.net.SocketException: Connection reset
+web-1     |     at java.net.SocketInputStream.read(SocketInputStream.java:210)
+web-1     |     at com.example.Main.handleRequest(Main.java:42)
+redis-1   | 2024-01-15 10:00:02.500 WARN Client connection closed unexpectedly
+web-1     | 2024-01-15 10:00:03.000 INFO Retrying connection to upstream service
+web-1     | 2024-01-15 10:00:03.500 ERROR Upstream service unavailable after 3 retries
+nginx-1   | 2024-01-15 10:00:03.600 WARN 502 Bad Gateway returned to client 192.168.1.100

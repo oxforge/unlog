@@ -13,7 +13,9 @@ var (
 	reSyslog3164 = regexp.MustCompile(`^<\d+>(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s`)
 	reCLF        = regexp.MustCompile(`^\S+\s+\S+\s+\S+\s+\[\d{2}/[A-Z]`)
 	reLogfmtPair = regexp.MustCompile(`\b\w+=(?:"[^"]*"|\S+)`)
-	reGenericTS  = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}`)
+	reKubePrefixed  = regexp.MustCompile(`^\[[\w/.:-]+\]\s+\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}`)
+	reDockerCompose = regexp.MustCompile(`^\w[\w.-]*-\d+\s+\|\s+`)
+	reGenericTS    = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}`)
 	reCSVData    = regexp.MustCompile(`(?i)^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}[^,]*,\s*(TRACE|DEBUG|INFO|WARN|WARNING|ERROR|FATAL|ERR)\s*,`)
 )
 
@@ -50,7 +52,7 @@ func classifyLine(line string) Format {
 		}
 	}
 
-	if reKubernetes.MatchString(line) {
+	if reKubernetes.MatchString(line) || reKubePrefixed.MatchString(line) {
 		return FormatKubernetes
 	}
 
@@ -72,6 +74,10 @@ func classifyLine(line string) Format {
 
 	if matches := reLogfmtPair.FindAllString(line, -1); len(matches) >= 3 {
 		return FormatLogfmt
+	}
+
+	if reDockerCompose.MatchString(line) {
+		return FormatDockerCompose
 	}
 
 	if reGenericTS.MatchString(line) {

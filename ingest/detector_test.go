@@ -37,6 +37,22 @@ func TestDetectFormat(t *testing.T) {
 			FormatKubernetes,
 		},
 		{
+			"kubernetes prefixed",
+			[]string{
+				`[pod/checkout-api-68f9d9cdf-vj6fz/checkout-api] 2026-03-19 12:29:30,963 INFO CHECKOUT_API APP_LOG`,
+				`[pod/checkout-api-68f9d9cdf-vj6fz/checkout-api] 2026-03-19 12:29:31,002 WARN CHECKOUT_API APP_LOG`,
+			},
+			FormatKubernetes,
+		},
+		{
+			"docker compose",
+			[]string{
+				`web-1     | 2024-01-15 10:00:00 INFO Starting application`,
+				`web-1     | 2024-01-15 10:00:01 ERROR Connection failed`,
+			},
+			FormatDockerCompose,
+		},
+		{
 			"json structured",
 			[]string{
 				`{"level":"info","msg":"starting","ts":"2024-01-15T10:00:00Z"}`,

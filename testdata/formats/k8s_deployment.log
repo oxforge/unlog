@@ -1,0 +1,13 @@
+[pod/payment-svc-7b4d8f6c9a-xk2nw/payment-svc] 2026-03-19 14:05:10,112 INFO PAYMENT_SVC APP_LOG Processing payment request for order ord-90412
+[pod/payment-svc-7b4d8f6c9a-xk2nw/payment-svc] 2026-03-19 14:05:10,215 INFO PAYMENT_SVC APP_LOG Calling gateway https://gw.example.com/v1/charge
+[pod/payment-svc-7b4d8f6c9a-xk2nw/payment-svc] 2026-03-19 14:05:10,892 WARN PAYMENT_SVC APP_LOG Gateway response slow: 677ms exceeds 500ms threshold
+[pod/payment-svc-7b4d8f6c9a-xk2nw/payment-svc] 2026-03-19 14:05:10,893 WARN PAYMENT_SVC APP_LOG Retrying charge for order ord-90412 (attempt 1/3)
+[pod/payment-svc-7b4d8f6c9a-xk2nw/payment-svc] 2026-03-19 14:05:11,450 WARN PAYMENT_SVC APP_LOG Gateway returned HTTP 503: service temporarily unavailable
+[pod/payment-svc-7b4d8f6c9a-xk2nw/payment-svc] 2026-03-19 14:05:11,451 WARN PAYMENT_SVC APP_LOG Retrying charge for order ord-90412 (attempt 2/3)
+[pod/payment-svc-7b4d8f6c9a-xk2nw/payment-svc] 2026-03-19 14:05:12,020 WARN PAYMENT_SVC APP_LOG Gateway returned HTTP 503: service temporarily unavailable
+[pod/payment-svc-7b4d8f6c9a-xk2nw/payment-svc] 2026-03-19 14:05:12,021 WARN PAYMENT_SVC APP_LOG Retrying charge for order ord-90412 (attempt 3/3)
+[pod/payment-svc-7b4d8f6c9a-xk2nw/payment-svc] 2026-03-19 14:05:12,590 ERROR PAYMENT_SVC APP_LOG Charge failed after 3 retries for order ord-90412: java.net.ConnectException: connection refused
+[pod/payment-svc-7b4d8f6c9a-m8hqp/payment-svc] 2026-03-19 14:05:08,330 INFO PAYMENT_SVC APP_LOG Processing refund request for order ord-87201
+[pod/payment-svc-7b4d8f6c9a-m8hqp/payment-svc] 2026-03-19 14:05:08,445 WARN PAYMENT_SVC APP_LOG Refund amount exceeds original charge, capping to max
+[pod/payment-svc-7b4d8f6c9a-m8hqp/payment-svc] 2026-03-19 14:05:09,100 ERROR PAYMENT_SVC APP_LOG Refund rejected by gateway for order ord-87201: insufficient merchant balance
+[pod/payment-svc-7b4d8f6c9a-m8hqp/payment-svc] 2026-03-19 14:05:09,101 INFO PAYMENT_SVC ACCESS_LOG 10.2.43.80 - - [19/Mar/2026:14:05:09 +0000] "POST /api/v1/refund HTTP/1.1" 502 89 "-" "internal-gateway/2.1"

@@ -1,6 +1,10 @@
 package ingest
 
-import "github.com/oxforge/unlog/types"
+import (
+	"strings"
+
+	"github.com/oxforge/unlog/types"
+)
 
 // Format identifies a log format.
 type Format int
@@ -8,6 +12,7 @@ type Format int
 const (
 	FormatUnknown Format = iota
 	FormatDockerJSON
+	FormatDockerCompose
 	FormatCloudWatch
 	FormatKubernetes
 	FormatJSON
@@ -24,6 +29,8 @@ func (f Format) String() string {
 	switch f {
 	case FormatDockerJSON:
 		return "docker-json"
+	case FormatDockerCompose:
+		return "docker-compose"
 	case FormatCloudWatch:
 		return "cloudwatch"
 	case FormatKubernetes:
@@ -62,6 +69,8 @@ func parserForFormat(format Format) Parser {
 	switch format {
 	case FormatDockerJSON:
 		return &dockerParser{}
+	case FormatDockerCompose:
+		return &dockerComposeParser{}
 	case FormatCloudWatch:
 		return &cloudwatchParser{}
 	case FormatKubernetes:
@@ -94,9 +103,16 @@ func lineCheckerForFormat(format Format) LineChecker {
 		return func(line string) bool {
 			return len(line) > 0 && line[0] == '{'
 		}
+	case FormatDockerCompose:
+		return func(line string) bool {
+			if idx := strings.Index(line, " | "); idx >= 0 {
+				return reGenericTS.MatchString(strings.TrimSpace(line[idx+3:]))
+			}
+			return false
+		}
 	case FormatKubernetes:
 		return func(line string) bool {
-			return reKubernetes.MatchString(line)
+			return reKubernetes.MatchString(line) || reKubePrefixed.MatchString(line)
 		}
 	case FormatSyslog5424:
 		return func(line string) bool {

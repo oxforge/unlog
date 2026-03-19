@@ -12,6 +12,7 @@ var timestampFormats = []string{
 	time.RFC3339Nano,
 	"2006-01-02T15:04:05",
 	"2006-01-02 15:04:05.999",
+	"2006-01-02 15:04:05,999", // Java-style comma millis (e.g. log4j)
 	"2006-01-02 15:04:05",
 	"02/Jan/2006:15:04:05 -0700",
 	"Jan  2 15:04:05",
@@ -64,6 +65,29 @@ func tryUnixEpoch(s string) (time.Time, bool) {
 // single log source, so that subsequent lines avoid re-trying all formats.
 type formatCache struct {
 	lastFormat string
+}
+
+// ParseFromPrefix scans the beginning of s for a timestamp, trying
+// progressively shorter prefixes (max 35 chars down to 15). Returns the
+// parsed time, the byte offset where the remainder starts, and success.
+func (c *formatCache) ParseFromPrefix(s string) (time.Time, int, bool) {
+	maxLen := len(s)
+	if maxLen > 35 {
+		maxLen = 35
+	}
+	if maxLen < 15 || s[0] < '0' || s[0] > '9' {
+		return time.Time{}, 0, false
+	}
+	for length := maxLen; length >= 15; length-- {
+		candidate := strings.TrimSpace(s[:length])
+		if len(candidate) == 0 || candidate[0] < '0' || candidate[0] > '9' {
+			continue
+		}
+		if t, ok := c.Parse(candidate); ok {
+			return t, length, true
+		}
+	}
+	return time.Time{}, 0, false
 }
 
 // Parse attempts to parse s using the cached format first, then falls back to
