@@ -1,0 +1,6 @@
+<165>1 2024-01-15T10:00:00Z web-1 nginx 1234 - - Starting worker process
+<165>1 2024-01-15T10:00:01Z web-1 nginx 1234 - - Listening on 0.0.0.0:80
+<164>1 2024-01-15T10:00:05Z db-1 postgres 5678 - [meta@123 table="users"] Slow query detected
+<163>1 2024-01-15T10:00:10Z db-1 postgres 5678 - - Connection pool exhausted
+<162>1 2024-01-15T10:00:11Z app-1 myapp 9012 - - Unable to acquire connection
+<161>1 2024-01-15T10:00:15Z app-1 myapp 9012 - - Service unavailable, shutting down

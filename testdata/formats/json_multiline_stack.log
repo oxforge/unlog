@@ -1,0 +1,6 @@
+{"level":"info","msg":"Server starting","ts":"2024-01-15T10:00:00Z","version":"2.1.0"}
+{"level":"info","msg":"Database migration complete","ts":"2024-01-15T10:00:01Z","migrations":3}
+{"level":"error","msg":"Unhandled exception in request handler","ts":"2024-01-15T10:00:10Z","error":"NullPointerException","stacktrace":"java.lang.NullPointerException\n\tat com.example.UserService.getUser(UserService.java:42)\n\tat com.example.ApiController.handleRequest(ApiController.java:88)\n\tat org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:897)"}
+{"level":"error","msg":"Failed to send notification","ts":"2024-01-15T10:00:11Z","error":"ConnectionRefusedException","target":"smtp://mail.internal:587"}
+{"level":"warn","msg":"Retry queue depth exceeding threshold","ts":"2024-01-15T10:00:12Z","depth":5000,"max":10000}
+{"level":"fatal","msg":"Data corruption detected in primary index","ts":"2024-01-15T10:00:15Z","table":"orders","checksum_expected":"abc123","checksum_actual":"def456"}

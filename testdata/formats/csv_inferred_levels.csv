@@ -1,0 +1,11 @@
+timestamp,message,service
+2024-01-15T10:00:00Z,INFO: Application started successfully,api
+2024-01-15T10:00:01Z,INFO: Listening on port 8080,api
+2024-01-15T10:00:02Z,[DEBUG] Loading feature flags from config server,api
+2024-01-15T10:00:05Z,WARN: Deprecated endpoint /v1/users called,api
+2024-01-15T10:00:06Z,[WARNING] TLS certificate expires in 7 days,api
+2024-01-15T10:00:10Z,ERROR: Cannot parse request body: unexpected EOF,api
+2024-01-15T10:00:11Z,ERROR - Downstream service returned 502,api
+2024-01-15T10:00:15Z,FATAL: Out of memory,api
+2024-01-15T10:00:16Z,Request processed in 45ms,api
+2024-01-15T10:00:17Z,Health check passed,api

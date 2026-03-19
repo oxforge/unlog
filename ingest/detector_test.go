@@ -127,12 +127,13 @@ func TestDetectFormatMajorityVote(t *testing.T) {
 }
 
 func TestDetectFormatBelowThreshold(t *testing.T) {
+	// 2 JSON + 2 logfmt = 50/50, neither exceeds 60% threshold → Raw fallback.
 	lines := []string{
 		`{"level":"info","msg":"a","ts":"2024-01-15T10:00:00Z"}`,
-		`garbage line 1`,
-		`{"level":"info","msg":"b","ts":"2024-01-15T10:00:01Z"}`,
-		`garbage line 2`,
+		`level=info msg="hello" ts=2024-01-15T10:00:01Z`,
+		`{"level":"info","msg":"b","ts":"2024-01-15T10:00:02Z"}`,
+		`level=warn msg="world" ts=2024-01-15T10:00:03Z`,
 	}
 	format := detectFormat(lines)
-	assert.True(t, format == FormatGeneric || format == FormatRaw)
+	assert.Equal(t, FormatRaw, format)
 }

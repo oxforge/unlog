@@ -1,0 +1,7 @@
+time=2024-01-15T10:00:00Z lvl=info msg="Service starting" component=scheduler version=3.0.1
+time=2024-01-15T10:00:01Z lvl=info msg="Loaded 42 job definitions" component=scheduler
+time=2024-01-15T10:00:02Z lvl=debug msg="Checking cron expression" component=scheduler job=cleanup-old-data next_run=2024-01-15T12:00:00Z
+time=2024-01-15T10:00:05Z lvl=warn msg="Job execution slow" component=scheduler job=sync-users duration=45s threshold=30s
+time=2024-01-15T10:00:10Z lvl=error msg="Job failed" component=scheduler job=generate-report err="context deadline exceeded"
+time=2024-01-15T10:00:11Z lvl=error msg="Retry scheduled" component=scheduler job=generate-report attempt=2 backoff=60s
+time=2024-01-15T10:00:15Z lvl=fatal msg="Queue backend unreachable" component=scheduler target=redis://redis-primary:6379 last_error="connection refused"

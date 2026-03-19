@@ -21,7 +21,7 @@ func (p *csvParser) Name() string { return "csv" }
 
 // knownHeaders are column names that signal a CSV header row.
 var knownHeaders = map[string]bool{
-	"timestamp": true, "time": true, "ts": true, "date": true, "datetime": true,
+	"timestamp": true, "@timestamp": true, "time": true, "ts": true, "date": true, "datetime": true,
 	"level": true, "severity": true, "lvl": true, "loglevel": true,
 	"message": true, "msg": true, "log": true,
 	"source": true, "service": true, "host": true, "hostname": true,
@@ -78,7 +78,7 @@ func (p *csvParser) Parse(line string, lineNum int64, source string) (types.LogE
 		}
 		val := strings.TrimSpace(fields[i])
 		switch col {
-		case "timestamp", "time", "ts", "date", "datetime":
+		case "timestamp", "@timestamp", "time", "ts", "date", "datetime":
 			if ts, ok := p.tsCache.Parse(val); ok {
 				entry.Timestamp = ts
 			}

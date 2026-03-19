@@ -16,6 +16,7 @@ var timestampFormats = []string{
 	"02/Jan/2006:15:04:05 -0700",
 	"Jan  2 15:04:05",
 	"Jan 2 15:04:05",
+	"Jan 2, 2006 @ 15:04:05.000", // Kibana CSV export, e.g. "Feb 25, 2026 @ 03:32:24.771"
 }
 
 // parseTimestamp attempts to parse s as a timestamp, trying each known format

@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"time"
 
 	"github.com/oxforge/unlog/internal/analyze"
 	"github.com/oxforge/unlog/internal/pipeline"
+	"github.com/oxforge/unlog/types"
 )
 
 func printStats(w io.Writer, result *pipeline.Result, ar *analyze.AnalysisResult, showDetailed bool) {
@@ -31,10 +33,31 @@ func printStats(w io.Writer, result *pipeline.Result, ar *analyze.AnalysisResult
 		_, _ = fmt.Fprintf(w, "Dropped by dedup:       %d\n", ds.DroppedByDedup)
 		_, _ = fmt.Fprintf(w, "Dropped by auto-window: %d\n", ds.DroppedByAutoWindow)
 		_, _ = fmt.Fprintf(w, "Spike events:           %d\n", ds.SpikeCount)
-		if len(fs.SourceBreakdown) > 0 {
-			_, _ = fmt.Fprintln(w, "\n--- Error Counts by Source ---")
-			for src, cnt := range fs.SourceBreakdown {
-				_, _ = fmt.Fprintf(w, "  %s: %d\n", src, cnt)
+
+		if len(result.IngestStats) > 0 {
+			_, _ = fmt.Fprintln(w, "\n--- Sources ---")
+			// Sort source names for stable output.
+			names := make([]string, 0, len(result.IngestStats))
+			for name := range result.IngestStats {
+				names = append(names, name)
+			}
+			sort.Strings(names)
+			for _, name := range names {
+				ss := result.IngestStats[name]
+				_, _ = fmt.Fprintf(w, "  %s  format=%s entries=%d",
+					name, ss.Format, ss.Entries)
+				for _, lvl := range []types.Level{
+					types.LevelFatal, types.LevelError, types.LevelWarn,
+					types.LevelInfo, types.LevelDebug, types.LevelTrace,
+				} {
+					if c := ss.Levels[lvl]; c > 0 {
+						_, _ = fmt.Fprintf(w, " %s=%d", lvl, c)
+					}
+				}
+				if c := ss.Levels[types.LevelUnknown]; c > 0 {
+					_, _ = fmt.Fprintf(w, " unknown=%d", c)
+				}
+				_, _ = fmt.Fprintln(w)
 			}
 		}
 	}

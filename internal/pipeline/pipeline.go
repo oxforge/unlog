@@ -32,6 +32,7 @@ type Result struct {
 	Summary       string
 	Stats         types.FilterStats
 	DetailedStats filter.DetailedStats
+	IngestStats   map[string]ingest.SourceStats
 	Duration      time.Duration
 }
 
@@ -106,6 +107,7 @@ func (p *Pipeline) Run(ctx context.Context, sources []string) (*Result, error) {
 		Summary:       <-compactOutCh,
 		Stats:         fo.stats,
 		DetailedStats: fo.detailed,
+		IngestStats:   ing.SourceStats(),
 		Duration:      time.Since(start),
 	}, nil
 }

@@ -1,0 +1,7 @@
+{"severity":"INFO","message":"Application starting","timestamp":"2024-01-15T10:00:00Z","service":"gateway"}
+{"severity":"INFO","message":"Connected to Redis","timestamp":"2024-01-15T10:00:01Z","service":"gateway"}
+{"severity":"DEBUG","message":"Cache miss for key user:1234","timestamp":"2024-01-15T10:00:02Z","service":"gateway"}
+{"severity":"WARNING","message":"Rate limit approaching for client api-key-xyz","timestamp":"2024-01-15T10:00:05Z","service":"gateway"}
+{"severity":"ERROR","message":"Upstream timeout after 30s","timestamp":"2024-01-15T10:00:10Z","service":"gateway","upstream":"payment-svc"}
+{"severity":"ERROR","message":"Circuit breaker tripped for payment-svc","timestamp":"2024-01-15T10:00:11Z","service":"gateway"}
+{"severity":"CRITICAL","message":"All upstreams unreachable, entering degraded mode","timestamp":"2024-01-15T10:00:15Z","service":"gateway"}

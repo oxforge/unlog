@@ -1,0 +1,10 @@
+2024-01-15T10:00:00.000000000Z stdout F Starting application v2.5.0
+2024-01-15T10:00:01.000000000Z stdout F Health check endpoint ready on :8081/healthz
+2024-01-15T10:00:05.000000000Z stderr F WARN: Leader election lost, switching to standby mode
+2024-01-15T10:00:10.000000000Z stderr F ERROR: Failed to watch ConfigMap
+2024-01-15T10:00:10.100000000Z stderr P panic: runtime error: invalid memory address or nil pointer dereference
+2024-01-15T10:00:10.100000001Z stderr P [signal SIGSEGV: segmentation violation code=0x1 addr=0x0 pc=0x1234]
+2024-01-15T10:00:10.100000002Z stderr P goroutine 1 [running]:
+2024-01-15T10:00:10.100000003Z stderr P main.(*Controller).reconcile(0xc0001234, 0x0)
+2024-01-15T10:00:10.100000004Z stderr F 	/app/controller.go:88
+2024-01-15T10:00:15.000000000Z stderr F FATAL: Controller crash loop detected, exiting

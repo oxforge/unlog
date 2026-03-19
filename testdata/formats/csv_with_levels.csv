@@ -1,0 +1,9 @@
+timestamp,severity,msg,host,request_id
+2024-01-15T10:00:00Z,INFO,Request received,web-1,req-001
+2024-01-15T10:00:01Z,DEBUG,Auth token validated,web-1,req-001
+2024-01-15T10:00:02Z,INFO,Request received,web-2,req-002
+2024-01-15T10:00:05Z,WARN,Response time > 2s,web-1,req-001
+2024-01-15T10:00:10Z,ERROR,Database connection refused,web-1,req-003
+2024-01-15T10:00:11Z,ERROR,Failover to replica,web-1,req-003
+2024-01-15T10:00:12Z,INFO,Replica connection established,web-1,req-003
+2024-01-15T10:00:15Z,FATAL,Disk full on /var/log,web-2,req-004

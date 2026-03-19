@@ -1,0 +1,6 @@
+{"level":"info","msg":"Worker pool initialized","ts":1705312800,"pool_size":16}
+{"level":"info","msg":"Accepting connections","ts":1705312801,"port":8080}
+{"level":"warn","msg":"Goroutine count high","ts":1705312805,"count":5000}
+{"level":"error","msg":"Panic recovered in handler","ts":1705312810,"stack":"goroutine 42 [running]"}
+{"level":"error","msg":"Write to closed channel","ts":1705312811}
+{"level":"fatal","msg":"OOM killer invoked","ts":1705312815}

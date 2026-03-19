@@ -1,0 +1,10 @@
+2024-01-15 10:00:00.123 [INFO] [main] Application starting
+2024-01-15 10:00:01.456 [INFO] [db-pool] Connection pool initialized (size=20)
+2024-01-15 10:00:02.789 [DEBUG] [auth] Loading RSA keys from /etc/app/keys
+2024-01-15 10:00:05.012 [WARN] [http] Request took 3.2s: GET /api/reports
+2024-01-15 10:00:06.345 [WARN] [gc] GC pause exceeded 100ms (152ms)
+2024-01-15 10:00:10.678 [ERROR] [db-pool] Failed to acquire connection after 5s
+2024-01-15 10:00:10.679 [ERROR] [db-pool] java.sql.SQLException: Connection pool exhausted
+2024-01-15 10:00:10.680 [ERROR] [db-pool]   at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:155)
+2024-01-15 10:00:10.681 [ERROR] [db-pool]   at com.example.Repository.query(Repository.java:42)
+2024-01-15 10:00:15.999 [FATAL] [main] Shutting down due to unrecoverable error

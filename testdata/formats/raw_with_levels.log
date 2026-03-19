@@ -1,0 +1,9 @@
+Application initializing
+Loading plugins from /usr/lib/app/plugins
+INFO: 3 plugins loaded successfully
+Connecting to message broker at amqp://rabbit:5672
+WARN: Broker connection using unencrypted channel
+ERROR: Plugin "audit-logger" failed to initialize: permission denied
+Retrying plugin initialization
+ERROR: Plugin "audit-logger" retry also failed
+FATAL: Required plugin unavailable, cannot start

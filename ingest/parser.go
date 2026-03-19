@@ -56,3 +56,75 @@ type Parser interface {
 	Parse(line string, lineNum int64, source string) (types.LogEntry, bool)
 	Name() string
 }
+
+// parserForFormat returns the appropriate Parser for a detected format.
+func parserForFormat(format Format) Parser {
+	switch format {
+	case FormatDockerJSON:
+		return &dockerParser{}
+	case FormatCloudWatch:
+		return &cloudwatchParser{}
+	case FormatKubernetes:
+		return &kubeParser{}
+	case FormatJSON:
+		return &jsonParser{}
+	case FormatSyslog5424:
+		return newSyslogParser(true)
+	case FormatSyslog3164:
+		return newSyslogParser(false)
+	case FormatCLF:
+		return &clfParser{}
+	case FormatLogfmt:
+		return &logfmtParser{}
+	case FormatCSV:
+		return &csvParser{}
+	case FormatGeneric:
+		return &genericParser{}
+	default:
+		return &rawParser{}
+	}
+}
+
+// lineCheckerForFormat returns a LineChecker that recognises the first line of
+// a new log entry for the given format. This is used by the reader to reassemble
+// multi-line entries (e.g. stack traces).
+func lineCheckerForFormat(format Format) LineChecker {
+	switch format {
+	case FormatDockerJSON, FormatCloudWatch, FormatJSON:
+		return func(line string) bool {
+			return len(line) > 0 && line[0] == '{'
+		}
+	case FormatKubernetes:
+		return func(line string) bool {
+			return reKubernetes.MatchString(line)
+		}
+	case FormatSyslog5424:
+		return func(line string) bool {
+			return reSyslog5424.MatchString(line)
+		}
+	case FormatSyslog3164:
+		return func(line string) bool {
+			return reSyslog3164.MatchString(line)
+		}
+	case FormatCLF:
+		return func(line string) bool {
+			return reCLF.MatchString(line)
+		}
+	case FormatLogfmt:
+		return func(line string) bool {
+			return len(reLogfmtPair.FindAllString(line, 3)) >= 3
+		}
+	case FormatCSV:
+		return func(line string) bool {
+			return len(line) > 0
+		}
+	case FormatGeneric:
+		return func(line string) bool {
+			return reGenericTS.MatchString(line)
+		}
+	default:
+		return func(line string) bool {
+			return true
+		}
+	}
+}

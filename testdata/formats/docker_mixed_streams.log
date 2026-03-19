@@ -1,0 +1,9 @@
+{"log":"[2024-01-15 10:00:00] INFO: Starting web server\n","stream":"stdout","time":"2024-01-15T10:00:00.000000000Z"}
+{"log":"[2024-01-15 10:00:01] INFO: Loaded 12 routes\n","stream":"stdout","time":"2024-01-15T10:00:01.000000000Z"}
+{"log":"[2024-01-15 10:00:05] WARN: Deprecated API version v1 used by client 10.0.0.5\n","stream":"stdout","time":"2024-01-15T10:00:05.000000000Z"}
+{"log":"Traceback (most recent call last):\n","stream":"stderr","time":"2024-01-15T10:00:10.000000000Z"}
+{"log":"  File \"/app/handlers.py\", line 42, in handle_request\n","stream":"stderr","time":"2024-01-15T10:00:10.000000001Z"}
+{"log":"  File \"/app/db.py\", line 88, in query\n","stream":"stderr","time":"2024-01-15T10:00:10.000000002Z"}
+{"log":"psycopg2.OperationalError: connection to server lost\n","stream":"stderr","time":"2024-01-15T10:00:10.000000003Z"}
+{"log":"[2024-01-15 10:00:11] ERROR: Database connection lost, activating circuit breaker\n","stream":"stderr","time":"2024-01-15T10:00:11.000000000Z"}
+{"log":"[2024-01-15 10:00:15] FATAL: Healthcheck failed 3 times, shutting down\n","stream":"stderr","time":"2024-01-15T10:00:15.000000000Z"}

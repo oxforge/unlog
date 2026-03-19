@@ -2,6 +2,7 @@ package ingest
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -10,11 +11,10 @@ var (
 	reKubernetes = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\s+(stdout|stderr)\s+[FP]\s+`)
 	reSyslog5424 = regexp.MustCompile(`^<\d+>\d+\s+`)
 	reSyslog3164 = regexp.MustCompile(`^<\d+>(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s`)
-	reCLF        = regexp.MustCompile(`^\S+\s+\S+\s+\S+\s+\[`)
+	reCLF        = regexp.MustCompile(`^\S+\s+\S+\s+\S+\s+\[\d{2}/[A-Z]`)
 	reLogfmtPair = regexp.MustCompile(`\b\w+=(?:"[^"]*"|\S+)`)
 	reGenericTS  = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}`)
-	reCSVHeader  = regexp.MustCompile(`(?i)^(timestamp|time|ts|date),\s*(level|severity|lvl),\s*(message|msg|log)`)
-	reCSVData    = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}[^,]*,\s*(TRACE|DEBUG|INFO|WARN|WARNING|ERROR|FATAL|ERR|trace|debug|info|warn|warning|error|fatal|err)\s*,`)
+	reCSVData    = regexp.MustCompile(`(?i)^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}[^,]*,\s*(TRACE|DEBUG|INFO|WARN|WARNING|ERROR|FATAL|ERR)\s*,`)
 )
 
 // classifyLine returns the most specific Format that matches line.
@@ -66,7 +66,7 @@ func classifyLine(line string) Format {
 		return FormatCLF
 	}
 
-	if reCSVHeader.MatchString(line) || reCSVData.MatchString(line) {
+	if isCSVHeaderLine(line) || reCSVData.MatchString(line) {
 		return FormatCSV
 	}
 
@@ -79,6 +79,35 @@ func classifyLine(line string) Format {
 	}
 
 	return FormatRaw
+}
+
+// isCSVHeaderLine parses line as a quoted CSV row and checks whether it looks
+// like a header using the same knownHeaders set as the CSV parser.
+func isCSVHeaderLine(line string) bool {
+	fields, ok := parseCSVLine(line)
+	if !ok {
+		return false
+	}
+	return isHeaderRow(fields)
+}
+
+// formatFromExtension returns a format hint based on the file extension of source.
+// Returns FormatUnknown if the extension doesn't map to a specific format.
+// Note: .json is intentionally excluded — JSON is an encoding shared by multiple
+// formats (structured JSON, Docker JSON, CloudWatch), and content-based detection
+// is needed to distinguish them.
+func formatFromExtension(source string) Format {
+	// Strip archive qualifiers like "file.tar.gz:inner.csv" → use inner name.
+	if idx := strings.LastIndex(source, ":"); idx >= 0 {
+		source = source[idx+1:]
+	}
+	ext := strings.ToLower(filepath.Ext(source))
+	switch ext {
+	case ".csv":
+		return FormatCSV
+	default:
+		return FormatUnknown
+	}
 }
 
 // DetectFormat inspects a sample of lines and returns the most likely Format
@@ -95,7 +124,7 @@ func detectFormat(lines []string) Format {
 	votes := make(map[Format]int)
 	for _, line := range lines {
 		f := classifyLine(line)
-		if f != FormatUnknown {
+		if f != FormatUnknown && f != FormatRaw {
 			votes[f]++
 		}
 	}
@@ -117,80 +146,13 @@ func detectFormat(lines []string) Format {
 		return bestFormat
 	}
 
+	// A CSV header is a strong signal — even a single header row among
+	// otherwise-unclassifiable data lines is enough to select CSV.
+	if votes[FormatCSV] > 0 {
+		return FormatCSV
+	}
 	if votes[FormatGeneric] > 0 {
 		return FormatGeneric
 	}
 	return FormatRaw
-}
-
-// parserForFormat returns the appropriate Parser for a detected format.
-func parserForFormat(format Format) Parser {
-	switch format {
-	case FormatDockerJSON:
-		return &dockerParser{}
-	case FormatCloudWatch:
-		return &cloudwatchParser{}
-	case FormatKubernetes:
-		return &kubeParser{}
-	case FormatJSON:
-		return &jsonParser{}
-	case FormatSyslog5424:
-		return newSyslogParser(true)
-	case FormatSyslog3164:
-		return newSyslogParser(false)
-	case FormatCLF:
-		return &clfParser{}
-	case FormatLogfmt:
-		return &logfmtParser{}
-	case FormatCSV:
-		return &csvParser{}
-	case FormatGeneric:
-		return &genericParser{}
-	default:
-		return &rawParser{}
-	}
-}
-
-// lineCheckerForFormat returns a LineChecker that recognises the first line of
-// a new log entry for the given format. This is used by the reader to reassemble
-// multi-line entries (e.g. stack traces).
-func lineCheckerForFormat(format Format) LineChecker {
-	switch format {
-	case FormatDockerJSON, FormatCloudWatch, FormatJSON:
-		return func(line string) bool {
-			return len(line) > 0 && line[0] == '{'
-		}
-	case FormatKubernetes:
-		return func(line string) bool {
-			return reKubernetes.MatchString(line)
-		}
-	case FormatSyslog5424:
-		return func(line string) bool {
-			return reSyslog5424.MatchString(line)
-		}
-	case FormatSyslog3164:
-		return func(line string) bool {
-			return reSyslog3164.MatchString(line)
-		}
-	case FormatCLF:
-		return func(line string) bool {
-			return reCLF.MatchString(line)
-		}
-	case FormatLogfmt:
-		return func(line string) bool {
-			return len(reLogfmtPair.FindAllString(line, 3)) >= 3
-		}
-	case FormatCSV:
-		return func(line string) bool {
-			return len(line) > 0
-		}
-	case FormatGeneric:
-		return func(line string) bool {
-			return reGenericTS.MatchString(line)
-		}
-	default:
-		return func(line string) bool {
-			return true
-		}
-	}
 }
