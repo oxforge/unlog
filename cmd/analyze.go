@@ -72,9 +72,13 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 		}
 
 		var streamCB analyze.StreamCallback
-		if effectiveFormat == "text" && outputFlag == "" {
+		if effectiveFormat == "text" {
+			streamW := os.Stdout
+			if outputFlag != "" {
+				streamW = os.Stderr
+			}
 			streamCB = func(token string) {
-				_, _ = fmt.Fprint(os.Stdout, token)
+				_, _ = fmt.Fprint(streamW, token)
 			}
 		}
 
@@ -83,8 +87,12 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 			return fmt.Errorf("cmd: analyze: %w", err)
 		}
 
-		if effectiveFormat == "text" && outputFlag == "" {
-			_, _ = fmt.Fprintln(os.Stdout)
+		if effectiveFormat == "text" {
+			streamW := os.Stdout
+			if outputFlag != "" {
+				streamW = os.Stderr
+			}
+			_, _ = fmt.Fprintln(streamW)
 		}
 	}
 

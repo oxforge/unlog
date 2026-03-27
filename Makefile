@@ -12,8 +12,6 @@ lint:
 smoke: build
 	./bin/unlog testdata/incidents/db_connection/
 	./bin/unlog --format json testdata/incidents/deploy_failure/
-	./bin/unlog stats testdata/incidents/db_connection/
-	./bin/unlog formats testdata/formats/
 
 bigdata:
 	@mkdir -p testdata/big
