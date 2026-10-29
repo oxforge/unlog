@@ -1,105 +1,117 @@
 package filter
 
 import (
+	"math/rand"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/oxforge/unlog/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func makeEntry(msg string, ts time.Time) types.LogEntry {
-	return types.LogEntry{Timestamp: ts, Level: types.LevelError, Source: "test", Message: msg}
+var t0 = time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+
+func entryAt(level types.Level, source, msg string, ts time.Time, line int64) types.LogEntry {
+	return types.LogEntry{Timestamp: ts, Level: level, Source: source, Message: msg, LineNumber: line}
 }
 
-func TestDedupFilter_KeepsFirstN(t *testing.T) {
-	df := NewDedupFilter(2, 1, 100)
-	ts := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+func TestDedupMergesRepeatsIntoOneRecord(t *testing.T) {
+	const n = 3000
+	entries := make([]types.LogEntry, n)
+	for i := range entries {
+		entries[i] = entryAt(types.LevelError, "app.log", "upstream timeout for order "+strconv.Itoa(i),
+			t0.Add(time.Duration(i)*time.Second), int64(i+1))
+	}
+	rand.New(rand.NewSource(42)).Shuffle(n, func(i, j int) { entries[i], entries[j] = entries[j], entries[i] })
 
-	// Same message 3 times — first 2 kept, 3rd dropped.
-	r1, ok1 := df.Apply(makeEntry("error on host 10.0.0.1", ts))
-	assert.True(t, ok1)
-	assert.Equal(t, 1, r1.OccurrenceCount)
-
-	r2, ok2 := df.Apply(makeEntry("error on host 10.0.0.2", ts.Add(time.Second)))
-	assert.True(t, ok2)
-	assert.Equal(t, 2, r2.OccurrenceCount)
-
-	_, ok3 := df.Apply(makeEntry("error on host 10.0.0.3", ts.Add(2*time.Second)))
-	assert.False(t, ok3)
-}
-
-func TestDedupFilter_DifferentSignaturesIndependent(t *testing.T) {
-	df := NewDedupFilter(1, 1, 100)
-	ts := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
-
-	r1, ok1 := df.Apply(makeEntry("connection refused", ts))
-	assert.True(t, ok1)
-	assert.Equal(t, 1, r1.OccurrenceCount)
-
-	r2, ok2 := df.Apply(makeEntry("disk full", ts.Add(time.Second)))
-	assert.True(t, ok2)
-	assert.Equal(t, 1, r2.OccurrenceCount)
-}
-
-func TestDedupFilter_Summaries(t *testing.T) {
-	df := NewDedupFilter(1, 1, 100)
-	t0 := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
-	t1 := t0.Add(time.Second)
-	t2 := t0.Add(2 * time.Second)
-
-	msg1 := "error on host 10.0.0.1"
-	msg2 := "error on host 10.0.0.2"
-	msg3 := "error on host 10.0.0.3"
-
-	// Same signature, different variable parts.
-	df.Apply(makeEntry(msg1, t0))
-	df.Apply(makeEntry(msg2, t1))
-	df.Apply(makeEntry(msg3, t2))
-
-	summaries := df.Summaries()
-	assert.Len(t, summaries, 1)
-
-	s := summaries[0]
-	assert.Equal(t, 3, s.OccurrenceCount)
-	assert.Equal(t, t0, s.FirstSeen)
-	assert.Equal(t, t2, s.LastSeen)
-	assert.Equal(t, types.LevelError, s.Level)
-	assert.Equal(t, "test", s.Source)
-	// Message should be the original first-seen message, not the signature.
-	assert.Equal(t, msg1, s.Message)
-}
-
-func TestDedupFilter_LRUEviction(t *testing.T) {
-	// 1 shard, cache size 2 — third distinct signature evicts the first.
-	df := NewDedupFilter(5, 1, 2)
-	ts := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
-
-	df.Apply(makeEntry("alpha error", ts))
-	df.Apply(makeEntry("beta error", ts.Add(time.Second)))
-	df.Apply(makeEntry("gamma error", ts.Add(2*time.Second)))
-
-	// "alpha error" was evicted; re-applying should return count=1.
-	r, ok := df.Apply(makeEntry("alpha error", ts.Add(3*time.Second)))
-	assert.True(t, ok)
-	assert.Equal(t, 1, r.OccurrenceCount)
-}
-
-func TestDedupFilter_ConcurrentAccess(t *testing.T) {
-	df := NewDedupFilter(5, 16, 1000)
-	ts := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
-
+	df := NewDedupFilter(4)
 	var wg sync.WaitGroup
-	for i := 0; i < 100; i++ {
+	for g := 0; g < 4; g++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			df.Apply(makeEntry("concurrent error on host 10.0.0.1", ts))
+			for i := g; i < n; i += 4 {
+				df.Add(entries[i])
+			}
 		}()
 	}
 	wg.Wait()
 
-	// Just verify no panic/race and unique signatures is 1.
-	assert.Equal(t, 1, df.UniqueSignatures())
+	got := df.Entries()
+	require.Len(t, got, 1)
+	assert.Equal(t, 3000, got[0].OccurrenceCount)
+	assert.True(t, t0.Equal(got[0].FirstSeen))
+	assert.True(t, t0.Add(2999*time.Second).Equal(got[0].LastSeen), "last seen 10:49:59")
+	assert.Equal(t, "upstream timeout for order 0", got[0].Message)
+	assert.True(t, got[0].FirstSeen.Equal(got[0].Timestamp))
+}
+
+func TestDedupKeepsHighestLevel(t *testing.T) {
+	df := NewDedupFilter(1)
+	df.Add(entryAt(types.LevelWarn, "a.log", "disk 91% full", t0, 1))
+	df.Add(entryAt(types.LevelError, "a.log", "disk 97% full", t0.Add(5*time.Minute), 2))
+	got := df.Entries()
+	require.Len(t, got, 1)
+	assert.Equal(t, types.LevelError, got[0].Level)
+	assert.Equal(t, "disk 91% full", got[0].Message)
+}
+
+func TestDedupSeparatesSources(t *testing.T) {
+	df := NewDedupFilter(4)
+	df.Add(entryAt(types.LevelError, "api-1.log", "connection refused", t0, 1))
+	df.Add(entryAt(types.LevelError, "api-2.log", "connection refused", t0, 1))
+	assert.Len(t, df.Entries(), 2)
+}
+
+func TestDedupTieBreaksOnLineNumber(t *testing.T) {
+	df := NewDedupFilter(1)
+	df.Add(entryAt(types.LevelError, "a.log", "boom", t0, 7))
+	df.Add(entryAt(types.LevelError, "a.log", "boom", t0, 3))
+	got := df.Entries()
+	require.Len(t, got, 1)
+	assert.Equal(t, int64(3), got[0].LineNumber)
+}
+
+func TestDedupUndatedNeverWinsOverDated(t *testing.T) {
+	df := NewDedupFilter(1)
+	df.Add(entryAt(types.LevelError, "a.log", "boom", time.Time{}, 1))
+	df.Add(entryAt(types.LevelError, "a.log", "boom", t0, 9))
+	got := df.Entries()
+	require.Len(t, got, 1)
+	assert.Equal(t, int64(9), got[0].LineNumber)
+	assert.True(t, t0.Equal(got[0].FirstSeen))
+	assert.Equal(t, 2, got[0].OccurrenceCount)
+}
+
+func TestDedupEntriesAreSorted(t *testing.T) {
+	df := NewDedupFilter(2)
+	df.Add(entryAt(types.LevelError, "b.log", "second", t0.Add(2*time.Minute), 1))
+	df.Add(entryAt(types.LevelError, "a.log", "first", t0.Add(time.Minute), 1))
+	df.Add(entryAt(types.LevelError, "c.log", "undated", time.Time{}, 1))
+	got := df.Entries()
+	require.Len(t, got, 3)
+	assert.Equal(t, "first", got[0].Message)
+	assert.Equal(t, "second", got[1].Message)
+	assert.Equal(t, "undated", got[2].Message)
+}
+
+func TestUniqueSignaturesIgnoresSource(t *testing.T) {
+	df := NewDedupFilter(4)
+	df.Add(entryAt(types.LevelError, "a.log", "connection refused", t0, 1))
+	df.Add(entryAt(types.LevelError, "b.log", "connection refused", t0, 1))
+	df.Add(entryAt(types.LevelError, "a.log", "disk full", t0, 2))
+	assert.Equal(t, 2, df.UniqueSignatures())
+}
+
+func TestDedupSpikeMarkAppearsInEntries(t *testing.T) {
+	df := NewDedupFilter(1)
+	id := df.Add(entryAt(types.LevelError, "a.log", "boom", t0, 1))
+	require.NotNil(t, df.record(id))
+	df.markSpike(id)
+	got := df.Entries()
+	require.Len(t, got, 1)
+	assert.True(t, got[0].IsSpike)
 }

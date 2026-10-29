@@ -68,14 +68,14 @@ func BenchmarkDedupCacheLookup(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		// Fresh cache each iteration to avoid state leak across b.N runs.
 		b.StopTimer()
-		dedup := NewDedupFilter(5, 16, 10_000)
+		dedup := NewDedupFilter(16)
 		for j := range seedEntries {
-			dedup.Apply(seedEntries[j])
+			dedup.Add(seedEntries[j])
 		}
 		b.StartTimer()
 
 		for j := range lookups {
-			dedup.Apply(lookups[j])
+			dedup.Add(lookups[j])
 		}
 	}
 }

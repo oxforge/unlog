@@ -1,23 +1,39 @@
 package filter
 
-// workerStats holds per-worker drop counters. Not thread-safe —
+// workerStats holds per-worker counters. Not thread-safe —
 // each worker owns its own instance.
 type workerStats struct {
 	ingested       int64
+	passed         int64
 	droppedByLevel int64
 	droppedByTime  int64
 	droppedByNoise int64
-	droppedByDedup int64
+	// errorsBySource counts ERROR and FATAL occurrences that passed the
+	// filters, before merging.
+	errorsBySource map[string]int64
 }
 
-// mergeWorkerStats combines per-worker stats into DetailedStats.
-func mergeWorkerStats(workers []workerStats) (ingested int64, detailed DetailedStats) {
+// mergedStats is the combination of all workers' counters.
+type mergedStats struct {
+	ingested       int64
+	passed         int64
+	errorsBySource map[string]int64
+	detailed       DetailedStats
+}
+
+// mergeWorkerStats combines per-worker stats. DroppedByDedup is left for
+// phase 2, which knows how many records survived.
+func mergeWorkerStats(workers []workerStats) mergedStats {
+	m := mergedStats{errorsBySource: make(map[string]int64)}
 	for _, w := range workers {
-		ingested += w.ingested
-		detailed.DroppedByLevel += w.droppedByLevel
-		detailed.DroppedByTimeWindow += w.droppedByTime
-		detailed.DroppedByNoise += w.droppedByNoise
-		detailed.DroppedByDedup += w.droppedByDedup
+		m.ingested += w.ingested
+		m.passed += w.passed
+		m.detailed.DroppedByLevel += w.droppedByLevel
+		m.detailed.DroppedByTimeWindow += w.droppedByTime
+		m.detailed.DroppedByNoise += w.droppedByNoise
+		for src, n := range w.errorsBySource {
+			m.errorsBySource[src] += n
+		}
 	}
-	return ingested, detailed
+	return m
 }

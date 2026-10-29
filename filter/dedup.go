@@ -1,143 +1,192 @@
 package filter
 
 import (
+	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/oxforge/unlog/types"
 )
 
-// dedupEntry tracks a deduplicated log message signature.
-type dedupEntry struct {
-	first    types.LogEntry
-	lastSeen time.Time
-	count    int
+// dedupKey identifies a record: one per error per source.
+type dedupKey struct {
+	source string
+	sig    string
+}
+
+// dedupRecord accumulates every occurrence of one error in one source.
+type dedupRecord struct {
+	exemplar types.LogEntry
 	sig      string
+	count    int64
+	first    time.Time
+	last     time.Time
+	level    types.Level
+	spike    bool
 }
 
-// dedupShard is a concurrency-safe partition of the dedup cache.
+// dedupShard is a concurrency-safe partition of the record map.
 type dedupShard struct {
-	mu    sync.Mutex
-	cache *lru[string, *dedupEntry]
+	mu      sync.Mutex
+	records map[dedupKey]*dedupRecord
+	ids     map[dedupKey]uint32
 }
 
-// DedupFilter performs fuzzy deduplication of log entries using signature extraction
-// and a sharded LRU cache for concurrent access.
+// DedupFilter merges log entries into one record per (source, fuzzy signature).
+// The result does not depend on the order entries arrive in.
 type DedupFilter struct {
-	shards  []*dedupShard
-	maxDups int
+	shards []*dedupShard
+	nextID atomic.Uint32
+	byID   sync.Map // uint32 -> *dedupRecord
 }
 
-// NewDedupFilter creates a DedupFilter with the given maximum duplicate count,
-// number of shards for concurrency, and total cache size across all shards.
-func NewDedupFilter(maxDups, numShards, cacheSize int) *DedupFilter {
+// NewDedupFilter creates a DedupFilter with the given number of shards.
+func NewDedupFilter(numShards int) *DedupFilter {
 	if numShards < 1 {
 		numShards = 1
-	}
-	perShard := cacheSize / numShards
-	if perShard < 1 {
-		perShard = 1
 	}
 	shards := make([]*dedupShard, numShards)
 	for i := range shards {
 		shards[i] = &dedupShard{
-			cache: newLRU[string, *dedupEntry](perShard),
+			records: make(map[dedupKey]*dedupRecord),
+			ids:     make(map[dedupKey]uint32),
 		}
 	}
-	return &DedupFilter{
-		shards:  shards,
-		maxDups: maxDups,
-	}
+	return &DedupFilter{shards: shards}
 }
 
 // shardFor selects a shard using inline FNV-1a hash to avoid allocations.
-func (d *DedupFilter) shardFor(sig string) *dedupShard {
+func (d *DedupFilter) shardFor(k dedupKey) *dedupShard {
 	var h uint32 = 2166136261
-	for i := 0; i < len(sig); i++ {
-		h ^= uint32(sig[i])
+	for i := 0; i < len(k.source); i++ {
+		h ^= uint32(k.source[i])
+		h *= 16777619
+	}
+	h ^= 0xff
+	h *= 16777619
+	for i := 0; i < len(k.sig); i++ {
+		h ^= uint32(k.sig[i])
 		h *= 16777619
 	}
 	return d.shards[h%uint32(len(d.shards))]
 }
 
-// Apply checks whether the entry should be kept based on its fuzzy signature.
-func (d *DedupFilter) Apply(entry types.LogEntry) (types.FilteredEntry, bool) {
-	sig := ExtractSignature(entry.Message)
-	shard := d.shardFor(sig)
+// betterExemplar reports whether e should replace the record's current exemplar:
+// the earliest dated occurrence wins; ties go to the smaller source, then line.
+// An undated occurrence only counts while the record has no dated one.
+func betterExemplar(e, cur types.LogEntry) bool {
+	switch {
+	case e.Timestamp.IsZero() != cur.Timestamp.IsZero():
+		return !e.Timestamp.IsZero()
+	case !e.Timestamp.Equal(cur.Timestamp):
+		return e.Timestamp.Before(cur.Timestamp)
+	case e.Source != cur.Source:
+		return e.Source < cur.Source
+	default:
+		return e.LineNumber < cur.LineNumber
+	}
+}
+
+// Add merges the entry into the record keyed by (Source, signature) and returns
+// the record's id. It is safe for concurrent use.
+func (d *DedupFilter) Add(entry types.LogEntry) uint32 {
+	k := dedupKey{source: entry.Source, sig: ExtractSignature(entry.Message)}
+	shard := d.shardFor(k)
 
 	shard.mu.Lock()
 	defer shard.mu.Unlock()
 
-	existing, ok := shard.cache.Get(sig)
+	rec, ok := shard.records[k]
 	if !ok {
-		shard.cache.Put(sig, &dedupEntry{
-			first:    entry,
-			lastSeen: entry.Timestamp,
-			count:    1,
-			sig:      sig,
-		})
-		return types.FilteredEntry{
-			LogEntry:        entry,
-			OccurrenceCount: 1,
-			FirstSeen:       entry.Timestamp,
-			LastSeen:        entry.Timestamp,
-			Signature:       sig,
-		}, true
+		rec = &dedupRecord{exemplar: entry, sig: k.sig, level: entry.Level}
+		id := d.nextID.Add(1)
+		shard.records[k] = rec
+		shard.ids[k] = id
+		d.byID.Store(id, rec)
+	} else if betterExemplar(entry, rec.exemplar) {
+		rec.exemplar = entry
 	}
-
-	existing.count++
-	if entry.Timestamp.After(existing.lastSeen) {
-		existing.lastSeen = entry.Timestamp
+	rec.count++
+	if entry.Level > rec.level {
+		rec.level = entry.Level
 	}
-
-	if existing.count <= d.maxDups {
-		return types.FilteredEntry{
-			LogEntry:        entry,
-			OccurrenceCount: existing.count,
-			FirstSeen:       existing.first.Timestamp,
-			LastSeen:        entry.Timestamp,
-			Signature:       sig,
-		}, true
+	if ts := entry.Timestamp; !ts.IsZero() {
+		if rec.first.IsZero() || ts.Before(rec.first) {
+			rec.first = ts
+		}
+		if ts.After(rec.last) {
+			rec.last = ts
+		}
 	}
-
-	return types.FilteredEntry{}, false
+	return shard.ids[k]
 }
 
-// Summaries returns synthetic FilteredEntry values for every signature whose
-// count exceeded maxDups.
-func (d *DedupFilter) Summaries() []types.FilteredEntry {
+// record returns the record with the given id, or nil.
+func (d *DedupFilter) record(id uint32) *dedupRecord {
+	v, ok := d.byID.Load(id)
+	if !ok {
+		return nil
+	}
+	return v.(*dedupRecord)
+}
+
+// markSpike flags the record as part of a burst. Call it only after all Add calls.
+func (d *DedupFilter) markSpike(id uint32) {
+	if r := d.record(id); r != nil {
+		r.spike = true
+	}
+}
+
+// Entries returns one FilteredEntry per record, sorted by FirstSeen (undated
+// last), then source, then exemplar line number. Call it only after all Add calls.
+func (d *DedupFilter) Entries() []types.FilteredEntry {
 	var out []types.FilteredEntry
 	for _, shard := range d.shards {
 		shard.mu.Lock()
-		shard.cache.Each(func(_ string, de *dedupEntry) {
-			if de.count > d.maxDups {
-				out = append(out, types.FilteredEntry{
-					LogEntry: types.LogEntry{
-						Timestamp: de.first.Timestamp,
-						Level:     de.first.Level,
-						Source:    de.first.Source,
-						Message:   de.first.Message,
-					},
-					OccurrenceCount: de.count,
-					FirstSeen:       de.first.Timestamp,
-					LastSeen:        de.lastSeen,
-					IsSpike:         false,
-					Signature:       de.sig,
-				})
-			}
-		})
+		for _, r := range shard.records {
+			le := r.exemplar
+			le.Level = r.level
+			le.Timestamp = r.first
+			out = append(out, types.FilteredEntry{
+				LogEntry:        le,
+				OccurrenceCount: int(r.count),
+				FirstSeen:       r.first,
+				LastSeen:        r.last,
+				IsSpike:         r.spike,
+				Signature:       r.sig,
+			})
+		}
 		shard.mu.Unlock()
 	}
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.FirstSeen.IsZero() != b.FirstSeen.IsZero() {
+			return !a.FirstSeen.IsZero()
+		}
+		if !a.FirstSeen.Equal(b.FirstSeen) {
+			return a.FirstSeen.Before(b.FirstSeen)
+		}
+		if a.Source != b.Source {
+			return a.Source < b.Source
+		}
+		if a.LineNumber != b.LineNumber {
+			return a.LineNumber < b.LineNumber
+		}
+		return a.Signature < b.Signature
+	})
 	return out
 }
 
-// UniqueSignatures returns the total number of unique signatures across all shards.
+// UniqueSignatures returns the number of distinct signatures, ignoring source.
 func (d *DedupFilter) UniqueSignatures() int {
-	total := 0
+	sigs := make(map[string]struct{})
 	for _, shard := range d.shards {
 		shard.mu.Lock()
-		total += shard.cache.Len()
+		for k := range shard.records {
+			sigs[k.sig] = struct{}{}
+		}
 		shard.mu.Unlock()
 	}
-	return total
+	return len(sigs)
 }
