@@ -120,6 +120,7 @@ unlog --ai-provider openai --format markdown --output report.md logs/
 | `--level` | Minimum log level: `trace`, `debug`, `info`, `warn`, `error`, `fatal` (default: `warn`) |
 | `--since` | Start time filter (ISO 8601 or relative: `2h`, `30m`) |
 | `--until` | End time filter (ISO 8601 or relative: `2h`, `30m`) |
+| `--tz` | Time zone of timestamps that carry none, in logs and in `--since`/`--until` (e.g. `Europe/Berlin`, `Local`; default: UTC) |
 | `--noise-file` | Path to a custom noise patterns file |
 | `--verbose`, `-v` | Show detailed output including per-filter drop counts |
 | `--no-color` | Disable colored output (also respects `NO_COLOR` env var) |
@@ -140,6 +141,9 @@ ai_provider = ""       # set to "openai", "anthropic", "gemini", or "ollama" to 
 model = ""
 system_prompt = ""     # custom LLM system prompt (empty = built-in default)
 ai_timeout = ""        # timeout for LLM API calls (e.g. "2m", "30s"; default: 5m)
+since = ""             # start time filter (ISO 8601 or relative, e.g. "2h")
+until = ""             # end time filter
+tz = ""                # zone of timestamps that carry none (default: UTC)
 noise_file = ""
 verbose = false
 no_color = false
@@ -159,6 +163,10 @@ Every config option can be set via `UNLOG_*` environment variables:
 | `UNLOG_AI_TIMEOUT` | Timeout for LLM API calls (e.g. `2m`, `30s`) |
 | `UNLOG_NOISE_FILE` | Custom noise patterns path |
 | `UNLOG_VERBOSE` | Verbose output (`true`/`false`) |
+| `UNLOG_SINCE` | Start time filter |
+| `UNLOG_UNTIL` | End time filter |
+| `UNLOG_TZ` | Zone of timestamps that carry none |
+| `UNLOG_NO_COLOR` | Disable color (`true`/`false`) |
 | `NO_COLOR` | Disable color (any value, per [no-color.org](https://no-color.org)) |
 
 ### LLM provider API keys

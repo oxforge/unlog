@@ -67,31 +67,36 @@ type Parser interface {
 
 // parserForFormat returns the appropriate Parser for a detected format. ref
 // is when the source was last written (its mtime), which dates timestamps that
-// carry no year.
-func parserForFormat(format Format, ref time.Time) Parser {
+// carry no year; loc is the zone of timestamps that carry none (nil = UTC).
+func parserForFormat(format Format, ref time.Time, loc *time.Location) Parser {
+	ts := formatCache{loc: loc}
 	switch format {
 	case FormatDockerJSON:
-		return &dockerParser{}
+		return &dockerParser{tsCache: ts}
 	case FormatDockerCompose:
-		return &dockerComposeParser{}
+		return &dockerComposeParser{tsCache: ts}
 	case FormatCloudWatch:
-		return &cloudwatchParser{}
+		return &cloudwatchParser{tsCache: ts}
 	case FormatKubernetes:
-		return &kubeParser{}
+		return &kubeParser{tsCache: ts}
 	case FormatJSON:
-		return &jsonParser{}
+		return &jsonParser{tsCache: ts}
 	case FormatSyslog5424:
-		return newSyslogParser(true, ref)
+		p := newSyslogParser(true, ref)
+		p.tsCache = ts
+		return p
 	case FormatSyslog3164:
-		return newSyslogParser(false, ref)
+		p := newSyslogParser(false, ref)
+		p.tsCache = ts
+		return p
 	case FormatCLF:
-		return &clfParser{}
+		return &clfParser{tsCache: ts}
 	case FormatLogfmt:
-		return &logfmtParser{}
+		return &logfmtParser{tsCache: ts}
 	case FormatCSV:
-		return &csvParser{}
+		return &csvParser{tsCache: ts}
 	case FormatGeneric:
-		return &genericParser{}
+		return &genericParser{tsCache: ts}
 	default:
 		return &rawParser{}
 	}

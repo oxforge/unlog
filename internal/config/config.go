@@ -27,6 +27,7 @@ type Config struct {
 	NoiseFile    string `toml:"noise_file"`    // custom noise patterns path
 	Since        string `toml:"since"`         // time filter start (ISO 8601 or relative)
 	Until        string `toml:"until"`         // time filter end (ISO 8601 or relative)
+	TZ           string `toml:"tz"`            // zone of timestamps that carry none (default UTC)
 	AIProvider   string `toml:"ai_provider"`   // LLM provider: openai, anthropic, ollama (empty = no AI)
 	Model        string `toml:"model"`         // LLM model override
 	SystemPrompt string `toml:"system_prompt"` // custom LLM system prompt
@@ -76,6 +77,9 @@ func overlayEnv(cfg *Config) {
 	}
 	if v := os.Getenv("UNLOG_UNTIL"); v != "" {
 		cfg.Until = v
+	}
+	if v := os.Getenv("UNLOG_TZ"); v != "" {
+		cfg.TZ = v
 	}
 	if v := os.Getenv("UNLOG_AI_PROVIDER"); v != "" {
 		cfg.AIProvider = v

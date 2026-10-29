@@ -585,3 +585,39 @@ func TestE2EStdinAlongsideFiles(t *testing.T) {
 	assert.Contains(t, report.CompactedSummary, "stdin: piped failure")
 	assert.Contains(t, report.CompactedSummary, "app.log")
 }
+
+const zonelessFixture = `2024-01-15 10:00:00 ERROR early failure
+2024-01-15 11:00:00 ERROR late failure
+`
+
+// The same zone-less string means the same instant in a flag and in a log
+// line, whatever the machine's time zone.
+func TestE2ESinceUsesTheLogsZone(t *testing.T) {
+	logPath := writeFile(t, t.TempDir(), "app.log", zonelessFixture)
+
+	r := runUnlog(t, t.TempDir(), []string{"TZ=Asia/Tokyo"}, "--format", "json", "--since", "2024-01-15 10:30:00", logPath)
+
+	require.Equal(t, 0, r.exit, "stderr: %s", r.stderr)
+	var report types.AnalysisReport
+	require.NoError(t, json.Unmarshal([]byte(r.stdout), &report))
+	assert.Contains(t, report.CompactedSummary, "late failure")
+	assert.NotContains(t, report.CompactedSummary, "early failure")
+}
+
+func TestE2ETZFlagSetsTheZoneOfZonelessTimestamps(t *testing.T) {
+	logPath := writeFile(t, t.TempDir(), "app.log", zonelessFixture)
+
+	report := runJSON(t, "--tz", "Asia/Tokyo", "--since", "2024-01-15 10:30:00", logPath)
+
+	assert.Contains(t, report.CompactedSummary, "2024-01-15T02:00:00Z [ERROR]")
+	assert.NotContains(t, report.CompactedSummary, "early failure")
+}
+
+func TestE2EInvalidTZFails(t *testing.T) {
+	logPath := writeFile(t, t.TempDir(), "app.log", zonelessFixture)
+
+	r := runUnlog(t, t.TempDir(), nil, "--tz", "Mars/Olympus", logPath)
+
+	assert.Equal(t, 1, r.exit)
+	assert.Contains(t, r.stderr, "invalid --tz value")
+}

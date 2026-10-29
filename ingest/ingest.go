@@ -39,6 +39,8 @@ type IngestOptions struct {
 	BufferSize int
 	// SampleLines is how many lines to read for format detection. Default: 100.
 	SampleLines int
+	// Location is the zone of timestamps that carry none. Default: UTC.
+	Location *time.Location
 }
 
 func (o IngestOptions) withDefaults() IngestOptions {
@@ -155,7 +157,7 @@ func (ing *Ingester) processSource(ctx context.Context, source string, r io.Read
 	if format == FormatUnknown {
 		format = detectFormat(detectionLines)
 	}
-	parser := parserForFormat(format, modTime)
+	parser := parserForFormat(format, modTime, ing.opts.Location)
 	checker := lineCheckerForFormat(format)
 
 	slog.Debug("ingest: detected format", "source", source, "format", format.String())

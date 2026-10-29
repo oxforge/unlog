@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/oxforge/unlog/ingest"
 	"github.com/oxforge/unlog/internal/analyze"
 	"github.com/oxforge/unlog/internal/pipeline"
 	"github.com/oxforge/unlog/internal/render"
@@ -63,12 +64,20 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 		return err
 	}
 
-	filterOpts, err := buildFilterOpts(cmd)
+	loc, err := resolveLocation(cmd)
 	if err != nil {
 		return err
 	}
 
-	result, err := pipeline.New(pipeline.Options{FilterOpts: filterOpts}).Run(ctx, args)
+	filterOpts, err := buildFilterOpts(cmd, loc)
+	if err != nil {
+		return err
+	}
+
+	result, err := pipeline.New(pipeline.Options{
+		IngestOpts: ingest.IngestOptions{Location: loc},
+		FilterOpts: filterOpts,
+	}).Run(ctx, args)
 	if err != nil {
 		return fmt.Errorf("cmd: pipeline: %w", err)
 	}

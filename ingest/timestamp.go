@@ -21,16 +21,17 @@ var timestampFormats = []string{
 }
 
 // parseTimestamp attempts to parse s as a timestamp, trying each known format
-// in order. Returns the parsed time, the matched format string, and whether
-// parsing succeeded. The returned time is always in UTC.
-func parseTimestamp(s string) (time.Time, string, bool) {
+// in order; a timestamp without a zone is read in loc. Returns the parsed
+// time, the matched format string, and whether parsing succeeded. The
+// returned time is always in UTC.
+func parseTimestamp(s string, loc *time.Location) (time.Time, string, bool) {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return time.Time{}, "", false
 	}
 
 	for _, fmt := range timestampFormats {
-		if t, err := time.Parse(fmt, s); err == nil {
+		if t, err := time.ParseInLocation(fmt, s, loc); err == nil {
 			return t.UTC(), fmt, true
 		}
 	}
@@ -82,6 +83,8 @@ func tryUnixEpoch(s string) (time.Time, bool) {
 // single log source, so that subsequent lines avoid re-trying all formats.
 type formatCache struct {
 	lastFormat string
+	// loc is the zone of timestamps that carry none; nil means UTC.
+	loc *time.Location
 }
 
 // ParseFromPrefix scans the beginning of s for a timestamp, trying
@@ -121,15 +124,23 @@ func (c *formatCache) Parse(s string) (time.Time, bool) {
 				return t.UTC(), true
 			}
 		} else {
-			if t, err := time.Parse(c.lastFormat, s); err == nil {
+			if t, err := time.ParseInLocation(c.lastFormat, s, c.zone()); err == nil {
 				return t.UTC(), true
 			}
 		}
 	}
 
-	t, fmt, ok := parseTimestamp(s)
+	t, fmt, ok := parseTimestamp(s, c.zone())
 	if ok {
 		c.lastFormat = fmt
 	}
 	return t, ok
+}
+
+// zone is the location for timestamps without a zone: loc, or UTC.
+func (c *formatCache) zone() *time.Location {
+	if c.loc == nil {
+		return time.UTC
+	}
+	return c.loc
 }
