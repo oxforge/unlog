@@ -125,7 +125,7 @@ func TestIntegrationAnthropic(t *testing.T) {
 func TestIntegrationGemini(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Contains(t, r.URL.Path, "/v1beta/models/gemini-2.5-flash:streamGenerateContent")
-		assert.Equal(t, "test-key", r.URL.Query().Get("key"))
+		assert.Equal(t, "test-key", r.Header.Get("x-goog-api-key"))
 
 		resp := "Timeline: pool exhaustion. Root cause: connection leak. Recommendation: add pool limits."
 		w.Header().Set("Content-Type", "text/event-stream")
