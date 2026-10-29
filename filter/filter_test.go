@@ -38,10 +38,10 @@ func TestEndToEnd(t *testing.T) {
 		}
 	}
 
-	// 1 noise at ERROR level — should be dropped by noise filter.
+	// 1 noise at WARN level — should be dropped by noise filter.
 	input <- types.LogEntry{
 		Timestamp: base.Add(16 * time.Second),
-		Level:     types.LevelError,
+		Level:     types.LevelWarn,
 		Source:    "app",
 		Message:   "GET /healthz returned 200",
 	}

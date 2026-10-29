@@ -212,7 +212,7 @@ Stages 1-4 are pure Go with no network calls. Stage 5 is optional (enabled with 
 
 ## Custom noise patterns
 
-Create a text file with one pattern per line (case-insensitive substring match). Lines starting with `#` are comments.
+Create a text file with one pattern per line (case-insensitive substring match). Lines starting with `#` are comments. Patterns apply only to entries below ERROR: an error or fatal entry is always kept, even when its text matches.
 
 ```text
 # My custom noise patterns

@@ -37,7 +37,7 @@ func TestNoiseFilter(t *testing.T) {
 		require.NoError(t, err)
 
 		noisy := []string{
-			"scraping /metrics endpoint",
+			"GET /metrics 200 12ms",
 			"prometheus scrape completed",
 		}
 		for _, msg := range noisy {
@@ -54,7 +54,6 @@ func TestNoiseFilter(t *testing.T) {
 			"leader election acquired lock",
 			"lease renewed for node-1",
 			"Successfully synced configmap",
-			"BackOff restarting pod",
 		}
 		for _, msg := range noisy {
 			entry := types.LogEntry{Message: msg}
@@ -82,7 +81,6 @@ func TestNoiseFilter(t *testing.T) {
 
 		noisy := []string{
 			"connection pool stats: active=5 idle=10",
-			"pool size adjusted to 20",
 			"idle connections: 15",
 		}
 		for _, msg := range noisy {
@@ -104,6 +102,47 @@ func TestNoiseFilter(t *testing.T) {
 		}
 		for _, msg := range kept {
 			entry := types.LogEntry{Message: msg}
+			assert.True(t, f.Filter(entry), "should keep: %s", msg)
+		}
+	})
+
+	t.Run("errors are never noise", func(t *testing.T) {
+		f, err := NewNoiseFilter("")
+		require.NoError(t, err)
+
+		for _, level := range []types.Level{types.LevelError, types.LevelFatal} {
+			for _, msg := range []string{
+				"GET /healthz 503 upstream unavailable",
+				"retrying request failed permanently after 5 attempts",
+				"idle connections exhausted",
+			} {
+				entry := types.LogEntry{Level: level, Message: msg}
+				assert.True(t, f.Filter(entry), "should keep %s: %s", level, msg)
+			}
+		}
+	})
+
+	t.Run("noise below error is still dropped", func(t *testing.T) {
+		f, err := NewNoiseFilter("")
+		require.NoError(t, err)
+
+		for _, level := range []types.Level{types.LevelUnknown, types.LevelInfo, types.LevelWarn} {
+			entry := types.LogEntry{Level: level, Message: "retrying request to s3 (attempt 2)"}
+			assert.False(t, f.Filter(entry), "should drop at %s", level)
+		}
+	})
+
+	t.Run("broad phrases are not noise", func(t *testing.T) {
+		f, err := NewNoiseFilter("")
+		require.NoError(t, err)
+
+		for _, msg := range []string{
+			"max pool size reached, rejecting connections",
+			"failed to push /metrics to gateway: 500",
+			"Back-off restarting failed container api in pod api-7f9c",
+			"BackOff restarting failed container",
+		} {
+			entry := types.LogEntry{Level: types.LevelWarn, Message: msg}
 			assert.True(t, f.Filter(entry), "should keep: %s", msg)
 		}
 	})

@@ -281,3 +281,18 @@ func TestE2EOversizedLineDoesNotStopTheFile(t *testing.T) {
 	assert.Contains(t, report.CompactedSummary, "failure after the big line")
 	assert.Less(t, len(report.CompactedSummary), 64*1024)
 }
+
+func TestE2ENoisePatternsDoNotDropErrors(t *testing.T) {
+	logPath := writeFile(t, t.TempDir(), "app.log",
+		`{"level":"error","msg":"max pool size reached, rejecting connections","time":"2024-01-15T10:00:00Z"}
+{"level":"error","msg":"failed to push /metrics to gateway: 500","time":"2024-01-15T10:00:01Z"}
+{"level":"error","msg":"retrying request failed permanently after 5 attempts","time":"2024-01-15T10:00:02Z"}
+`)
+
+	report := runJSON(t, logPath)
+
+	critical := sectionOf(report.CompactedSummary, "## Critical Errors")
+	assert.Contains(t, critical, "max pool size reached")
+	assert.Contains(t, critical, "failed to push /metrics to gateway")
+	assert.Contains(t, critical, "retrying request failed permanently")
+}

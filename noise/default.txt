@@ -9,19 +9,17 @@ GET /ping
 GET /status
 health check passed
 # Prometheus
-/metrics
+GET /metrics
 prometheus scrape
 # Kubernetes internals
 leader election
 lease renewed
 Successfully synced
-BackOff restarting
 # TLS noise
 TLS handshake complete
 certificate verified
 # Connection pool
 connection pool stats
-pool size
 idle connections
 # AWS SDK
 retrying request

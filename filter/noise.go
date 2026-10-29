@@ -9,7 +9,9 @@ import (
 	"github.com/oxforge/unlog/types"
 )
 
-// NoiseFilter drops log entries matching known noise patterns.
+// NoiseFilter drops log entries below ERROR that match known noise patterns.
+// ERROR and FATAL entries are never noise: a failing health check or a final
+// retry failure is signal even when its text matches a pattern.
 type NoiseFilter struct {
 	patterns []string
 }
@@ -65,7 +67,7 @@ func scanPatterns(s *bufio.Scanner) []string {
 }
 
 func (f *NoiseFilter) Filter(entry types.LogEntry) bool {
-	if entry.Message == "" {
+	if entry.Message == "" || entry.Level >= types.LevelError {
 		return true
 	}
 	lower := strings.ToLower(entry.Message)

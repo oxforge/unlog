@@ -26,11 +26,12 @@ func TestFilterPipeline_Integration_IncidentScenario(t *testing.T) {
 		}
 	}
 
-	// 50 health checks at ERROR level — should be dropped by noise filter.
+	// 50 health checks at WARN level — should be dropped by noise filter
+	// (at ERROR they would be kept: errors are never noise).
 	for i := 0; i < 50; i++ {
 		input <- types.LogEntry{
 			Timestamp: base.Add(time.Duration(100+i) * time.Second),
-			Level:     types.LevelError,
+			Level:     types.LevelWarn,
 			Source:    "lb",
 			Message:   fmt.Sprintf("GET /healthz returned 503 attempt %d", i),
 		}
