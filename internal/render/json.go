@@ -27,6 +27,10 @@ func RenderJSON(w io.Writer, result *pipeline.Result, ar *analyze.AnalysisResult
 		CompactedSummary:   result.Summary,
 	}
 
+	if report.Stats.SourceBreakdown == nil {
+		report.Stats.SourceBreakdown = map[string]int64{}
+	}
+
 	if ar != nil {
 		report.Analysis = ar.Analysis
 		report.ModelUsed = ar.ModelUsed
