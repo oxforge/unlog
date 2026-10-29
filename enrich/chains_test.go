@@ -1,6 +1,7 @@
 package enrich
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -183,4 +184,164 @@ func TestFindChains_UndatedEntriesAreSkipped(t *testing.T) {
 	}
 
 	assert.Empty(t, NewChainMatcher().FindChains(entries))
+}
+
+// Any step can open a chain and any later one advances it, so a log that
+// skips a step, or starts after the first one, still shows the chain.
+func TestFindChains_StepsMayBeSkipped(t *testing.T) {
+	tests := []struct {
+		name    string
+		entries []types.EnrichedEntry
+		pattern string
+		want    []step
+	}{
+		{"steps 1 and 3", []types.EnrichedEntry{
+			makeChainEntry("deployment started: api to v2.4.1", types.LevelInfo, "deploy", chainBase, 1),
+			makeChainEntry("deployment failed: rolling back api to v2.4.0", types.LevelError, "deploy", chainBase.Add(3*time.Minute), 2),
+		}, "deployment-failure", []step{{0, 1}, {1, 3}}},
+		{"steps 2 and 3", []types.EnrichedEntry{
+			makeChainEntry("too many connections", types.LevelError, "db", chainBase, 1),
+			makeChainEntry("query failed: cannot execute SELECT", types.LevelError, "app", chainBase.Add(5*time.Second), 2),
+		}, "db-connection-exhaustion", []step{{0, 2}, {1, 3}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			chains := NewChainMatcher().FindChains(tt.entries)
+			require.Len(t, chains, 1, "%+v", chains)
+			assert.Equal(t, tt.pattern, chains[0].Pattern)
+			assert.Equal(t, 2, chains[0].Matched, "two distinct steps")
+			assert.Equal(t, tt.want, membersOf(chains[0]))
+		})
+	}
+}
+
+// Steps must come in order: a later step logged in the same second counts,
+// whatever order the files sort in; one logged after the step it should
+// precede does not.
+func TestFindChains_StepOrder(t *testing.T) {
+	breaker := makeChainEntry("circuit breaker open for payment-api", types.LevelWarn, "api.log", chainBase, 1)
+
+	same := NewChainMatcher().FindChains([]types.EnrichedEntry{
+		breaker, makeChainEntry("timeout connecting to payment-api", types.LevelError, "worker.log", chainBase, 1)})
+	require.Len(t, same, 1)
+	assert.Equal(t, []step{{0, 2}, {1, 1}}, membersOf(same[0]))
+
+	after := NewChainMatcher().FindChains([]types.EnrichedEntry{
+		breaker, makeChainEntry("timeout connecting to payment-api", types.LevelError, "worker.log", chainBase.Add(30*time.Second), 1)})
+	assert.Empty(t, after)
+}
+
+// Before a chain forms, an unrelated earlier match outside the window must
+// not hide it.
+func TestFindChains_AnEarlierMatchDoesNotHideAChain(t *testing.T) {
+	entries := []types.EnrichedEntry{
+		makeChainEntry("timeout connecting to ledger", types.LevelError, "app", chainBase, 1),
+		makeChainEntry("connection refused by payment-api", types.LevelError, "app", chainBase.Add(110*time.Second), 2),
+		makeChainEntry("circuit breaker open for payment-api", types.LevelWarn, "app", chainBase.Add(130*time.Second), 3),
+	}
+
+	chains := NewChainMatcher().FindChains(entries)
+
+	require.Len(t, chains, 1)
+	assert.Equal(t, []step{{1, 1}, {2, 2}}, membersOf(chains[0]))
+}
+
+// An error repeated up to the next step is one record dated at its first
+// occurrence; it still counts as happening within the window.
+func TestFindChains_ARepeatedErrorCountsUntilItsLastOccurrence(t *testing.T) {
+	timeouts := makeChainEntry("timeout connecting to payment-api", types.LevelError, "app", chainBase, 1)
+	timeouts.FirstSeen, timeouts.LastSeen, timeouts.OccurrenceCount = chainBase, chainBase.Add(290*time.Second), 30
+	breaker := makeChainEntry("circuit breaker open for payment-api", types.LevelWarn, "app", chainBase.Add(295*time.Second), 2)
+
+	chains := NewChainMatcher().FindChains([]types.EnrichedEntry{timeouts, breaker})
+
+	require.Len(t, chains, 1)
+	assert.Equal(t, []step{{0, 1}, {1, 2}}, membersOf(chains[0]))
+}
+
+// A chain stays open for its window after its latest new step, so repeats
+// right after the last step join it; later ones don't, so a day of timeouts
+// doesn't become one chain.
+func TestFindChains_RepeatsJoinUntilTheWindowCloses(t *testing.T) {
+	entries := []types.EnrichedEntry{
+		makeChainEntry("timeout connecting to payment-api", types.LevelError, "app", chainBase, 1),
+		makeChainEntry("circuit breaker open for payment-api", types.LevelWarn, "app", chainBase.Add(5*time.Second), 2),
+		makeChainEntry("fallback activated: cached prices", types.LevelWarn, "app", chainBase.Add(6*time.Second), 3),
+		makeChainEntry("circuit breaker open for ledger", types.LevelWarn, "app", chainBase.Add(8*time.Second), 4),
+	}
+	for k := range 60 {
+		entries = append(entries, makeChainEntry(fmt.Sprintf("timeout reading shard %c", 'a'+k%26), types.LevelError, "app",
+			chainBase.Add(time.Duration(k+1)*time.Minute), int64(5+k)))
+	}
+
+	chains := NewChainMatcher().FindChains(entries)
+
+	require.NotEmpty(t, chains)
+	assert.Equal(t, "circuit-breaker", chains[0].ID)
+	assert.Equal(t, []step{{0, 1}, {1, 2}, {2, 3}, {3, 2}, {4, 1}, {5, 1}}, membersOf(chains[0]),
+		"the breaker for ledger joins, and the timeouts at 1m and 2m, within 2 minutes of the last new step (6s)")
+}
+
+// An entry can belong to chains of different patterns; each keeps it.
+func TestFindChains_AnEntryCanBelongToTwoChains(t *testing.T) {
+	entries := []types.EnrichedEntry{
+		makeChainEntry("DNS lookup failed for payments.internal", types.LevelError, "app", chainBase, 1),
+		makeChainEntry("dial tcp 10.0.0.5:443: connect: ECONNREFUSED", types.LevelError, "app", chainBase.Add(2*time.Second), 2),
+		makeChainEntry("circuit breaker open for payments", types.LevelWarn, "app", chainBase.Add(5*time.Second), 3),
+		makeChainEntry("fallback activated: serving cached prices", types.LevelWarn, "app", chainBase.Add(6*time.Second), 4),
+	}
+
+	chains := NewChainMatcher().FindChains(entries)
+
+	byPattern := map[string][]step{}
+	for _, c := range chains {
+		byPattern[c.Pattern] = membersOf(c)
+	}
+	assert.Equal(t, []step{{0, 1}, {1, 2}}, byPattern["dns-failure"])
+	assert.Equal(t, []step{{1, 1}, {2, 2}, {3, 3}}, byPattern["circuit-breaker"])
+}
+
+func TestFindChains_InputOrderDoesNotMatter(t *testing.T) {
+	entries := []types.EnrichedEntry{
+		makeChainEntry("circuit breaker open for payment-api", types.LevelWarn, "app", chainBase.Add(10*time.Second), 1),
+		makeChainEntry("timeout connecting to payment-api", types.LevelError, "app", chainBase, 2),
+	}
+
+	chains := NewChainMatcher().FindChains(entries)
+
+	require.Len(t, chains, 1)
+	assert.Equal(t, []step{{1, 1}, {0, 2}}, membersOf(chains[0]))
+}
+
+// The deployment-failure chain starts at a deployment, as the deploy
+// detector sees it, so every start it names survives the level filter too.
+func TestFindChains_DeploymentFailureStartsAtADeployment(t *testing.T) {
+	entries := []types.EnrichedEntry{
+		makeChainEntry("new version 2.4.1 rolled to production", types.LevelInfo, "deploy", chainBase, 1),
+		makeChainEntry("readiness probe failed: HTTP 503", types.LevelWarn, "k8s", chainBase.Add(time.Minute), 2),
+		makeChainEntry("rollback triggered", types.LevelError, "deploy", chainBase.Add(2*time.Minute), 3),
+	}
+
+	chains := NewChainMatcher().FindChains(entries)
+
+	require.Len(t, chains, 1)
+	assert.Equal(t, "deployment-failure", chains[0].Pattern)
+	assert.Equal(t, 3, chains[0].Matched)
+}
+
+// A chain begins at its lowest step: errors of later steps that ended
+// before it are not part of it, so the timeline never runs backwards.
+func TestFindChains_ChainStartsAtItsLowestStep(t *testing.T) {
+	entries := []types.EnrichedEntry{
+		makeChainEntry("upstream service unavailable after 3 retries", types.LevelError, "web", chainBase, 1),
+		makeChainEntry("service unavailable: proxy returned 503", types.LevelError, "web", chainBase.Add(8*time.Second), 2),
+		makeChainEntry("OOM killer invoked", types.LevelFatal, "kernel", chainBase.Add(15*time.Second), 3),
+		makeChainEntry("service unavailable, shutting down", types.LevelFatal, "app", chainBase.Add(15*time.Second), 4),
+	}
+
+	chains := NewChainMatcher().FindChains(entries)
+
+	require.Len(t, chains, 1)
+	assert.Equal(t, "oom-cascade", chains[0].Pattern)
+	assert.Equal(t, []step{{2, 2}, {3, 3}}, membersOf(chains[0]))
 }

@@ -32,10 +32,20 @@ type FilteredEntry struct {
 	Signature      string `json:"signature"`
 }
 
+// ChainLink places an entry in one detected error chain.
+type ChainLink struct {
+	ID    string `json:"id"`
+	Step  int    `json:"step"`  // the stage (1-based) the entry matched
+	Steps int    `json:"steps"` // the chain pattern's number of stages
+}
+
 // EnrichedEntry is produced by Stage 3 (Enrich). Adds structural context.
 type EnrichedEntry struct {
 	FilteredEntry
-	ChainID string `json:"chain_id,omitempty"`
+	// Chains lists every error chain the entry belongs to, in the order the
+	// chains were found. ChainID, ChainStep and ChainSteps repeat the first.
+	Chains  []ChainLink `json:"chains,omitempty"`
+	ChainID string      `json:"chain_id,omitempty"`
 	// ChainStep is the stage (1-based) of the chain this entry matched, and
 	// ChainSteps the chain pattern's number of stages; both 0 outside a chain.
 	ChainStep    int  `json:"chain_step,omitempty"`
@@ -50,6 +60,15 @@ type EnrichedEntry struct {
 	ErrorType       string   `json:"error_type,omitempty"`
 	HTTPStatus      int      `json:"http_status,omitempty"`
 	TraceID         string   `json:"trace_id,omitempty"`
+}
+
+// ChainLinks returns the chains the entry belongs to: Chains, or the single
+// chain ChainID names when only that is set.
+func (e EnrichedEntry) ChainLinks() []ChainLink {
+	if len(e.Chains) == 0 && e.ChainID != "" {
+		return []ChainLink{{ID: e.ChainID, Step: e.ChainStep, Steps: e.ChainSteps}}
+	}
+	return e.Chains
 }
 
 // Origin labels where the entry came from: the source, plus the service in

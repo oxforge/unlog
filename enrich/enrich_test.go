@@ -125,3 +125,33 @@ func TestEnricher_ZeroOptionsUseTheDefaultWindow(t *testing.T) {
 	assert.Equal(t, []string{"db"}, (<-output).CorrelatedWith)
 	assert.Equal(t, []string{"api"}, (<-output).CorrelatedWith)
 }
+
+// An entry in two chains is linked to both, so neither is shown without it.
+func TestEnricher_LinksAnEntryToEveryChainItIsIn(t *testing.T) {
+	base := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
+	lines := []string{
+		"DNS lookup failed for payments.internal",
+		"dial tcp 10.0.0.5:443: connect: ECONNREFUSED",
+		"circuit breaker open for payments",
+	}
+	input := make(chan types.FilteredEntry, len(lines))
+	output := make(chan types.EnrichedEntry, len(lines))
+	for i, msg := range lines {
+		input <- types.FilteredEntry{LogEntry: types.LogEntry{
+			Timestamp: base.Add(time.Duration(i) * time.Second), Level: types.LevelError, Source: "app", Message: msg, LineNumber: int64(i + 1)}}
+	}
+	close(input)
+
+	require.NoError(t, NewEnricher(input, output, DefaultOptions()).Run(context.Background()))
+
+	var results []types.EnrichedEntry
+	for e := range output {
+		results = append(results, e)
+	}
+	require.Len(t, results, 3)
+	assert.Equal(t, []types.ChainLink{
+		{ID: "dns-failure", Step: 2, Steps: 3},
+		{ID: "circuit-breaker", Step: 1, Steps: 3},
+	}, results[1].Chains)
+	assert.Equal(t, "dns-failure", results[1].ChainID, "ChainID repeats the first link")
+}

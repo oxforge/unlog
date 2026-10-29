@@ -33,7 +33,7 @@ func Score(e types.EnrichedEntry) int {
 	if e.IsSpike {
 		score += weightSpike
 	}
-	if e.ChainID != "" {
+	if len(e.ChainLinks()) > 0 {
 		score += weightChain
 	}
 	if e.IsDeployment {
