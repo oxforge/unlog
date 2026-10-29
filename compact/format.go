@@ -439,7 +439,7 @@ func formatEntry(e types.EnrichedEntry) string {
 		tags = append(tags, "trace="+e.TraceID)
 	}
 	if len(e.CorrelatedWith) > 0 {
-		tags = append(tags, "with="+joinCapped(e.CorrelatedWith, 3))
+		tags = append(tags, "with="+joinCapped(e.CorrelatedWith, max(e.CorrelatedCount, len(e.CorrelatedWith)), 2))
 	}
 
 	if len(tags) > 0 {
@@ -521,11 +521,12 @@ func formatBurst(b types.Burst) string {
 
 // joinCapped joins up to limit items with commas and counts the rest
 // ("a,b,c,+2").
-func joinCapped(items []string, limit int) string {
-	if len(items) <= limit {
-		return strings.Join(items, ",")
+func joinCapped(items []string, total, limit int) string {
+	shown := items[:min(len(items), limit)]
+	if total <= len(shown) {
+		return strings.Join(shown, ",")
 	}
-	return strings.Join(items[:limit], ",") + fmt.Sprintf(",+%d", len(items)-limit)
+	return strings.Join(shown, ",") + fmt.Sprintf(",+%d", total-len(shown))
 }
 
 // capMessage cuts msg to at most maxMessageBytes on a UTF-8 boundary and says

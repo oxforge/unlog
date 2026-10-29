@@ -899,9 +899,10 @@ func TestFormatEntryShowsTheService(t *testing.T) {
 func TestFormatEntryNamesConcurrentFailures(t *testing.T) {
 	at := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
 	e := spanEntry(types.LevelError, "request failed", "api.log", at, at, 1)
-	e.CorrelatedWith = []string{"agg.log[payments]", "cache.log", "db.log", "queue.log"}
+	e.CorrelatedWith = []string{"agg.log[payments]", "cache.log", "db.log"}
+	e.CorrelatedCount = 7
 
-	assert.Equal(t, "2024-01-15T10:00:00Z [ERROR] api.log: request failed {with=agg.log[payments],cache.log,db.log,+1}", formatEntry(e))
+	assert.Equal(t, "2024-01-15T10:00:00Z [ERROR] api.log: request failed {with=agg.log[payments],cache.log,+5}", formatEntry(e))
 }
 
 func TestScore_ConcurrentFailureAddsPoints(t *testing.T) {

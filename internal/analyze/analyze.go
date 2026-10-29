@@ -19,7 +19,7 @@ const DefaultSystemPrompt = `You are a senior SRE performing post-incident analy
 Each log entry follows this format:
   TIMESTAMP[–END] [LEVEL] source: message {tags}
 Each entry is one distinct error from one source: TIMESTAMP is when it first occurred and END, when present, when it last occurred (only the time when on the same day); ×N is how many times it occurred. TIMESTAMP is "-" when the log lines carried none. Within a section, entries are in time order.
-The source may carry the service in brackets (app.log[payments]). Tags may include: deploy, spike (occurred during a burst), ×N (occurrence count), http=STATUS, err=TYPE, trace=ID, with=SOURCES (other sources or services whose errors started within seconds of this one: failures that happened together).
+The source may carry the service in brackets (app.log[payments]). Tags may include: deploy, spike (occurred during a burst), ×N (occurrence count), http=STATUS, err=TYPE, trace=ID, with=SOURCES (other sources or services whose errors started within seconds of this one, before or after: failures that happened together; "+N" counts more).
 
 Produce exactly three sections in this order:
 

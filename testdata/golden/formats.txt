@@ -16,42 +16,42 @@ web-1     | java.net.SocketException: Connection reset
 web-1     |     at java.net.SocketInputStream.read(SocketInputStream.java:210)
 web-1     |     at com.example.Main.handleRequest(Main.java:42) {err=Connection}
 2024-01-15T10:00:03Z [ERROR] testdata/formats/docker_compose.log[web]: ERROR Upstream service unavailable after 3 retries
-2024-01-15T10:00:10Z [ERROR] testdata/formats/csv_kibana.csv: [Thread-4] ERROR com.example.db.QueryExecutor - Query timeout after 30000ms: SELECT * FROM orders WHERE status = 'pending' {with=testdata/formats/cloudwatch.log}
-2024-01-15T10:00:10Z [ERROR] testdata/formats/json_epoch.json: Panic recovered in handler {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv}
-2024-01-15T10:00:10Z [ERROR] testdata/formats/json_multiline_stack.log: Unhandled exception in request handler {err=NullPointerException with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,testdata/formats/json_epoch.json}
-2024-01-15T10:00:10Z [ERROR] testdata/formats/kubernetes_multiline.log: ERROR: Failed to watch ConfigMap {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,testdata/formats/json_epoch.json,+1}
-2024-01-15T10:00:10Z [ERROR] testdata/formats/logfmt_varied.log: Job failed {err=context deadline exceeded with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,testdata/formats/json_epoch.json,+2}
-2024-01-15T10:00:10Z [ERROR] testdata/formats/syslog_rfc5424.log[postgres]: Connection pool exhausted {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,testdata/formats/json_epoch.json,+3}
-2024-01-15T10:00:10Z [ERROR] testdata/formats/cloudwatch.log: ERROR: failed to write batch
-2024-01-15T10:00:10Z [ERROR] testdata/formats/kubernetes_multiline.log: panic: runtime error: invalid memory address or nil pointer dereference {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,testdata/formats/json_epoch.json,+3}
-2024-01-15T10:00:10Z [ERROR] testdata/formats/generic_with_brackets.log: [ERROR] [db-pool] Failed to acquire connection after 5s {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,testdata/formats/json_epoch.json,+4}
-2024-01-15T10:00:10Z [ERROR] testdata/formats/generic_with_brackets.log: [ERROR] [db-pool] java.sql.SQLException: Connection pool exhausted {err=Connection with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,testdata/formats/json_epoch.json,+4}
-2024-01-15T10:00:10Z [ERROR] testdata/formats/generic_with_brackets.log: [ERROR] [db-pool]   at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:155) {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,testdata/formats/json_epoch.json,+4}
-2024-01-15T10:00:10Z [ERROR] testdata/formats/generic_with_brackets.log: [ERROR] [db-pool]   at com.example.Repository.query(Repository.java:42) {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,testdata/formats/json_epoch.json,+4}
-2024-01-15T10:00:11Z [FATAL] testdata/formats/syslog_rfc5424.log[myapp]: Unable to acquire connection {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,testdata/formats/docker_mixed_streams.log,+6}
-2024-01-15T10:00:11Z [ERROR] testdata/formats/csv_kibana.csv: [elastic-apm-remote-config-poller] ERROR co.elastic.apm.agent.configuration.ApmServerConfigurationSource - Unable to tunnel through proxy. Proxy returns "HTTP/1.0 503 Service Unavailable" {http=503 with=testdata/formats/cloudwatch.log,testdata/formats/generic_with_brackets.log,testdata/formats/json_epoch.json,+4}
-2024-01-15T10:00:11Z [ERROR] testdata/formats/docker_mixed_streams.log: [2024-01-15 10:00:11] ERROR: Database connection lost, activating circuit breaker {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,testdata/formats/generic_with_brackets.log,+5}
-2024-01-15T10:00:11Z [ERROR] testdata/formats/json_epoch.json: Write to closed channel {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,testdata/formats/docker_mixed_streams.log,+5}
-2024-01-15T10:00:11Z [ERROR] testdata/formats/json_multiline_stack.log: Failed to send notification {err=ConnectionRefusedException with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,testdata/formats/docker_mixed_streams.log,+5}
-2024-01-15T10:00:11Z [ERROR] testdata/formats/logfmt_varied.log: Retry scheduled {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,testdata/formats/docker_mixed_streams.log,+5}
-2024-01-15T10:00:15Z [FATAL] testdata/formats/docker_mixed_streams.log: [2024-01-15 10:00:15] FATAL: Healthcheck failed 3 times, shutting down {err=Healthcheck with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,testdata/formats/generic_with_brackets.log,+6}
-2024-01-15T10:00:15Z [FATAL] testdata/formats/json_epoch.json: OOM killer invoked {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,testdata/formats/docker_mixed_streams.log,+6}
-2024-01-15T10:00:15Z [FATAL] testdata/formats/json_multiline_stack.log: Data corruption detected in primary index {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,testdata/formats/docker_mixed_streams.log,+6}
-2024-01-15T10:00:15Z [FATAL] testdata/formats/kubernetes_multiline.log: FATAL: Controller crash loop detected, exiting {err=Controller with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,testdata/formats/docker_mixed_streams.log,+6}
-2024-01-15T10:00:15Z [FATAL] testdata/formats/logfmt_varied.log: Queue backend unreachable {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,testdata/formats/docker_mixed_streams.log,+6}
-2024-01-15T10:00:15Z [FATAL] testdata/formats/syslog_rfc5424.log[myapp]: Service unavailable, shutting down {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,testdata/formats/docker_mixed_streams.log,+6}
-2024-01-15T10:00:15Z [ERROR] testdata/formats/cloudwatch.log: ERROR: max retries exceeded {with=testdata/formats/csv_kibana.csv,testdata/formats/docker_mixed_streams.log,testdata/formats/generic_with_brackets.log,+6}
-2024-01-15T10:00:15Z [ERROR] testdata/formats/csv_kibana.csv: [Thread-8] ERROR com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Exception during pool initialization. {with=testdata/formats/cloudwatch.log,testdata/formats/docker_mixed_streams.log,testdata/formats/generic_with_brackets.log,+6}
-2024-01-15T10:00:15Z [FATAL] testdata/formats/generic_with_brackets.log: [FATAL] [main] Shutting down due to unrecoverable error {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,testdata/formats/docker_mixed_streams.log,+5}
-2024-01-15T10:00:20Z [ERROR] testdata/formats/csv_kibana.csv: [2024-01-1510:00:20+0100] [error] Payment request with checksum (abc123def456) could not be imported into reporting database {with=testdata/formats/cloudwatch.log,testdata/formats/docker_mixed_streams.log,testdata/formats/generic_with_brackets.log,+5}
+2024-01-15T10:00:10Z [ERROR] testdata/formats/cloudwatch.log: ERROR: failed to write batch {with=testdata/formats/csv_kibana.csv,testdata/formats/docker_mixed_streams.log,+7}
+2024-01-15T10:00:10Z [ERROR] testdata/formats/csv_kibana.csv: [Thread-4] ERROR com.example.db.QueryExecutor - Query timeout after 30000ms: SELECT * FROM orders WHERE status = 'pending' {with=testdata/formats/cloudwatch.log,testdata/formats/docker_mixed_streams.log,+7}
+2024-01-15T10:00:10Z [ERROR] testdata/formats/json_epoch.json: Panic recovered in handler {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
+2024-01-15T10:00:10Z [ERROR] testdata/formats/json_multiline_stack.log: Unhandled exception in request handler {err=NullPointerException with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
+2024-01-15T10:00:10Z [ERROR] testdata/formats/kubernetes_multiline.log: ERROR: Failed to watch ConfigMap {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
+2024-01-15T10:00:10Z [ERROR] testdata/formats/logfmt_varied.log: Job failed {err=context deadline exceeded with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
+2024-01-15T10:00:10Z [ERROR] testdata/formats/syslog_rfc5424.log[postgres]: Connection pool exhausted {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
+2024-01-15T10:00:10Z [ERROR] testdata/formats/kubernetes_multiline.log: panic: runtime error: invalid memory address or nil pointer dereference {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
+2024-01-15T10:00:10Z [ERROR] testdata/formats/generic_with_brackets.log: [ERROR] [db-pool] Failed to acquire connection after 5s {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
+2024-01-15T10:00:10Z [ERROR] testdata/formats/generic_with_brackets.log: [ERROR] [db-pool] java.sql.SQLException: Connection pool exhausted {err=Connection with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
+2024-01-15T10:00:10Z [ERROR] testdata/formats/generic_with_brackets.log: [ERROR] [db-pool]   at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:155) {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
+2024-01-15T10:00:10Z [ERROR] testdata/formats/generic_with_brackets.log: [ERROR] [db-pool]   at com.example.Repository.query(Repository.java:42) {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
+2024-01-15T10:00:11Z [FATAL] testdata/formats/syslog_rfc5424.log[myapp]: Unable to acquire connection {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
+2024-01-15T10:00:11Z [ERROR] testdata/formats/csv_kibana.csv: [elastic-apm-remote-config-poller] ERROR co.elastic.apm.agent.configuration.ApmServerConfigurationSource - Unable to tunnel through proxy. Proxy returns "HTTP/1.0 503 Service Unavailable" {http=503 with=testdata/formats/cloudwatch.log,testdata/formats/docker_mixed_streams.log,+7}
+2024-01-15T10:00:11Z [ERROR] testdata/formats/docker_mixed_streams.log: [2024-01-15 10:00:11] ERROR: Database connection lost, activating circuit breaker {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
+2024-01-15T10:00:11Z [ERROR] testdata/formats/json_epoch.json: Write to closed channel {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
+2024-01-15T10:00:11Z [ERROR] testdata/formats/json_multiline_stack.log: Failed to send notification {err=ConnectionRefusedException with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
+2024-01-15T10:00:11Z [ERROR] testdata/formats/logfmt_varied.log: Retry scheduled {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
+2024-01-15T10:00:15Z [FATAL] testdata/formats/docker_mixed_streams.log: [2024-01-15 10:00:15] FATAL: Healthcheck failed 3 times, shutting down {err=Healthcheck with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
+2024-01-15T10:00:15Z [FATAL] testdata/formats/json_epoch.json: OOM killer invoked {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
+2024-01-15T10:00:15Z [FATAL] testdata/formats/json_multiline_stack.log: Data corruption detected in primary index {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
+2024-01-15T10:00:15Z [FATAL] testdata/formats/kubernetes_multiline.log: FATAL: Controller crash loop detected, exiting {err=Controller with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
+2024-01-15T10:00:15Z [FATAL] testdata/formats/logfmt_varied.log: Queue backend unreachable {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
+2024-01-15T10:00:15Z [FATAL] testdata/formats/syslog_rfc5424.log[myapp]: Service unavailable, shutting down {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
+2024-01-15T10:00:15Z [ERROR] testdata/formats/cloudwatch.log: ERROR: max retries exceeded {with=testdata/formats/csv_kibana.csv,testdata/formats/docker_mixed_streams.log,+7}
+2024-01-15T10:00:15Z [ERROR] testdata/formats/csv_kibana.csv: [Thread-8] ERROR com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Exception during pool initialization. {with=testdata/formats/cloudwatch.log,testdata/formats/docker_mixed_streams.log,+7}
+2024-01-15T10:00:15Z [FATAL] testdata/formats/generic_with_brackets.log: [FATAL] [main] Shutting down due to unrecoverable error {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+6}
+2024-01-15T10:00:20Z [ERROR] testdata/formats/csv_kibana.csv: [2024-01-1510:00:20+0100] [error] Payment request with checksum (abc123def456) could not be imported into reporting database {with=testdata/formats/cloudwatch.log,testdata/formats/docker_mixed_streams.log,+6}
 2024-01-15T10:00:30Z [FATAL] testdata/formats/csv_kibana.csv: [Thread-1] FATAL com.example.Application - Out of memory, shutting down
 2024-01-15T17:00:05Z–17:00:07Z [ERROR] testdata/formats/apache_clf.log: GET /api/orders HTTP/1.1 500 {×3 http=500}
 2024-01-15T17:00:08Z [ERROR] testdata/formats/apache_clf.log: POST /api/checkout HTTP/1.1 503 {http=503}
 2026-03-19T14:05:09Z [ERROR] testdata/formats/k8s_deployment.log[payment-svc]: ERROR PAYMENT_SVC APP_LOG Refund rejected by gateway for order ord-87201: insufficient merchant balance
 2026-03-19T14:05:12Z [ERROR] testdata/formats/k8s_deployment.log[payment-svc]: ERROR PAYMENT_SVC APP_LOG Charge failed after 3 retries for order ord-90412: java.net.ConnectException: connection refused {err=connection}
-- [FATAL] testdata/formats/unstructured.log: Fatal: cannot start without database, exiting {with=testdata/formats/k8s_deployment.log[payment-svc]}
-- [ERROR] testdata/formats/unstructured.log: Error: failed to authenticate with database {err=failed with=testdata/formats/k8s_deployment.log[payment-svc]}
-- [ERROR] testdata/formats/unstructured.log: Error: second attempt also failed {err=second with=testdata/formats/k8s_deployment.log[payment-svc]}
+- [FATAL] testdata/formats/unstructured.log: Fatal: cannot start without database, exiting
+- [ERROR] testdata/formats/unstructured.log: Error: failed to authenticate with database {err=failed}
+- [ERROR] testdata/formats/unstructured.log: Error: second attempt also failed {err=second}
 
 ## Error Chains
 (none)

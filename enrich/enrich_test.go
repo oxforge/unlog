@@ -76,8 +76,9 @@ func TestEnricher_Integration(t *testing.T) {
 	// Entry 2: error type extracted.
 	assert.Equal(t, "ConnectionRefused", results[2].ErrorType)
 
-	// Only errors correlate: the INFO deploy line is not tagged; the db error
-	// started 2s after the api error.
+	// Only errors correlate: the INFO deploy line is not tagged; the api and
+	// db errors started 2s apart, and each is tagged with the other.
+	assert.Equal(t, []string{"db-svc"}, results[0].CorrelatedWith)
 	assert.Nil(t, results[1].CorrelatedWith)
 	assert.Equal(t, []string{"api-svc"}, results[2].CorrelatedWith)
 }
@@ -121,6 +122,6 @@ func TestEnricher_ZeroOptionsUseTheDefaultWindow(t *testing.T) {
 
 	require.NoError(t, NewEnricher(input, output, EnrichOptions{}).Run(context.Background()))
 
-	<-output
+	assert.Equal(t, []string{"db"}, (<-output).CorrelatedWith)
 	assert.Equal(t, []string{"api"}, (<-output).CorrelatedWith)
 }

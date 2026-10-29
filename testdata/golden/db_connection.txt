@@ -20,7 +20,7 @@ Error chains detected: circuit-breaker
 
 ## Error Chains
 circuit-breaker: 2 of 3 steps, 2024-01-15T10:31:10Z–10:31:35Z
-  1. 2024-01-15T10:31:10Z–10:31:13Z [ERROR] testdata/incidents/db_connection/app.log: database connection timeout: context deadline exceeded {×4}
+  1. 2024-01-15T10:31:10Z–10:31:13Z [ERROR] testdata/incidents/db_connection/app.log: database connection timeout: context deadline exceeded {×4 with=testdata/incidents/db_connection/db.log[postgres]}
   2. 2024-01-15T10:31:20Z [ERROR] testdata/incidents/db_connection/app.log: circuit breaker opened: database {with=testdata/incidents/db_connection/db.log[postgres]}
   2. 2024-01-15T10:31:25Z–10:31:35Z [ERROR] testdata/incidents/db_connection/app.log: all requests rejected: circuit breaker open {×3 with=testdata/incidents/db_connection/db.log[postgres]}
 

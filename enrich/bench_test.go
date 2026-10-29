@@ -64,22 +64,17 @@ func BenchmarkChainMatching(b *testing.B) {
 func BenchmarkCorrelation(b *testing.B) {
 	sources := []string{"api", "db", "cache", "queue", "worker"}
 	base := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
+	entries := make([]types.EnrichedEntry, 100)
+	for j := range entries {
+		entries[j].Timestamp = base.Add(time.Duration(j) * 500 * time.Millisecond)
+		entries[j].Level = types.LevelError
+		entries[j].Source = sources[j%len(sources)]
+		entries[j].Message = "error occurred"
+	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		c := NewCorrelator(5 * time.Second)
-		for j := 0; j < 100; j++ {
-			entry := types.EnrichedEntry{
-				FilteredEntry: types.FilteredEntry{
-					LogEntry: types.LogEntry{
-						Timestamp: base.Add(time.Duration(j) * 500 * time.Millisecond),
-						Source:    sources[j%len(sources)],
-						Message:   "error occurred",
-					},
-				},
-			}
-			c.Correlate(&entry)
-		}
+		NewCorrelator(5 * time.Second).Correlate(entries)
 	}
 }
 
