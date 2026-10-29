@@ -68,7 +68,13 @@ func (p *Pipeline) Run(ctx context.Context, sources []string) (*Result, error) {
 	}
 	filterOutCh := make(chan filterOut, 1)
 
-	fp := filter.NewFilterPipeline(ingestCh, filterCh, p.opts.FilterOpts, nil)
+	filterOpts := p.opts.FilterOpts
+	if filterOpts.KeepAtAnyLevel == nil {
+		// Deployment lines are usually INFO; they mark what changed before
+		// an incident, so they pass the level filter.
+		filterOpts.KeepAtAnyLevel = enrich.LooksLikeDeployment
+	}
+	fp := filter.NewFilterPipeline(ingestCh, filterCh, filterOpts, nil)
 	g.Go(func() error {
 		fs, ds, err := fp.Run(gCtx)
 		if err != nil {

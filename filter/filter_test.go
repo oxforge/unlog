@@ -373,3 +373,25 @@ func TestUndatedEntriesNeverFormABurst(t *testing.T) {
 		}
 	}
 }
+
+func TestKeepAtAnyLevelPassesTheLevelFilter(t *testing.T) {
+	input := make(chan types.LogEntry, 3)
+	output := make(chan types.FilteredEntry, 3)
+	at := time.Date(2024, 1, 15, 14, 1, 55, 0, time.UTC)
+	input <- types.LogEntry{Timestamp: at, Level: types.LevelInfo, Source: "deploy.log", Message: "deployment started: app to 3.3.0"}
+	input <- types.LogEntry{Timestamp: at.Add(time.Second), Level: types.LevelInfo, Source: "deploy.log", Message: "pod app-pod-1 updated"}
+	input <- types.LogEntry{Timestamp: at.Add(2 * time.Second), Level: types.LevelError, Source: "app.log", Message: "health check failed"}
+	close(input)
+
+	opts := DefaultFilterOptions()
+	opts.KeepAtAnyLevel = func(e types.LogEntry) bool { return strings.HasPrefix(e.Message, "deployment started") }
+	_, detailed, err := NewFilterPipeline(input, output, opts, nil).Run(context.Background())
+	require.NoError(t, err)
+
+	var messages []string
+	for e := range output {
+		messages = append(messages, e.Message)
+	}
+	assert.Equal(t, []string{"deployment started: app to 3.3.0", "health check failed"}, messages)
+	assert.Equal(t, int64(1), detailed.DroppedByLevel)
+}

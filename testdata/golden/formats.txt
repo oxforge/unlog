@@ -2,6 +2,13 @@
 Window: 2024-01-15T10:00:00Z — 2026-03-19T14:05:12Z (19060h5m13s)
 Sources: 14 (testdata/formats/apache_clf.log, testdata/formats/cloudwatch.log, testdata/formats/csv_kibana.csv, testdata/formats/docker_compose.log, testdata/formats/docker_mixed_streams.log, +9 more)
 Events: 10 fatal, 29 error (28 distinct), 24 warn (21 distinct)
+Last deployment: 2024-01-15T10:00:01Z, 1s before the first error
+
+## Deployments
+2024-01-15T10:00:00Z [INFO] testdata/formats/kubernetes_multiline.log: Starting application v2.5.0 {deploy}
+2024-01-15T10:00:00Z [INFO] testdata/formats/docker_compose.log: INFO Starting application on port 8080 {deploy}
+2024-01-15T10:00:01Z [INFO] testdata/formats/csv_kibana.csv: [Thread-1] INFO com.example.Application - Listening on port 8080 {deploy}
+2024-01-15T10:00:01Z [INFO] testdata/formats/json_multiline_stack.log: Database migration complete {deploy}
 
 ## Critical Errors
 2024-01-15T10:00:02Z [ERROR] testdata/formats/docker_compose.log: ERROR Failed to process request: connection reset by peer

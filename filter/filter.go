@@ -30,6 +30,9 @@ type FilterOptions struct {
 	SpikeMultiplier float64
 	// MinBurstEvents is the fewest events a burst must hold. Default: 20.
 	MinBurstEvents int
+	// KeepAtAnyLevel reports entries that pass the level filter whatever
+	// their level; the pipeline uses it for deployment lines. Nil keeps none.
+	KeepAtAnyLevel func(types.LogEntry) bool
 }
 
 // DefaultFilterOptions returns FilterOptions with all defaults set.
@@ -113,7 +116,9 @@ func (p *FilterPipeline) Run(ctx context.Context) (types.FilterStats, DetailedSt
 	start := time.Now()
 
 	var chain []EntryFilter
-	chain = append(chain, NewLevelFilter(p.opts.MinLevel))
+	levelFilter := NewLevelFilter(p.opts.MinLevel)
+	levelFilter.keep = p.opts.KeepAtAnyLevel
+	chain = append(chain, levelFilter)
 
 	tw := NewTimeWindowFilter(p.opts.Since, p.opts.Until)
 	if tw.IsActive() {

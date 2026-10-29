@@ -13,19 +13,21 @@ import (
 
 // Budget fractions for each output section. They sum to 1.0.
 const (
-	budgetOverview  = 0.05
-	budgetCritical  = 0.45
-	budgetChains    = 0.20
-	budgetAnomalies = 0.10
-	budgetContext   = 0.20
+	budgetOverview    = 0.05
+	budgetDeployments = 0.05
+	budgetCritical    = 0.45
+	budgetChains      = 0.20
+	budgetAnomalies   = 0.10
+	budgetContext     = 0.15
 )
 
 const (
-	sectionOverview  = "Incident Overview"
-	sectionCritical  = "Critical Errors"
-	sectionChains    = "Error Chains"
-	sectionAnomalies = "Rate Anomalies"
-	sectionContext   = "Context"
+	sectionOverview    = "Incident Overview"
+	sectionDeployments = "Deployments"
+	sectionCritical    = "Critical Errors"
+	sectionChains      = "Error Chains"
+	sectionAnomalies   = "Rate Anomalies"
+	sectionContext     = "Context"
 )
 
 // maxMessageBytes caps how much of one entry's message the summary shows, so
@@ -58,6 +60,19 @@ func formatSummary(all []scoredEntry, bursts []types.Burst, tokenBudget int) str
 		}
 	}
 
+	// Every deployment is listed under Deployments, chain members too; those
+	// below ERROR leave the other sections, while an ERROR-level one (a
+	// restart after a crash) stays in Critical Errors as well.
+	var deployments []scoredEntry
+	for i, se := range all {
+		if se.entry.IsDeployment {
+			deployments = append(deployments, se)
+			if se.entry.Level < types.LevelError {
+				claimed[i] = true
+			}
+		}
+	}
+
 	var criticals []scoredEntry
 	for i, se := range all {
 		if !claimed[i] && (se.entry.Level == types.LevelFatal || se.entry.Level == types.LevelError) {
@@ -77,15 +92,16 @@ func formatSummary(all []scoredEntry, bursts []types.Burst, tokenBudget int) str
 	overviewText := buildOverview(all, len(bursts))
 	writeSection(&sb, sectionOverview, truncateToTokens(overviewText, overviewBudget))
 
-	// Listed in the order leftover budget is handed out.
-	sections := []*entrySection{
-		newEntrySection(sectionCritical, criticals, sectionBudget(tokenBudget, budgetCritical)),
-		newChainSection(sectionChains, chainIDs, chains, sectionBudget(tokenBudget, budgetChains)),
-		newBurstSection(sectionAnomalies, bursts, sectionBudget(tokenBudget, budgetAnomalies)),
-		newEntrySection(sectionContext, contextEntries, sectionBudget(tokenBudget, budgetContext)),
-	}
-	shareUnusedBudget(sections)
-	for _, sec := range sections {
+	deploySec := newEntrySection(sectionDeployments, deployments, sectionBudget(tokenBudget, budgetDeployments))
+	criticalSec := newEntrySection(sectionCritical, criticals, sectionBudget(tokenBudget, budgetCritical))
+	chainSec := newChainSection(sectionChains, chainIDs, chains, sectionBudget(tokenBudget, budgetChains))
+	burstSec := newBurstSection(sectionAnomalies, bursts, sectionBudget(tokenBudget, budgetAnomalies))
+	contextSec := newEntrySection(sectionContext, contextEntries, sectionBudget(tokenBudget, budgetContext))
+
+	// Leftover budget goes out in this order; the sections print in reading
+	// order, deployments first so they read before the errors they precede.
+	shareUnusedBudget([]*entrySection{criticalSec, chainSec, deploySec, burstSec, contextSec})
+	for _, sec := range []*entrySection{deploySec, criticalSec, chainSec, burstSec, contextSec} {
 		sec.write(&sb)
 	}
 
@@ -291,6 +307,9 @@ func buildOverview(all []scoredEntry, burstCount int) string {
 	parts = append(parts, fmt.Sprintf("Sources: %d (%s)", len(sources), joinedSources(sources)))
 	parts = append(parts, fmt.Sprintf("Events: %s, %s, %s",
 		fatal.describe("fatal"), errs.describe("error"), warn.describe("warn")))
+	if line := lastDeploymentLine(all); line != "" {
+		parts = append(parts, line)
+	}
 
 	if len(chainIDs) > 0 {
 		parts = append(parts, fmt.Sprintf("Error chains detected: %s", strings.Join(chainIDs, ", ")))
@@ -300,6 +319,39 @@ func buildOverview(all []scoredEntry, burstCount int) string {
 	}
 
 	return strings.Join(parts, "\n")
+}
+
+// lastDeploymentLine names the latest deployment at or before the first
+// error, and how long before it; "" when there is none.
+func lastDeploymentLine(all []scoredEntry) string {
+	var firstError time.Time
+	for _, se := range all {
+		e := se.entry
+		if e.Level >= types.LevelError && !e.Timestamp.IsZero() &&
+			(firstError.IsZero() || e.Timestamp.Before(firstError)) {
+			firstError = e.Timestamp
+		}
+	}
+	if firstError.IsZero() {
+		return ""
+	}
+	var last time.Time
+	for _, se := range all {
+		e := se.entry
+		if !e.IsDeployment {
+			continue
+		}
+		for _, t := range []time.Time{e.Timestamp, e.LastSeen} {
+			if !t.IsZero() && !t.After(firstError) && t.After(last) {
+				last = t
+			}
+		}
+	}
+	if last.IsZero() {
+		return ""
+	}
+	return fmt.Sprintf("Last deployment: %s, %s before the first error",
+		last.UTC().Format(time.RFC3339), firstError.Sub(last).Round(time.Second))
 }
 
 // levelTally counts one level's occurrences and the distinct errors behind

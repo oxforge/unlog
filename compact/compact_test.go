@@ -826,3 +826,62 @@ func TestRun_OverviewCountsEachOccurrenceAtItsOwnLevel(t *testing.T) {
 
 	assert.Contains(t, summary, "Events: 20852 fatal (1 distinct), 48876 error (1 distinct), 0 warn\n")
 }
+
+// ─── Deployments ────────────────────────────────────────────────────────────
+
+func deployEntry(level types.Level, msg string, at time.Time) types.EnrichedEntry {
+	e := spanEntry(level, msg, "deploy.log", at, at, 1)
+	e.IsDeployment = true
+	return e
+}
+
+func TestRun_DeploymentsComeBeforeTheErrors(t *testing.T) {
+	at := func(m, s int) time.Time { return time.Date(2024, 1, 15, 14, m, s, 0, time.UTC) }
+	entries := []types.EnrichedEntry{
+		spanEntry(types.LevelError, "health check failed", "app.log", at(2, 15), at(2, 15), 1),
+		deployEntry(types.LevelInfo, "rolling update initiated: 3 pods", at(2, 0)),
+		deployEntry(types.LevelInfo, "deployment started: app to 3.3.0", at(1, 55)),
+	}
+	ch := make(chan types.EnrichedEntry, len(entries))
+	sendAndClose(ch, entries)
+
+	summary, err := Run(context.Background(), ch, Options{})
+	require.NoError(t, err)
+
+	assert.Equal(t, "\n"+
+		"2024-01-15T14:01:55Z [INFO] deploy.log: deployment started: app to 3.3.0 {deploy}\n"+
+		"2024-01-15T14:02:00Z [INFO] deploy.log: rolling update initiated: 3 pods {deploy}\n\n",
+		extractSection(summary, "## Deployments", "## Critical Errors"))
+	assert.Less(t, strings.Index(summary, "## Deployments"), strings.Index(summary, "## Critical Errors"))
+	assert.Contains(t, extractSection(summary, "## Incident Overview", "## Deployments"),
+		"Last deployment: 2024-01-15T14:02:00Z, 15s before the first error")
+	assert.NotContains(t, extractSection(summary, "## Context", "\x00"), "deploy.log")
+}
+
+func TestRun_NoDeploymentBeforeTheFirstError(t *testing.T) {
+	at := time.Date(2024, 1, 15, 14, 2, 0, 0, time.UTC)
+	entries := []types.EnrichedEntry{
+		spanEntry(types.LevelError, "health check failed", "app.log", at, at, 1),
+		deployEntry(types.LevelInfo, "rolling update initiated", at.Add(time.Minute)),
+	}
+	ch := make(chan types.EnrichedEntry, len(entries))
+	sendAndClose(ch, entries)
+
+	summary, err := Run(context.Background(), ch, Options{})
+	require.NoError(t, err)
+
+	assert.NotContains(t, summary, "Last deployment")
+	assert.Contains(t, extractSection(summary, "## Deployments", "## Critical Errors"), "rolling update initiated")
+}
+
+func TestRun_ErrorLevelDeployLineStaysInCriticalErrors(t *testing.T) {
+	at := time.Date(2024, 1, 15, 14, 2, 0, 0, time.UTC)
+	ch := make(chan types.EnrichedEntry, 1)
+	sendAndClose(ch, []types.EnrichedEntry{deployEntry(types.LevelError, "service restarted after crash", at)})
+
+	summary, err := Run(context.Background(), ch, Options{})
+	require.NoError(t, err)
+
+	assert.Contains(t, extractSection(summary, "## Critical Errors", "## Error Chains"), "service restarted after crash {deploy}")
+	assert.Contains(t, extractSection(summary, "## Deployments", "## Critical Errors"), "service restarted after crash")
+}
