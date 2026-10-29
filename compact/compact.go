@@ -43,7 +43,8 @@ type Options struct {
 	// Default: DefaultTokenBudget.
 	TokenBudget int
 	// Bursts returns the bursts to list under Rate Anomalies. Run calls it
-	// once, after the entries channel is closed; nil means none.
+	// once, after the entries channel is closed and only when ctx is not
+	// cancelled; nil means none.
 	Bursts func() []types.Burst
 }
 
@@ -87,6 +88,11 @@ drain:
 	}
 	slog.Debug("compact: collected entries", "count", len(all))
 
+	// On cancellation an upstream stage closes the input early, possibly
+	// before the filter has finished its bursts: stop before reading them.
+	if err := ctx.Err(); err != nil {
+		return "", fmt.Errorf("compact: %w", err)
+	}
 	var bursts []types.Burst
 	if opts.Bursts != nil {
 		bursts = opts.Bursts()

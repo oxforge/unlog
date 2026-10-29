@@ -774,3 +774,21 @@ func TestRun_OverviewCountsBursts(t *testing.T) {
 	without := runWithBursts(t, entries, nil)
 	assert.NotContains(t, without, "Bursts:")
 }
+
+// On cancellation an upstream stage can close compact's input before the
+// filter has finished writing its bursts, so a cancelled run must not read
+// them.
+func TestRun_CancelledRunDoesNotReadBursts(t *testing.T) {
+	for i := 0; i < 50; i++ {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		ch := make(chan types.EnrichedEntry)
+		close(ch)
+		read := false
+
+		_, err := Run(ctx, ch, Options{Bursts: func() []types.Burst { read = true; return nil }})
+
+		require.ErrorIs(t, err, context.Canceled)
+		require.False(t, read, "Bursts was read on a cancelled run")
+	}
+}
