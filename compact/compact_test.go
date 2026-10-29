@@ -792,3 +792,16 @@ func TestRun_CancelledRunDoesNotReadBursts(t *testing.T) {
 		require.False(t, read, "Bursts was read on a cancelled run")
 	}
 }
+
+func TestRun_OverviewCountsEachOccurrenceAtItsOwnLevel(t *testing.T) {
+	at := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+	e := spanEntry(types.LevelFatal, "ledger write failed", "app.log", at, at.Add(time.Hour), 69728)
+	e.OccurrencesByLevel = map[types.Level]int{types.LevelError: 48876, types.LevelFatal: 20852}
+	ch := make(chan types.EnrichedEntry, 1)
+	sendAndClose(ch, []types.EnrichedEntry{e})
+
+	summary, err := Run(context.Background(), ch, Options{})
+	require.NoError(t, err)
+
+	assert.Contains(t, summary, "Events: 20852 fatal (1 distinct), 48876 error (1 distinct), 0 warn\n")
+}

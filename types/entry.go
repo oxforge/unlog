@@ -16,10 +16,13 @@ type LogEntry struct {
 // FilteredEntry is produced by Stage 2 (Filter). Adds dedup info.
 type FilteredEntry struct {
 	LogEntry
-	OccurrenceCount int       `json:"occurrence_count"`
-	FirstSeen       time.Time `json:"first_seen"`
-	LastSeen        time.Time `json:"last_seen"`
-	IsSpike         bool      `json:"is_spike"`
+	OccurrenceCount int `json:"occurrence_count"`
+	// OccurrencesByLevel counts the occurrences at each level; Level is the
+	// highest of them.
+	OccurrencesByLevel map[Level]int `json:"occurrences_by_level,omitempty"`
+	FirstSeen          time.Time     `json:"first_seen"`
+	LastSeen           time.Time     `json:"last_seen"`
+	IsSpike            bool          `json:"is_spike"`
 	// Deprecated: never set; dedup emits one entry per error.
 	IsDedupSummary bool   `json:"is_dedup_summary,omitempty"`
 	Signature      string `json:"signature"`

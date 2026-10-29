@@ -23,6 +23,7 @@ type dedupRecord struct {
 	first    time.Time
 	last     time.Time
 	level    types.Level
+	byLevel  [types.LevelFatal + 1]int // occurrences per level
 	spike    bool
 }
 
@@ -108,6 +109,9 @@ func (d *DedupFilter) Add(entry types.LogEntry) uint32 {
 		rec.exemplar = entry
 	}
 	rec.count++
+	if entry.Level >= 0 && entry.Level <= types.LevelFatal {
+		rec.byLevel[entry.Level]++
+	}
 	if entry.Level > rec.level {
 		rec.level = entry.Level
 	}
@@ -148,13 +152,20 @@ func (d *DedupFilter) Entries() []types.FilteredEntry {
 			le := r.exemplar
 			le.Level = r.level
 			le.Timestamp = r.first
+			byLevel := make(map[types.Level]int)
+			for lvl, n := range r.byLevel {
+				if n > 0 {
+					byLevel[types.Level(lvl)] = n
+				}
+			}
 			out = append(out, types.FilteredEntry{
-				LogEntry:        le,
-				OccurrenceCount: int(r.count),
-				FirstSeen:       r.first,
-				LastSeen:        r.last,
-				IsSpike:         r.spike,
-				Signature:       r.sig,
+				LogEntry:           le,
+				OccurrenceCount:    int(r.count),
+				OccurrencesByLevel: byLevel,
+				FirstSeen:          r.first,
+				LastSeen:           r.last,
+				IsSpike:            r.spike,
+				Signature:          r.sig,
 			})
 		}
 		shard.mu.Unlock()

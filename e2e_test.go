@@ -417,6 +417,8 @@ func TestE2EHighestSeverityWins(t *testing.T) {
 	critical := sectionOf(summary, "## Critical Errors")
 	assert.Contains(t, critical, "2024-01-15T10:00:00Z–10:05:00Z [ERROR]")
 	assert.Contains(t, critical, "disk 91% full on /data")
+	// Each occurrence counts at its own level in the overview.
+	assert.Contains(t, summary, "Events: 0 fatal, 1 error, 1 warn\n")
 }
 
 func TestE2EOneLinePerSource(t *testing.T) {
