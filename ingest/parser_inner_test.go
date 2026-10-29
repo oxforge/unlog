@@ -56,7 +56,7 @@ func TestContainerParsersReadStructuredPayloads(t *testing.T) {
 			wantLevel: types.LevelWarn,
 			wantMsg:   "slow query",
 			wantTS:    time.Date(2024, 1, 15, 10, 0, 2, 0, time.UTC),
-			wantMeta:  map[string]string{"container": "api-1", "ms": "812"},
+			wantMeta:  map[string]string{"container": "api-1", "service": "api", "ms": "812"},
 		},
 		{
 			name:      "cloudwatch with JSON",

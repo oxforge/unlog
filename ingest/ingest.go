@@ -15,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"golang.org/x/sync/errgroup"
 
@@ -261,24 +263,18 @@ func (ing *Ingester) processSource(ctx context.Context, source string, r io.Read
 }
 
 // serviceKeys are the metadata fields, in order of preference, that name the
-// service a line came from: a JSON or logfmt "service", a syslog program
-// ("app"), a container (Docker Compose, kubectl --prefix), a Kubernetes pod.
+// service a line came from: a JSON or logfmt "service" (also the Compose
+// parser's service), a syslog program ("app"), a container (kubectl
+// --prefix), a Kubernetes pod.
 var serviceKeys = []string{"service", "app", "container", "pod"}
 
-// replicaSuffix strips what tells replicas of one service apart, so they
-// share the service: a Compose index ("web-1", "web_1"), or a Kubernetes
-// pod's generated suffix: a Deployment's ReplicaSet hash and pod id
-// ("api-7d9f8b6c4-x2k4p"), a StatefulSet ordinal ("db-0"), a DaemonSet pod
-// id ("fluentd-x7k2p"). Generated ids use Kubernetes' vowel-free alphabet,
-// so a name like "api-proxy" is left alone.
-var replicaSuffix = map[string]*regexp.Regexp{
-	"container": regexp.MustCompile(`^(.+?)[-_]\d+$`),
-	"pod":       regexp.MustCompile(`^(.+?)(?:-[bcdfghjklmnpqrstvwxz24-9]{6,10})?-(?:[bcdfghjklmnpqrstvwxz24-9]{5}|\d+)$`),
-}
-
-// reServiceName is what a service name may contain; anything else (a JSON
-// null or object, RFC 5424's nil "-", control characters) names none.
-var reServiceName = regexp.MustCompile(`^[\w.:@/-]+$`)
+// podSuffix strips what tells a Kubernetes pod from its workload's other
+// pods, so they share the service: a Deployment's ReplicaSet hash and pod id
+// ("api-7d9f8b6c4-x2k4p"), a CronJob's run time and pod id
+// ("backup-28456789-x7k2p"), a StatefulSet ordinal ("db-0"), a DaemonSet or
+// Job pod id ("fluentd-x7k2p"). Generated ids use Kubernetes' vowel-free
+// alphabet, so a name like "api-proxy" is left alone.
+var podSuffix = regexp.MustCompile(`^(.+?)(?:-(?:[bcdfghjklmnpqrstvwxz24-9]{6,10}|\d{6,}))?-(?:[bcdfghjklmnpqrstvwxz24-9]{5}|\d+)$`)
 
 // maxServiceLen caps a service name, which is shown on every summary line.
 const maxServiceLen = 64
@@ -286,17 +282,34 @@ const maxServiceLen = 64
 func serviceOf(metadata map[string]string) string {
 	for _, key := range serviceKeys {
 		v := metadata[key]
-		if v == "-" || !reServiceName.MatchString(v) {
+		if !isServiceName(v) {
 			continue
 		}
-		if re := replicaSuffix[key]; re != nil {
-			if m := re.FindStringSubmatch(v); m != nil {
+		if key == "pod" {
+			if m := podSuffix.FindStringSubmatch(v); m != nil {
 				v = m[1]
 			}
 		}
-		return v[:min(len(v), maxServiceLen)]
+		if len(v) > maxServiceLen {
+			cut := maxServiceLen
+			for cut > 0 && !utf8.RuneStart(v[cut]) {
+				cut--
+			}
+			v = v[:cut]
+		}
+		return v
 	}
 	return ""
+}
+
+// isServiceName reports whether v can name a service: not empty, not
+// RFC 5424's nil "-", not a JSON object or array, and free of control
+// characters (a newline would break the summary's lines).
+func isServiceName(v string) bool {
+	if v == "" || v == "-" || v[0] == '{' || v[0] == '[' {
+		return false
+	}
+	return !strings.ContainsFunc(v, unicode.IsControl)
 }
 
 // errNotText marks a source that isn't a text log.
