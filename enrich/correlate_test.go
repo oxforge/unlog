@@ -140,3 +140,24 @@ func BenchmarkCorrelate_DenseStorm(b *testing.B) {
 		c.Correlate(entries)
 	}
 }
+
+// A file literally named "x[y]" and service y in file x display alike; they
+// are still two origins, and counting them as one must not corrupt the
+// counts for later errors.
+func TestCorrelator_OriginsThatDisplayAlikeStayApart(t *testing.T) {
+	named := failure("x[y]", 0) // source x, service y
+	file := failure("x[y]", time.Second)
+	file.Source, file.Service = "x[y]", ""
+	later := failure("x", 20*time.Second) // unnamed, in x
+
+	got := correlate(named, file, failure("z.log", 2*time.Second), later, failure("z.log", 21*time.Second))
+
+	assert.Equal(t, []string{"z.log"}, got[3].CorrelatedWith)
+}
+
+func TestCorrelator_NegativeWindowCorrelatesNothing(t *testing.T) {
+	entries := []types.EnrichedEntry{failure("a.log", 0), failure("b.log", time.Second)}
+
+	assert.NotPanics(t, func() { NewCorrelator(-time.Second).Correlate(entries) })
+	assert.Nil(t, entries[0].CorrelatedWith)
+}

@@ -1057,3 +1057,28 @@ func TestRun_ChainSpanIsWhenItsStepsOccurred(t *testing.T) {
 
 	assert.Contains(t, chains, "circuit-breaker: 2 of 3 steps, 2024-01-15T10:00:00Z–10:01:00Z")
 }
+
+// A chain line that merges one error from several sources doesn't list
+// those sources again as failing alongside it.
+func TestRun_MergedChainLineOmitsItsOwnSourcesFromWith(t *testing.T) {
+	at := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+	var entries []types.EnrichedEntry
+	pods := []string{"pod1.log", "pod2.log", "pod3.log"}
+	for i, src := range pods {
+		e := chainMember(types.LevelError, "upstream timeout calling payments", at.Add(time.Duration(i)*time.Second),
+			at.Add(time.Duration(i)*time.Second), 1, "circuit-breaker", 1, 3)
+		e.Source, e.Signature = src, e.Message
+		for _, other := range append(append([]string(nil), pods...), "db.log") {
+			if other != src {
+				e.CorrelatedWith = append(e.CorrelatedWith, other)
+			}
+		}
+		e.CorrelatedCount = len(e.CorrelatedWith)
+		entries = append(entries, e)
+	}
+	entries = append(entries, chainMember(types.LevelWarn, "circuit breaker open for payments", at.Add(time.Minute), at.Add(time.Minute), 1, "circuit-breaker", 2, 3))
+
+	chains := sectionOf(runEntries(t, entries, Options{}), "## Error Chains")
+
+	assert.Contains(t, chains, "upstream timeout calling payments {×3 with=db.log} (also from 2 other sources)")
+}
