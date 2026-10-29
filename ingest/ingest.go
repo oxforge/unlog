@@ -175,6 +175,9 @@ func (ing *Ingester) processSource(ctx context.Context, source string, r io.Read
 		if entry.Level == types.LevelUnknown && entry.Message != "" {
 			entry.Level = InferLevel(entry.Message)
 		}
+		if entry.Service == "" {
+			entry.Service = serviceOf(entry.Metadata)
+		}
 		ing.stats.record(source, entry.Level, unparsed)
 		select {
 		case ing.output <- entry:
@@ -188,6 +191,20 @@ func (ing *Ingester) processSource(ctx context.Context, source string, r io.Read
 		return sendErr
 	}
 	return readErr
+}
+
+// serviceKeys are the metadata fields, in order of preference, that name the
+// service a line came from: a JSON or logfmt "service", a syslog program
+// ("app"), a Docker Compose "container", a Kubernetes "pod".
+var serviceKeys = []string{"service", "app", "container", "pod"}
+
+func serviceOf(metadata map[string]string) string {
+	for _, key := range serviceKeys {
+		if v := metadata[key]; v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 // isBinary reports whether f starts with a NUL byte in its first 8 KB, and

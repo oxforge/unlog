@@ -8,10 +8,10 @@ import (
 	"github.com/oxforge/unlog/types"
 )
 
-// recentEntry tracks a recent entry's source and timestamp for correlation.
+// recentEntry tracks a recent error's origin and timestamp for correlation.
 type recentEntry struct {
 	Timestamp time.Time
-	Source    string
+	Source    string // the entry's Origin()
 }
 
 // maxRecentEntries caps the correlator buffer to prevent unbounded memory growth.
@@ -32,10 +32,16 @@ func NewCorrelator(window time.Duration) *Correlator {
 	}
 }
 
-// Correlate sets CorrelatedWith on the entry based on other sources
-// that have entries within the correlation window.
+// Correlate sets CorrelatedWith on an ERROR or FATAL entry to the other
+// origins (source, plus service when the line names one) whose errors started
+// within the correlation window: failures that happened together. Entries
+// below ERROR are neither tagged nor remembered.
 func (c *Correlator) Correlate(entry *types.EnrichedEntry) {
+	if entry.Level < types.LevelError {
+		return
+	}
 	ts := entry.Timestamp
+	origin := entry.Origin()
 	if ts.After(c.maxTimeSeen) {
 		c.maxTimeSeen = ts
 	}
@@ -57,7 +63,7 @@ func (c *Correlator) Correlate(entry *types.EnrichedEntry) {
 	}
 	seen := c.seen
 	for _, r := range c.recent {
-		if r.Source != entry.Source && !seen[r.Source] {
+		if r.Source != origin && !seen[r.Source] {
 			diff := ts.Sub(r.Timestamp)
 			if diff < 0 {
 				diff = -diff
@@ -83,6 +89,6 @@ func (c *Correlator) Correlate(entry *types.EnrichedEntry) {
 	}
 	c.recent = append(c.recent, recentEntry{
 		Timestamp: ts,
-		Source:    entry.Source,
+		Source:    origin,
 	})
 }

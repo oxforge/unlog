@@ -9,10 +9,11 @@ import (
 	"github.com/oxforge/unlog/types"
 )
 
-// dedupKey identifies a record: one per error per source.
+// dedupKey identifies a record: one per error per source and service.
 type dedupKey struct {
-	source string
-	sig    string
+	source  string
+	service string
+	sig     string
 }
 
 // dedupRecord accumulates every occurrence of one error in one source.
@@ -92,7 +93,7 @@ func betterExemplar(e, cur types.LogEntry) bool {
 // Add merges the entry into the record keyed by (Source, signature) and returns
 // the record's id. It is safe for concurrent use.
 func (d *DedupFilter) Add(entry types.LogEntry) uint32 {
-	k := dedupKey{source: entry.Source, sig: ExtractSignature(entry.Message)}
+	k := dedupKey{source: entry.Source, service: entry.Service, sig: ExtractSignature(entry.Message)}
 	shard := d.shardFor(k)
 
 	shard.mu.Lock()
@@ -180,6 +181,9 @@ func (d *DedupFilter) Entries() []types.FilteredEntry {
 		}
 		if a.Source != b.Source {
 			return a.Source < b.Source
+		}
+		if a.Service != b.Service {
+			return a.Service < b.Service
 		}
 		if a.LineNumber != b.LineNumber {
 			return a.LineNumber < b.LineNumber

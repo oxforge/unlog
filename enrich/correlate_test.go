@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/oxforge/unlog/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -175,4 +176,36 @@ func TestCorrelator_OutOfOrderTimestamp(t *testing.T) {
 	c.Correlate(&e3)
 	// svc-a evicted (maxTime=10, 10-0=10 > 5). svc-b within window of itself but not of e3 (|3-10|=7 > 5).
 	assert.Nil(t, e3.CorrelatedWith)
+}
+
+func TestCorrelator_ServicesWithinAFileAreDistinct(t *testing.T) {
+	c := NewCorrelator(5 * time.Second)
+	base := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
+
+	e1 := makeEnrichedEntry("upstream refused", nil)
+	e1.Timestamp, e1.Source, e1.Service = base, "agg.log", "payments"
+	c.Correlate(&e1)
+	e2 := makeEnrichedEntry("index unavailable", nil)
+	e2.Timestamp, e2.Source, e2.Service = base.Add(time.Second), "agg.log", "search"
+	c.Correlate(&e2)
+
+	assert.Equal(t, []string{"agg.log[payments]"}, e2.CorrelatedWith)
+}
+
+func TestCorrelator_OnlyErrorsCorrelate(t *testing.T) {
+	c := NewCorrelator(5 * time.Second)
+	base := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
+
+	warn := makeEnrichedEntry("slow query", nil)
+	warn.Timestamp, warn.Source, warn.Level = base, "db.log", types.LevelWarn
+	c.Correlate(&warn)
+	failure := makeEnrichedEntry("request failed", nil)
+	failure.Timestamp, failure.Source = base.Add(time.Second), "api.log"
+	c.Correlate(&failure)
+	info := makeEnrichedEntry("request served", nil)
+	info.Timestamp, info.Source, info.Level = base.Add(2*time.Second), "web.log", types.LevelInfo
+	c.Correlate(&info)
+
+	assert.Nil(t, failure.CorrelatedWith, "a WARN in another source is not a concurrent failure")
+	assert.Nil(t, info.CorrelatedWith, "an INFO line gets no correlation")
 }

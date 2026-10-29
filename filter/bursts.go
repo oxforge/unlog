@@ -22,36 +22,46 @@ type secondCount struct {
 	count  int64
 }
 
-// detectBursts finds, per source, runs of seconds far above the source's median
+// burstOrigin is where a burst happened: a source, and the service within it
+// when the lines name one.
+type burstOrigin struct {
+	source  string
+	service string
+}
+
+// detectBursts finds, per source and service, runs of seconds far above the source's median
 // rate, marks every record with an occurrence inside one, and returns the bursts
 // sorted by Start, then Source. The result does not depend on the order of notes.
 // Call it only after all DedupFilter.Add calls.
 func detectBursts(notes []occurrence, d *DedupFilter, multiplier float64, minEvents int64) []types.Burst {
-	bySource := make(map[string][]occurrence)
+	byOrigin := make(map[burstOrigin][]occurrence)
 	for _, n := range notes {
 		r := d.record(n.record)
 		if r == nil {
 			continue
 		}
-		src := r.exemplar.Source
-		bySource[src] = append(bySource[src], n)
+		o := burstOrigin{source: r.exemplar.Source, service: r.exemplar.Service}
+		byOrigin[o] = append(byOrigin[o], n)
 	}
 
 	var bursts []types.Burst
-	for src, srcNotes := range bySource {
-		bursts = append(bursts, sourceBursts(src, srcNotes, d, multiplier, minEvents)...)
+	for o, originNotes := range byOrigin {
+		bursts = append(bursts, sourceBursts(o, originNotes, d, multiplier, minEvents)...)
 	}
 	sort.Slice(bursts, func(i, j int) bool {
 		if !bursts[i].Start.Equal(bursts[j].Start) {
 			return bursts[i].Start.Before(bursts[j].Start)
 		}
-		return bursts[i].Source < bursts[j].Source
+		if bursts[i].Source != bursts[j].Source {
+			return bursts[i].Source < bursts[j].Source
+		}
+		return bursts[i].Service < bursts[j].Service
 	})
 	return bursts
 }
 
 // sourceBursts detects the bursts of one source and marks their records.
-func sourceBursts(src string, notes []occurrence, d *DedupFilter, multiplier float64, minEvents int64) []types.Burst {
+func sourceBursts(src burstOrigin, notes []occurrence, d *DedupFilter, multiplier float64, minEvents int64) []types.Burst {
 	sort.Slice(notes, func(i, j int) bool {
 		if notes[i].second != notes[j].second {
 			return notes[i].second < notes[j].second
@@ -126,7 +136,7 @@ func medianCount(counts []secondCount, span int64) float64 {
 // buildBurst turns the run [start, end] into a Burst when it holds enough
 // events, marking the records that occur inside it. notes must be sorted by second.
 func buildBurst(
-	src string, notes []occurrence, start, end int64, baseline float64, d *DedupFilter, minEvents int64,
+	src burstOrigin, notes []occurrence, start, end int64, baseline float64, d *DedupFilter, minEvents int64,
 ) (types.Burst, bool) {
 	lo := sort.Search(len(notes), func(i int) bool { return notes[i].second >= start })
 	hi := sort.Search(len(notes), func(i int) bool { return notes[i].second > end })
@@ -165,7 +175,8 @@ func buildBurst(
 	}
 
 	return types.Burst{
-		Source:    src,
+		Source:    src.source,
+		Service:   src.service,
 		Start:     time.Unix(start, 0).UTC(),
 		End:       time.Unix(end, 0).UTC(),
 		Events:    events,

@@ -24,6 +24,7 @@ unlog --ai-provider openai logs/
 - **Compressed file support** -- Reads `.gz`, `.tar.gz`, and `.tgz` files transparently.
 - **Noise removal** -- Built-in noise patterns (health checks, Prometheus scrapes, k8s internals) plus custom pattern files.
 - **One line per error** -- Normalizes UUIDs, IPs, timestamps, and paths to group similar messages; each distinct error per source becomes one line with when it started and stopped and how many times it occurred. The same input always gives the same summary.
+- **Services within a file** -- When lines name a service, app, container or pod, errors and bursts are reported per service (`app.log[payments]`), and errors that started within seconds of each other in different sources or services are tagged as failing together (`with=`).
 - **Burst detection** -- Finds stretches where a source logged far above its normal rate, counted on real event volume, and lists the errors behind each burst.
 - **Error chain detection** -- 10 built-in patterns (DB exhaustion, OOM cascade, circuit breaker, deployment failure, disk full, cert expiry, DNS failure, etc.); a chain is reported when at least two of its steps occur, with its errors in order.
 - **Deployment markers** -- Deploy, restart and scaling lines are kept at any `--level` and listed before the errors, with how long before the first error the last deploy happened.

@@ -5,6 +5,7 @@ import "time"
 // Burst is a run of seconds in which one source logged far above its normal rate.
 type Burst struct {
 	Source    string       `json:"source"`
+	Service   string       `json:"service,omitempty"`
 	Start     time.Time    `json:"start"` // first second of the burst
 	End       time.Time    `json:"end"`   // last second of the burst
 	Events    int64        `json:"events"`

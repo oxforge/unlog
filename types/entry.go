@@ -4,9 +4,13 @@ import "time"
 
 // LogEntry is produced by Stage 1 (Ingest). One per log line.
 type LogEntry struct {
-	Timestamp  time.Time         `json:"timestamp"`
-	Level      Level             `json:"level"`
-	Source     string            `json:"source"`
+	Timestamp time.Time `json:"timestamp"`
+	Level     Level     `json:"level"`
+	Source    string    `json:"source"`
+	// Service is the service, app, container or pod the line names, when it
+	// names one; Source stays the file. Errors and bursts are split per
+	// (Source, Service).
+	Service    string            `json:"service,omitempty"`
 	Message    string            `json:"message"`
 	RawLine    string            `json:"raw_line,omitempty"`
 	LineNumber int64             `json:"line_number"`
@@ -41,4 +45,13 @@ type EnrichedEntry struct {
 	ErrorType      string   `json:"error_type,omitempty"`
 	HTTPStatus     int      `json:"http_status,omitempty"`
 	TraceID        string   `json:"trace_id,omitempty"`
+}
+
+// Origin labels where the entry came from: the source, plus the service in
+// brackets when the line names one ("agg.log[payments]").
+func (e LogEntry) Origin() string {
+	if e.Service == "" {
+		return e.Source
+	}
+	return e.Source + "[" + e.Service + "]"
 }
