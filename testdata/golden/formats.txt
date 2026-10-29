@@ -2,16 +2,17 @@
 Window: 2024-01-15T10:00:00Z — 2026-03-19T14:05:12Z (19060h5m13s)
 Sources: 14 (testdata/formats/apache_clf.log, testdata/formats/cloudwatch.log, testdata/formats/csv_kibana.csv, testdata/formats/docker_compose.log, testdata/formats/docker_mixed_streams.log, +9 more)
 Events: 10 fatal, 29 error (28 distinct), 24 warn (21 distinct)
-Error chains detected: cascade-failure-1, circuit-breaker-3, cascade-failure-4, circuit-breaker-6, rate-limiting-2, queue-backlog-5
 
 ## Critical Errors
 2024-01-15T10:00:02Z [ERROR] testdata/formats/docker_compose.log: ERROR Failed to process request: connection reset by peer
 web-1     | java.net.SocketException: Connection reset
 web-1     |     at java.net.SocketInputStream.read(SocketInputStream.java:210)
 web-1     |     at com.example.Main.handleRequest(Main.java:42) {err=Connection}
-2024-01-15T10:00:10Z [ERROR] testdata/formats/json_multiline_stack.log: Unhandled exception in request handler {err=NullPointerException}
+2024-01-15T10:00:03Z [ERROR] testdata/formats/docker_compose.log: ERROR Upstream service unavailable after 3 retries
 2024-01-15T10:00:10Z [ERROR] testdata/formats/cloudwatch.log: ERROR: failed to write batch
+2024-01-15T10:00:10Z [ERROR] testdata/formats/csv_kibana.csv: [Thread-4] ERROR com.example.db.QueryExecutor - Query timeout after 30000ms: SELECT * FROM orders WHERE status = 'pending'
 2024-01-15T10:00:10Z [ERROR] testdata/formats/json_epoch.json: Panic recovered in handler
+2024-01-15T10:00:10Z [ERROR] testdata/formats/json_multiline_stack.log: Unhandled exception in request handler {err=NullPointerException}
 2024-01-15T10:00:10Z [ERROR] testdata/formats/kubernetes_multiline.log: ERROR: Failed to watch ConfigMap
 2024-01-15T10:00:10Z [ERROR] testdata/formats/logfmt_varied.log: Job failed {err=context deadline exceeded}
 2024-01-15T10:00:10Z [ERROR] testdata/formats/syslog_rfc5424.log: Connection pool exhausted
@@ -21,33 +22,32 @@ web-1     |     at com.example.Main.handleRequest(Main.java:42) {err=Connection}
 2024-01-15T10:00:10Z [ERROR] testdata/formats/generic_with_brackets.log: [ERROR] [db-pool]   at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:155)
 2024-01-15T10:00:10Z [ERROR] testdata/formats/generic_with_brackets.log: [ERROR] [db-pool]   at com.example.Repository.query(Repository.java:42)
 2024-01-15T10:00:11Z [FATAL] testdata/formats/syslog_rfc5424.log: Unable to acquire connection
+2024-01-15T10:00:11Z [ERROR] testdata/formats/csv_kibana.csv: [elastic-apm-remote-config-poller] ERROR co.elastic.apm.agent.configuration.ApmServerConfigurationSource - Unable to tunnel through proxy. Proxy returns "HTTP/1.0 503 Service Unavailable" {http=503}
 2024-01-15T10:00:11Z [ERROR] testdata/formats/docker_mixed_streams.log: [2024-01-15 10:00:11] ERROR: Database connection lost, activating circuit breaker
-2024-01-15T10:00:11Z [ERROR] testdata/formats/logfmt_varied.log: Retry scheduled
-2024-01-15T10:00:11Z [ERROR] testdata/formats/json_multiline_stack.log: Failed to send notification {err=ConnectionRefusedException}
 2024-01-15T10:00:11Z [ERROR] testdata/formats/json_epoch.json: Write to closed channel
+2024-01-15T10:00:11Z [ERROR] testdata/formats/json_multiline_stack.log: Failed to send notification {err=ConnectionRefusedException}
+2024-01-15T10:00:11Z [ERROR] testdata/formats/logfmt_varied.log: Retry scheduled
+2024-01-15T10:00:15Z [FATAL] testdata/formats/docker_mixed_streams.log: [2024-01-15 10:00:15] FATAL: Healthcheck failed 3 times, shutting down {err=Healthcheck}
 2024-01-15T10:00:15Z [FATAL] testdata/formats/json_epoch.json: OOM killer invoked
 2024-01-15T10:00:15Z [FATAL] testdata/formats/json_multiline_stack.log: Data corruption detected in primary index
-2024-01-15T10:00:15Z [FATAL] testdata/formats/docker_mixed_streams.log: [2024-01-15 10:00:15] FATAL: Healthcheck failed 3 times, shutting down {err=Healthcheck}
-2024-01-15T10:00:15Z [FATAL] testdata/formats/syslog_rfc5424.log: Service unavailable, shutting down
-2024-01-15T10:00:15Z [FATAL] testdata/formats/logfmt_varied.log: Queue backend unreachable
 2024-01-15T10:00:15Z [FATAL] testdata/formats/kubernetes_multiline.log: FATAL: Controller crash loop detected, exiting {err=Controller}
-2024-01-15T10:00:15Z [ERROR] testdata/formats/csv_kibana.csv: [Thread-8] ERROR com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Exception during pool initialization.
+2024-01-15T10:00:15Z [FATAL] testdata/formats/logfmt_varied.log: Queue backend unreachable
+2024-01-15T10:00:15Z [FATAL] testdata/formats/syslog_rfc5424.log: Service unavailable, shutting down
 2024-01-15T10:00:15Z [ERROR] testdata/formats/cloudwatch.log: ERROR: max retries exceeded
+2024-01-15T10:00:15Z [ERROR] testdata/formats/csv_kibana.csv: [Thread-8] ERROR com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Exception during pool initialization.
 2024-01-15T10:00:15Z [FATAL] testdata/formats/generic_with_brackets.log: [FATAL] [main] Shutting down due to unrecoverable error
 2024-01-15T10:00:20Z [ERROR] testdata/formats/csv_kibana.csv: [2024-01-1510:00:20+0100] [error] Payment request with checksum (abc123def456) could not be imported into reporting database
 2024-01-15T10:00:30Z [FATAL] testdata/formats/csv_kibana.csv: [Thread-1] FATAL com.example.Application - Out of memory, shutting down
 2024-01-15T17:00:05Z–17:00:07Z [ERROR] testdata/formats/apache_clf.log: GET /api/orders HTTP/1.1 500 {×3 http=500}
 2024-01-15T17:00:08Z [ERROR] testdata/formats/apache_clf.log: POST /api/checkout HTTP/1.1 503 {http=503}
 2026-03-19T14:05:09Z [ERROR] testdata/formats/k8s_deployment.log: ERROR PAYMENT_SVC APP_LOG Refund rejected by gateway for order ord-87201: insufficient merchant balance
+2026-03-19T14:05:12Z [ERROR] testdata/formats/k8s_deployment.log: ERROR PAYMENT_SVC APP_LOG Charge failed after 3 retries for order ord-90412: java.net.ConnectException: connection refused {err=connection}
 - [FATAL] testdata/formats/unstructured.log: Fatal: cannot start without database, exiting
 - [ERROR] testdata/formats/unstructured.log: Error: failed to authenticate with database {err=failed}
 - [ERROR] testdata/formats/unstructured.log: Error: second attempt also failed {err=second}
 
 ## Error Chains
-2024-01-15T10:00:03Z [ERROR] testdata/formats/docker_compose.log: ERROR Upstream service unavailable after 3 retries {chain=cascade-failure-1}
-2024-01-15T10:00:10Z [ERROR] testdata/formats/csv_kibana.csv: [Thread-4] ERROR com.example.db.QueryExecutor - Query timeout after 30000ms: SELECT * FROM orders WHERE status = 'pending' {chain=circuit-breaker-3}
-2024-01-15T10:00:11Z [ERROR] testdata/formats/csv_kibana.csv: [elastic-apm-remote-config-poller] ERROR co.elastic.apm.agent.configuration.ApmServerConfigurationSource - Unable to tunnel through proxy. Proxy returns "HTTP/1.0 503 Service Unavailable" {chain=cascade-failure-4 http=503}
-2026-03-19T14:05:12Z [ERROR] testdata/formats/k8s_deployment.log: ERROR PAYMENT_SVC APP_LOG Charge failed after 3 retries for order ord-90412: java.net.ConnectException: connection refused {chain=circuit-breaker-6 err=connection}
+(none)
 
 ## Rate Anomalies
 (none)
@@ -61,10 +61,10 @@ web-1     |     at com.example.Main.handleRequest(Main.java:42) {err=Connection}
 2024-01-15T10:00:01Z [UNKNOWN] testdata/formats/cloudwatch.log: Processing 42 records
 2024-01-15T10:00:02Z [WARN] testdata/formats/docker_compose.log: WARN Client connection closed unexpectedly
 2024-01-15T10:00:03Z [WARN] testdata/formats/docker_compose.log: WARN 502 Bad Gateway returned to client 192.168.1.100
-2024-01-15T10:00:05Z [WARN] testdata/formats/cloudwatch.log: WARN: DynamoDB throttling detected {chain=rate-limiting-2}
-2024-01-15T10:00:05Z [WARN] testdata/formats/json_epoch.json: Goroutine count high
+2024-01-15T10:00:05Z [WARN] testdata/formats/cloudwatch.log: WARN: DynamoDB throttling detected
 2024-01-15T10:00:05Z [WARN] testdata/formats/csv_kibana.csv: [Thread-2] WARN com.example.pool.ConnectionPool - Pool utilization at 85% (17/20)
 2024-01-15T10:00:05Z [WARN] testdata/formats/docker_mixed_streams.log: [2024-01-15 10:00:05] WARN: Deprecated API version v1 used by client 10.0.0.5
+2024-01-15T10:00:05Z [WARN] testdata/formats/json_epoch.json: Goroutine count high
 2024-01-15T10:00:05Z [WARN] testdata/formats/logfmt_varied.log: Job execution slow
 2024-01-15T10:00:05Z [WARN] testdata/formats/syslog_rfc5424.log: Slow query detected
 2024-01-15T10:00:05Z [WARN] testdata/formats/generic_with_brackets.log: [WARN] [http] Request took 3.2s: GET /api/reports
@@ -82,7 +82,7 @@ web-1     |     at com.example.Main.handleRequest(Main.java:42) {err=Connection}
 2024-01-15T10:00:10Z [UNKNOWN] testdata/formats/csv_kibana.csv: at com.example.api.OrderController.listPending(OrderController.java:67)
 2024-01-15T10:00:10Z [UNKNOWN] testdata/formats/csv_kibana.csv: at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:897)
 2024-01-15T10:00:11Z [UNKNOWN] testdata/formats/cloudwatch.log: Retrying batch write (attempt 2)
-2024-01-15T10:00:12Z [WARN] testdata/formats/json_multiline_stack.log: Retry queue depth exceeding threshold {chain=queue-backlog-5}
+2024-01-15T10:00:12Z [WARN] testdata/formats/json_multiline_stack.log: Retry queue depth exceeding threshold
 2024-01-15T10:00:15Z [UNKNOWN] testdata/formats/csv_kibana.csv: com.mysql.cj.jdbc.exceptions.CommunicationsException: Communications link failure {err=Communications}
 2024-01-15T10:00:15Z [UNKNOWN] testdata/formats/csv_kibana.csv: at com.mysql.cj.jdbc.exceptions.SQLError.createCommunicationsException(SQLError.java:174)
 2024-01-15T10:00:15Z [UNKNOWN] testdata/formats/csv_kibana.csv: at com.mysql.cj.jdbc.ConnectionImpl.createNewIO(ConnectionImpl.java:828)
@@ -100,7 +100,7 @@ web-1     |     at com.example.Main.handleRequest(Main.java:42) {err=Connection}
 2026-03-19T14:05:10Z–14:05:12Z [WARN] testdata/formats/k8s_deployment.log: WARN PAYMENT_SVC APP_LOG Retrying charge for order ord-90412 (attempt 1/3) {×3}
 2026-03-19T14:05:11Z–14:05:12Z [WARN] testdata/formats/k8s_deployment.log: WARN PAYMENT_SVC APP_LOG Gateway returned HTTP 503: service temporarily unavailable {×2}
 - [WARN] testdata/formats/unstructured.log: Warning: connection pool size is low
-- [UNKNOWN] testdata/formats/unstructured.log: Retrying connection in 5 seconds
 - [UNKNOWN] testdata/formats/unstructured.log: Application starting up
 - [UNKNOWN] testdata/formats/unstructured.log: Loading configuration from /etc/app/config.yaml
 - [UNKNOWN] testdata/formats/unstructured.log: Connecting to database at db-primary:5432
+- [UNKNOWN] testdata/formats/unstructured.log: Retrying connection in 5 seconds

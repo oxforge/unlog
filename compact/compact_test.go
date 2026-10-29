@@ -250,32 +250,53 @@ func TestRun_SectionsPresent(t *testing.T) {
 	assert.Contains(t, summary, "## Context")
 }
 
-func TestRun_ChainDeduplication(t *testing.T) {
-	// Two entries with the same chain ID should appear as one entry in Error Chains.
-	base := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
+func chainMember(level types.Level, msg string, first, last time.Time, count int, id string, step, steps int) types.EnrichedEntry {
+	e := spanEntry(level, msg, "app.log", first, last, count)
+	e.ChainID, e.ChainStep, e.ChainSteps = id, step, steps
+	return e
+}
 
-	mkChain := func(msg string, offset time.Duration) types.EnrichedEntry {
-		e := makeEntry(types.LevelError, msg, "db", base.Add(offset))
-		e.ChainID = "db-connection-exhaustion-1"
-		return e
-	}
-
+func TestRun_ChainShowsEveryMemberInOrder(t *testing.T) {
+	at := func(m, s int) time.Time { return time.Date(2024, 1, 15, 10, m, s, 0, time.UTC) }
 	entries := []types.EnrichedEntry{
-		mkChain("lock timeout", 0),
-		mkChain("connection pool exhausted", time.Second),
-		mkChain("query failed", 2*time.Second),
+		chainMember(types.LevelError, "circuit breaker opened: database", at(31, 20), at(31, 20), 1, "circuit-breaker", 2, 3),
+		chainMember(types.LevelError, "database connection timeout: context deadline exceeded", at(31, 10), at(31, 13), 4, "circuit-breaker", 1, 3),
+		spanEntry(types.LevelError, "payment declined", "app.log", at(31, 15), at(31, 15), 1),
 	}
-
 	ch := make(chan types.EnrichedEntry, len(entries))
 	sendAndClose(ch, entries)
 
 	summary, err := Run(context.Background(), ch, Options{})
 	require.NoError(t, err)
 
-	// The chain ID should appear in the Error Chains section exactly once.
-	chainSection := extractSection(summary, "## Error Chains", "## Rate Anomalies")
-	count := strings.Count(chainSection, "db-connection-exhaustion-1")
-	assert.Equal(t, 1, count, "chain ID should appear exactly once in Error Chains section")
+	assert.Equal(t, "\n"+
+		"circuit-breaker: 2 of 3 steps, 2024-01-15T10:31:10Z–10:31:20Z\n"+
+		"  1. 2024-01-15T10:31:10Z–10:31:13Z [ERROR] app.log: database connection timeout: context deadline exceeded {×4}\n"+
+		"  2. 2024-01-15T10:31:20Z [ERROR] app.log: circuit breaker opened: database\n\n",
+		extractSection(summary, "## Error Chains", "## Rate Anomalies"))
+	critical := extractSection(summary, "## Critical Errors", "## Error Chains")
+	assert.Contains(t, critical, "payment declined")
+	assert.NotContains(t, critical, "circuit breaker opened")
+}
+
+func TestRun_ChainMembersBelowErrorStayInTheChain(t *testing.T) {
+	at := time.Date(2024, 1, 15, 14, 1, 55, 0, time.UTC)
+	entries := []types.EnrichedEntry{
+		chainMember(types.LevelInfo, "deployment starting for api-server v2.4.1", at, at, 1, "deployment-failure", 1, 3),
+		chainMember(types.LevelWarn, "readiness probe failed for api-server", at.Add(time.Minute), at.Add(time.Minute), 1, "deployment-failure", 2, 3),
+	}
+	ch := make(chan types.EnrichedEntry, len(entries))
+	sendAndClose(ch, entries)
+
+	summary, err := Run(context.Background(), ch, Options{})
+	require.NoError(t, err)
+
+	chains := extractSection(summary, "## Error Chains", "## Rate Anomalies")
+	assert.Contains(t, chains, "deployment-failure: 2 of 3 steps")
+	assert.Contains(t, chains, "  1. 2024-01-15T14:01:55Z [INFO] app.log: deployment starting")
+	assert.Contains(t, chains, "  2. 2024-01-15T14:02:55Z [WARN] app.log: readiness probe failed")
+	assert.Equal(t, "\n(none)", extractSection(summary, "## Context", "\x00"))
+	assert.NotContains(t, summary, "chain=")
 }
 
 func TestRun_DeploymentFlagInOutput(t *testing.T) {

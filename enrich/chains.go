@@ -3,6 +3,7 @@ package enrich
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"time"
 
 	"github.com/oxforge/unlog/types"
@@ -22,25 +23,9 @@ type ChainStage struct {
 	MinLevel       types.Level
 }
 
-// activeChain tracks a partially matched chain pattern.
-type activeChain struct {
-	Pattern   *ChainPattern
-	ID        string
-	StartTime time.Time
-	NextStage int
-	EntryIDs  []int64
-}
-
-// maxActiveChainsPerPattern limits how many active chains a single pattern
-// can have simultaneously, preventing unbounded growth during error spikes.
-const maxActiveChainsPerPattern = 100
-
-// ChainMatcher detects error chain patterns across a stream of log entries.
+// ChainMatcher detects error chain patterns across a run's entries.
 type ChainMatcher struct {
 	patterns []*ChainPattern
-	active   []*activeChain
-	maxTime  time.Time // high-water mark for expiration
-	counter  int64     // per-instance chain ID counter
 }
 
 // NewChainMatcher creates a ChainMatcher with the built-in patterns.
@@ -48,58 +33,6 @@ func NewChainMatcher() *ChainMatcher {
 	return &ChainMatcher{
 		patterns: builtinChainPatterns,
 	}
-}
-
-// Match checks the entry against active and potential chains.
-func (cm *ChainMatcher) Match(entry *types.EnrichedEntry) string {
-	ts := entry.Timestamp
-	if ts.After(cm.maxTime) {
-		cm.maxTime = ts
-	}
-
-	cm.expire()
-
-	var matchedChainID string
-
-	for _, ac := range cm.active {
-		if ac.NextStage >= len(ac.Pattern.Stages) {
-			continue
-		}
-		stage := ac.Pattern.Stages[ac.NextStage]
-		if cm.matchesStage(entry, stage) {
-			ac.NextStage++
-			ac.EntryIDs = append(ac.EntryIDs, entry.LineNumber)
-			if ac.NextStage >= len(ac.Pattern.Stages) {
-				matchedChainID = ac.ID
-			} else if matchedChainID == "" {
-				matchedChainID = ac.ID
-			}
-		}
-	}
-
-	for _, p := range cm.patterns {
-		stage := p.Stages[0]
-		if cm.matchesStage(entry, stage) {
-			if cm.countActiveForPattern(p.Name) >= maxActiveChainsPerPattern {
-				continue
-			}
-			cm.counter++
-			id := fmt.Sprintf("%s-%d", p.Name, cm.counter)
-			ac := &activeChain{
-				Pattern:   p,
-				ID:        id,
-				StartTime: ts,
-				NextStage: 1,
-				EntryIDs:  []int64{entry.LineNumber},
-			}
-			cm.active = append(cm.active, ac)
-			if matchedChainID == "" {
-				matchedChainID = id
-			}
-		}
-	}
-
-	return matchedChainID
 }
 
 func (cm *ChainMatcher) matchesStage(entry *types.EnrichedEntry, stage ChainStage) bool {
@@ -110,30 +43,6 @@ func (cm *ChainMatcher) matchesStage(entry *types.EnrichedEntry, stage ChainStag
 		return false
 	}
 	return stage.MessagePattern.MatchString(entry.Message)
-}
-
-func (cm *ChainMatcher) countActiveForPattern(name string) int {
-	count := 0
-	for _, ac := range cm.active {
-		if ac.Pattern.Name == name {
-			count++
-		}
-	}
-	return count
-}
-
-func (cm *ChainMatcher) expire() {
-	n := 0
-	for _, ac := range cm.active {
-		if cm.maxTime.Sub(ac.StartTime) <= ac.Pattern.Window {
-			cm.active[n] = ac
-			n++
-		}
-	}
-	for i := n; i < len(cm.active); i++ {
-		cm.active[i] = nil
-	}
-	cm.active = cm.active[:n]
 }
 
 // builtinChainPatterns defines the 10 built-in error chain patterns.
@@ -228,4 +137,92 @@ var builtinChainPatterns = []*ChainPattern{
 			{MessagePattern: regexp.MustCompile(`(?i)(HTTP\s+5\d{2}|status[=: ]+5\d{2}|5\d{2}\s+(error|response))`), MinLevel: types.LevelError},
 		},
 	},
+}
+
+// Chain is a detected error chain: the entries that matched at least two of a
+// pattern's stages within its window, in time order.
+type Chain struct {
+	ID      string // the pattern name, then "-2", "-3"... for later chains of it
+	Pattern string
+	Steps   int // the pattern's number of stages
+	Matched int // the highest stage reached
+	Members []ChainMember
+}
+
+// ChainMember is one entry of a chain and the stage (1-based) it matched.
+type ChainMember struct {
+	Index int // into the entries passed to FindChains
+	Step  int
+}
+
+// FindChains finds the chains in entries, which must be in time order.
+// Undated entries are skipped. For each pattern, one chain is open at a time:
+// it starts at an entry matching the first stage, takes the next stage when
+// an entry matches it within the pattern's window, and takes further entries
+// matching any stage it has already reached (more timeouts join the same
+// chain). A chain that reached at least two stages is reported. Chains are
+// sorted by their first member, then by pattern order.
+func (cm *ChainMatcher) FindChains(entries []types.EnrichedEntry) []Chain {
+	var chains []Chain
+	for _, p := range cm.patterns {
+		chains = append(chains, cm.patternChains(p, entries)...)
+	}
+	sort.SliceStable(chains, func(i, j int) bool {
+		return chains[i].Members[0].Index < chains[j].Members[0].Index
+	})
+	seen := make(map[string]int)
+	for i := range chains {
+		seen[chains[i].Pattern]++
+		chains[i].ID = chains[i].Pattern
+		if n := seen[chains[i].Pattern]; n > 1 {
+			chains[i].ID = fmt.Sprintf("%s-%d", chains[i].Pattern, n)
+		}
+	}
+	return chains
+}
+
+// patternChains runs one pattern over entries.
+func (cm *ChainMatcher) patternChains(p *ChainPattern, entries []types.EnrichedEntry) []Chain {
+	var chains []Chain
+	var open *Chain
+	var openedAt time.Time
+	finish := func() {
+		if open != nil && open.Matched >= 2 {
+			chains = append(chains, *open)
+		}
+		open = nil
+	}
+	for i := range entries {
+		e := &entries[i]
+		if e.Timestamp.IsZero() {
+			continue
+		}
+		if open != nil && e.Timestamp.Sub(openedAt) > p.Window {
+			finish()
+		}
+		if open == nil {
+			if cm.matchesStage(e, p.Stages[0]) {
+				open = &Chain{Pattern: p.Name, Steps: len(p.Stages), Matched: 1,
+					Members: []ChainMember{{Index: i, Step: 1}}}
+				openedAt = e.Timestamp
+			}
+			continue
+		}
+		if cm.matchesStage(e, p.Stages[open.Matched]) {
+			open.Matched++
+			open.Members = append(open.Members, ChainMember{Index: i, Step: open.Matched})
+			if open.Matched == len(p.Stages) {
+				finish()
+			}
+			continue
+		}
+		for s := open.Matched - 1; s >= 0; s-- {
+			if cm.matchesStage(e, p.Stages[s]) {
+				open.Members = append(open.Members, ChainMember{Index: i, Step: s + 1})
+				break
+			}
+		}
+	}
+	finish()
+	return chains
 }

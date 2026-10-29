@@ -43,33 +43,46 @@ func NewEnricher(input <-chan types.FilteredEntry, output chan<- types.EnrichedE
 	}
 }
 
-// Run processes all entries and closes the output channel when done.
+// Run enriches all entries and closes the output channel when done. It
+// reads every entry first (the filter stage emits only after reading all
+// input anyway), because a chain is known only once its later stages are
+// seen, and then tags every member. Entries keep their input order.
 func (e *Enricher) Run(ctx context.Context) error {
 	defer close(e.output)
 
+	var entries []types.EnrichedEntry
+collect:
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case entry, ok := <-e.input:
 			if !ok {
-				return nil
+				break collect
 			}
-
-			enriched := types.EnrichedEntry{
-				FilteredEntry: entry,
-			}
-
+			enriched := types.EnrichedEntry{FilteredEntry: entry}
 			e.fields.Extract(&enriched)
 			e.deploy.Detect(&enriched)
-			enriched.ChainID = e.chains.Match(&enriched)
-			e.corr.Correlate(&enriched)
+			entries = append(entries, enriched)
+		}
+	}
 
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case e.output <- enriched:
+	for _, c := range e.chains.FindChains(entries) {
+		for _, m := range c.Members {
+			member := &entries[m.Index]
+			if member.ChainID == "" {
+				member.ChainID, member.ChainStep, member.ChainSteps = c.ID, m.Step, c.Steps
 			}
 		}
 	}
+
+	for i := range entries {
+		e.corr.Correlate(&entries[i])
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case e.output <- entries[i]:
+		}
+	}
+	return nil
 }

@@ -40,23 +40,24 @@ func BenchmarkChainMatching(b *testing.B) {
 		"circuit breaker open for payment-api",
 	}
 
+	entries := make([]types.EnrichedEntry, len(messages))
+	for j, msg := range messages {
+		entries[j] = types.EnrichedEntry{
+			FilteredEntry: types.FilteredEntry{
+				LogEntry: types.LogEntry{
+					Timestamp:  base.Add(time.Duration(j) * time.Second),
+					Level:      types.LevelError,
+					Source:     "test",
+					Message:    msg,
+					LineNumber: int64(j),
+				},
+			},
+		}
+	}
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		cm := NewChainMatcher()
-		for j, msg := range messages {
-			entry := types.EnrichedEntry{
-				FilteredEntry: types.FilteredEntry{
-					LogEntry: types.LogEntry{
-						Timestamp:  base.Add(time.Duration(j) * time.Second),
-						Level:      types.LevelError,
-						Source:     "test",
-						Message:    msg,
-						LineNumber: int64(j),
-					},
-				},
-			}
-			cm.Match(&entry)
-		}
+		NewChainMatcher().FindChains(entries)
 	}
 }
 

@@ -102,11 +102,21 @@ drain:
 		return buildEmptySummary(), nil
 	}
 
+	// A total order, so equal entries never swap when unrelated scores change.
 	sort.Slice(all, func(i, j int) bool {
-		if all[i].score != all[j].score {
+		a, b := all[i].entry, all[j].entry
+		switch {
+		case all[i].score != all[j].score:
 			return all[i].score > all[j].score
+		case !a.Timestamp.Equal(b.Timestamp):
+			return a.Timestamp.Before(b.Timestamp)
+		case a.Source != b.Source:
+			return a.Source < b.Source
+		case a.LineNumber != b.LineNumber:
+			return a.LineNumber < b.LineNumber
+		default:
+			return a.Message < b.Message
 		}
-		return all[i].entry.Timestamp.Before(all[j].entry.Timestamp)
 	})
 
 	summary := formatSummary(all, bursts, opts.TokenBudget)
