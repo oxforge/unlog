@@ -156,3 +156,76 @@ func TestBurstsDoNotDependOnNoteOrder(t *testing.T) {
 	}
 	assert.Equal(t, want, n.detect())
 }
+
+// quietSource adds one error at each end of an hour, so the source's median
+// per-second count is 0.
+func (n *noteSet) quietSource() {
+	n.add(burstBase, "same.log", "heartbeat missed")
+	n.add(burstBase.Add(time.Hour), "same.log", "heartbeat missed")
+}
+
+func (n *noteSet) addSecond(at time.Time, events int, msg string) {
+	for i := 0; i < events; i++ {
+		n.add(at.Add(time.Duration(i)*time.Millisecond), "same.log", msg)
+	}
+}
+
+func TestBurstJoinsOneQuietSecondAndSplitsOnTwo(t *testing.T) {
+	at := burstBase.Add(10 * time.Minute)
+	tests := []struct {
+		name       string
+		gapSeconds int
+		wantBursts int
+	}{
+		{"one quiet second joins two hot seconds", 1, 1},
+		{"two quiet seconds split them", 2, 0}, // 15 + 15 apart: each run is under 20 events
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			n := newNoteSet()
+			n.quietSource()
+			n.addSecond(at, 15, "queue full")
+			n.addSecond(at.Add(time.Duration(tt.gapSeconds+1)*time.Second), 15, "queue full")
+
+			bursts := n.detect()
+
+			require.Len(t, bursts, tt.wantBursts)
+			if tt.wantBursts == 1 {
+				assert.Equal(t, int64(30), bursts[0].Events)
+				assert.True(t, at.Add(2*time.Second).Equal(bursts[0].End), "end: %s", bursts[0].End)
+			}
+		})
+	}
+}
+
+func TestBurstOfExactlyMinEvents(t *testing.T) {
+	n := newNoteSet()
+	n.quietSource()
+	n.addSecond(burstBase.Add(10*time.Minute), 20, "queue full")
+
+	bursts := n.detect()
+
+	require.Len(t, bursts, 1)
+	assert.Equal(t, int64(20), bursts[0].Events)
+}
+
+// A storm of 8 errors a second for 5 minutes in a source that otherwise logs
+// one error every 10 s is a burst, though no second reaches 10 events.
+func TestBurstFromSlowStormInQuietSource(t *testing.T) {
+	n := newNoteSet()
+	for i := 0; i < 360; i++ {
+		n.add(burstBase.Add(time.Duration(i)*10*time.Second), "same.log", fmt.Sprintf("cache miss for key user:%d", i))
+	}
+	stormStart := burstBase.Add(20 * time.Minute)
+	for i := 0; i < 2400; i++ {
+		n.add(stormStart.Add(time.Duration(i)*125*time.Millisecond), "same.log", fmt.Sprintf("upstream timeout for order %d", i))
+	}
+
+	bursts := n.detect()
+
+	require.Len(t, bursts, 1)
+	assert.True(t, stormStart.Equal(bursts[0].Start), "start: %s", bursts[0].Start)
+	assert.True(t, stormStart.Add(299*time.Second).Equal(bursts[0].End), "end: %s", bursts[0].End)
+	assert.Equal(t, int64(2430), bursts[0].Events) // 2,400 timeouts + 30 background errors inside
+	assert.Equal(t, int64(2400), bursts[0].TopErrors[0].Count)
+}
