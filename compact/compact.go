@@ -3,13 +3,17 @@
 // importance, and produces a structured text summary that fits within an LLM
 // context window.
 //
-// The output is organized into five sections with fixed token-budget fractions:
+// The output is organized into five sections, each with a base share of the
+// token budget; what a section does not need goes to the sections that would
+// otherwise be cut, in this order:
 //
-//	Incident Overview  5%
+//	Incident Overview  5% (fixed)
 //	Critical Errors   45%
 //	Error Chains      20%
 //	Rate Anomalies    10%
 //	Context           20%
+//
+// A section keeps its highest-scored entries and lists them in time order.
 //
 // This package is public — it can be imported by the enterprise repo.
 package compact

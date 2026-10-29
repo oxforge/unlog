@@ -2,6 +2,7 @@ package compact
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -404,19 +405,23 @@ func TestRun_KeepsLowAndUnknownLevelsInContext(t *testing.T) {
 func TestRun_UnknownLevelRanksBelowWarn(t *testing.T) {
 	base := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
 
-	entries := []types.EnrichedEntry{
-		makeEntry(types.LevelUnknown, "unclassified line", "db.log", base),
-		makeEntry(types.LevelWarn, "queue depth rising", "svc", base.Add(time.Second)),
+	// The unknown entry is the earliest, so only its score can keep it out.
+	entries := []types.EnrichedEntry{makeEntry(types.LevelUnknown, "unclassified line", "db.log", base)}
+	for i := 0; i < 30; i++ {
+		entries = append(entries, makeEntry(types.LevelWarn,
+			fmt.Sprintf("queue depth rising on shard %02d", i), "svc", base.Add(time.Duration(i+1)*time.Second)))
 	}
-
 	ch := make(chan types.EnrichedEntry, len(entries))
 	sendAndClose(ch, entries)
 
-	summary, err := Run(context.Background(), ch, Options{})
+	// ~300 tokens fit about 14 of the 31 lines.
+	summary, err := Run(context.Background(), ch, Options{TokenBudget: 300})
 	require.NoError(t, err)
 
 	contextSection := extractSection(summary, "## Context", "\x00")
-	assert.Less(t, strings.Index(contextSection, "queue depth rising"), strings.Index(contextSection, "unclassified line"))
+	assert.Contains(t, contextSection, "queue depth rising")
+	assert.Contains(t, contextSection, "more entries omitted")
+	assert.NotContains(t, contextSection, "unclassified line")
 }
 
 // ─── Overview content ────────────────────────────────────────────────────────
@@ -565,4 +570,85 @@ func TestRun_LongMessageIsCutInTheSummary(t *testing.T) {
 		assert.LessOrEqual(t, len(line), 2200, "a summary line should be capped near 2000 bytes")
 		assert.True(t, utf8.ValidString(line), "the cut must not split a UTF-8 character")
 	}
+}
+
+// ─── Entries without timestamps (M1) ────────────────────────────────────────
+
+func TestRun_OverviewCountsEntriesWithoutTimestamps(t *testing.T) {
+	ts := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
+	entries := []types.EnrichedEntry{
+		makeEntry(types.LevelError, "max_connections reached", "db.log", time.Time{}),
+		makeEntry(types.LevelError, "request failed", "app.log", ts),
+	}
+	ch := make(chan types.EnrichedEntry, len(entries))
+	sendAndClose(ch, entries)
+
+	summary, err := Run(context.Background(), ch, Options{})
+	require.NoError(t, err)
+
+	overview := extractSection(summary, "## Incident Overview", "## Critical Errors")
+	assert.Contains(t, overview, "Window: 2025-01-01T12:00:00Z — 2025-01-01T12:00:00Z (0s)")
+	assert.Contains(t, overview, "Sources: 2 (app.log, db.log)")
+	assert.Contains(t, overview, "Events: 0 fatal, 2 error, 0 warn")
+}
+
+func TestRun_EntryWithoutTimestampShowsNoDate(t *testing.T) {
+	entries := []types.EnrichedEntry{
+		makeEntry(types.LevelError, "max_connections reached", "db.log", time.Time{}),
+	}
+	ch := make(chan types.EnrichedEntry, len(entries))
+	sendAndClose(ch, entries)
+
+	summary, err := Run(context.Background(), ch, Options{})
+	require.NoError(t, err)
+
+	assert.NotContains(t, summary, "0001-01-01")
+	assert.Contains(t, summary, "Window: unknown (no timestamps)")
+	assert.Contains(t, summary, "\n- [ERROR] db.log: max_connections reached")
+}
+
+// ─── Budget and order within sections (M4) ──────────────────────────────────
+
+func TestRun_UnusedSectionBudgetGoesToOtherSections(t *testing.T) {
+	base := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
+	var entries []types.EnrichedEntry
+	for i := 0; i < 60; i++ {
+		entries = append(entries, makeEntry(types.LevelError,
+			fmt.Sprintf("payment %02d declined by issuer", i), "svc", base.Add(time.Duration(i)*time.Second)))
+	}
+	ch := make(chan types.EnrichedEntry, len(entries))
+	sendAndClose(ch, entries)
+
+	summary, err := Run(context.Background(), ch, Options{TokenBudget: 1000})
+	require.NoError(t, err)
+
+	// Each line is ~60 bytes (~18 tokens). The Critical share alone (45%,
+	// ~445 tokens) fits about 24; with the empty sections' shares it fits
+	// more than 40.
+	critical := extractSection(summary, "## Critical Errors", "## Error Chains")
+	assert.Greater(t, strings.Count(critical, "declined by issuer"), 40)
+	assert.LessOrEqual(t, EstimateTokens(summary), 1000)
+}
+
+func TestRun_SectionListsEntriesInTimeOrder(t *testing.T) {
+	base := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
+	entries := []types.EnrichedEntry{
+		makeEntry(types.LevelFatal, "third: process crashed", "svc", base.Add(3*time.Second)),
+		makeEntry(types.LevelError, "first: disk slow", "svc", base.Add(1*time.Second)),
+		makeEntry(types.LevelError, "undated: worker gone", "svc", time.Time{}),
+		makeEntry(types.LevelError, "second: write failed", "svc", base.Add(2*time.Second)),
+	}
+	ch := make(chan types.EnrichedEntry, len(entries))
+	sendAndClose(ch, entries)
+
+	summary, err := Run(context.Background(), ch, Options{})
+	require.NoError(t, err)
+
+	critical := extractSection(summary, "## Critical Errors", "## Error Chains")
+	first := strings.Index(critical, "first:")
+	second := strings.Index(critical, "second:")
+	third := strings.Index(critical, "third:")
+	undated := strings.Index(critical, "undated:")
+	assert.True(t, first >= 0 && first < second && second < third && third < undated,
+		"want time order with undated last, got:\n%s", critical)
 }

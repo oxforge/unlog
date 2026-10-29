@@ -305,10 +305,19 @@ func (p *FilterPipeline) postProcess(
 		}
 	}
 
+	// The window covers dated survivors only; undated ones sort first.
 	var winStart, winEnd time.Time
-	if len(survivors) > 0 {
-		winStart = survivors[0].Timestamp
-		winEnd = survivors[len(survivors)-1].Timestamp
+	for i := range survivors {
+		ts := survivors[i].Timestamp
+		if ts.IsZero() {
+			continue
+		}
+		if winStart.IsZero() || ts.Before(winStart) {
+			winStart = ts
+		}
+		if ts.After(winEnd) {
+			winEnd = ts
+		}
 	}
 
 	autoDetected := detailed.DroppedByAutoWindow > 0

@@ -18,6 +18,7 @@ const DefaultSystemPrompt = `You are a senior SRE performing post-incident analy
 
 Each log entry follows this format:
   TIMESTAMP [LEVEL] source: message {tags}
+TIMESTAMP is "-" when the log line carried none. Within a section, entries are in time order.
 Tags may include: chain=ID, deploy, spike, ×N (occurrence count), http=STATUS, err=TYPE, trace=ID.
 
 Produce exactly three sections in this order:
