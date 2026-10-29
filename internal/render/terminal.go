@@ -54,12 +54,15 @@ func (r *TerminalRenderer) renderSummary(w io.Writer, opts Options, c colorizer)
 }
 
 func (r *TerminalRenderer) renderAI(w io.Writer, opts Options, c colorizer) {
-	body := opts.Analysis.Analysis
+	body := strings.TrimRight(opts.Analysis.Analysis, "\n")
+	if opts.Analysis.Error != "" {
+		body = strings.TrimSpace(body + "\n\nAI analysis failed: " + opts.Analysis.Error)
+	}
 	if body == "" {
 		return
 	}
 	_, _ = fmt.Fprintf(w, "\n%s\n", c.wrap(ansiBoldCyan, "--- Analysis ---"))
-	_, _ = fmt.Fprintln(w, c.highlightLevels(strings.TrimRight(body, "\n")))
+	_, _ = fmt.Fprintln(w, c.highlightLevels(body))
 	_, _ = fmt.Fprintln(w)
 }
 

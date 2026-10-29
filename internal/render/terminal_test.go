@@ -144,3 +144,19 @@ func TestMarkdownRenderWriteError(t *testing.T) {
 	})
 	assert.Error(t, err, "should propagate write errors")
 }
+
+func TestTerminalRenderNamesAFailedAnalysis(t *testing.T) {
+	for name, body := range map[string]string{"partial analysis": "10:00 — pool saturated", "nothing streamed": ""} {
+		t.Run(name, func(t *testing.T) {
+			var buf bytes.Buffer
+			err := (&render.TerminalRenderer{}).Render(&buf, render.Options{
+				Result:   sampleResult(),
+				Analysis: &analyze.AnalysisResult{Analysis: body, Error: "analyze: anthropic: HTTP 529: overloaded", ModelUsed: "m"},
+				NoColor:  true,
+			})
+			require.NoError(t, err)
+			assert.Contains(t, buf.String(), "AI analysis failed: analyze: anthropic: HTTP 529: overloaded")
+			assert.Contains(t, buf.String(), body)
+		})
+	}
+}

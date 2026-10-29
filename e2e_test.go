@@ -675,20 +675,76 @@ func TestE2EProviderIsCheckedBeforeReadingInput(t *testing.T) {
 	}
 }
 
-// An AI failure still delivers the report: the proxy points at a closed
-// local port, so the call fails at once without touching the network.
+// An AI failure still delivers the report, and exits 3 so a caller can tell
+// it from a run with no report (1). The proxy points at a closed local port,
+// so the call fails at once without touching the network.
 func TestE2EFailedAnalysisStillWritesTheReport(t *testing.T) {
 	logPath := writeFile(t, t.TempDir(), "app.log", levelFixture)
 	env := []string{"HTTPS_PROXY=http://127.0.0.1:1", "ANTHROPIC_API_KEY=test-key"}
+	args := []string{"--ai-provider", "anthropic", "--ai-timeout", "5s"}
 
-	r := runUnlog(t, t.TempDir(), env, "--format", "json", "--ai-provider", "anthropic", logPath)
+	t.Run("json", func(t *testing.T) {
+		r := runUnlog(t, t.TempDir(), env, append(args, "--format", "json", logPath)...)
+
+		assert.Equal(t, 3, r.exit)
+		var report map[string]any
+		require.NoError(t, json.Unmarshal([]byte(r.stdout), &report), "stdout: %s", r.stdout)
+		assert.Contains(t, report["compacted_summary"], "disk controller lost")
+		assert.Contains(t, report["analysis_error"], "proxyconnect")
+		assert.Equal(t, 1, strings.Count(r.stderr, "proxyconnect"), "the error is printed once: %s", r.stderr)
+	})
+
+	t.Run("text to a file", func(t *testing.T) {
+		out := filepath.Join(t.TempDir(), "report.txt")
+		r := runUnlog(t, t.TempDir(), env, append(args, "--output", out, logPath)...)
+
+		assert.Equal(t, 3, r.exit)
+		written, err := os.ReadFile(out)
+		require.NoError(t, err)
+		assert.Contains(t, string(written), "disk controller lost")
+		assert.Contains(t, string(written), "AI analysis failed:")
+	})
+}
+
+// Errors print once, without the usage text, and without each layer naming
+// the one below twice ("pipeline: pipeline: ingest: ingest: ...").
+func TestE2EErrorsPrintOnceWithoutUsage(t *testing.T) {
+	r := runUnlog(t, t.TempDir(), nil, filepath.Join(t.TempDir(), "nope.log"))
 
 	assert.Equal(t, 1, r.exit)
-	var report map[string]any
-	require.NoError(t, json.Unmarshal([]byte(r.stdout), &report), "stdout: %s", r.stdout)
-	assert.Contains(t, report["compacted_summary"], "disk controller lost")
-	assert.Contains(t, report["analysis_error"], "anthropic")
-	assert.Contains(t, r.stderr, "anthropic")
+	assert.Equal(t, 1, strings.Count(r.stderr, "nope.log"), "stderr: %s", r.stderr)
+	assert.NotContains(t, r.stderr, "Usage:")
+	assert.NotContains(t, r.stderr, "pipeline: pipeline")
+	assert.NotContains(t, r.stderr, "ingest: ingest")
+
+	flag := runUnlog(t, t.TempDir(), nil, "--colour", "x.log")
+	assert.Equal(t, 1, flag.exit)
+	assert.Contains(t, flag.stderr, "unknown flag: --colour")
+	assert.Contains(t, flag.stderr, "unlog --help")
+	assert.NotContains(t, flag.stderr, "Usage:")
+}
+
+// --output is checked before any input is read or any AI call is paid for,
+// and a failed run leaves an existing output file as it was.
+func TestE2EOutputFileIsCheckedFirstAndKeptOnFailure(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "nope.log")
+
+	r := runUnlog(t, t.TempDir(), nil, "--output", filepath.Join(t.TempDir(), "no", "such", "dir", "r.txt"), missing)
+	assert.Equal(t, 1, r.exit)
+	assert.Contains(t, r.stderr, "output file")
+	assert.NotContains(t, r.stderr, "nope.log")
+
+	dir := t.TempDir()
+	previous := writeFile(t, dir, "previous.txt", "last week's report\n")
+	fresh := filepath.Join(dir, "fresh.txt")
+	for _, out := range []string{previous, fresh} {
+		r := runUnlog(t, t.TempDir(), nil, "--output", out, missing)
+		assert.Equal(t, 1, r.exit)
+	}
+	kept, err := os.ReadFile(previous)
+	require.NoError(t, err)
+	assert.Equal(t, "last week's report\n", string(kept))
+	assert.NoFileExists(t, fresh)
 }
 
 func TestE2EReportHasAnEmptyAnalysisErrorWithoutAI(t *testing.T) {

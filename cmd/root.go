@@ -38,6 +38,9 @@ var rootCmd = &cobra.Command{
 	Long:  "CLI tool that ingests raw log files, preprocesses them to extract signal from noise,\nthen optionally uses LLM APIs to produce incident timelines and root cause analysis.",
 	Args:  cobra.ArbitraryArgs,
 	RunE:  runAnalyze,
+	// Execute prints the error once; usage is for --help.
+	SilenceErrors: true,
+	SilenceUsage:  true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		path := configFile
 		if path == "" {
@@ -73,14 +76,33 @@ var rootCmd = &cobra.Command{
 	},
 }
 
+// Exit codes: 0 the report was written, 1 an error and no report, 3 the
+// report was written but the AI analysis failed, 130 interrupted.
+const exitAIFailed = 3
+
+// exitError is an error that ends the run with a code other than 1.
+type exitError struct {
+	code int
+	err  error
+}
+
+func (e *exitError) Error() string { return e.err.Error() }
+func (e *exitError) Unwrap() error { return e.err }
+
 func Execute() {
-	if err := rootCmd.Execute(); err != nil {
-		if errors.Is(err, context.Canceled) {
-			os.Exit(130)
-		}
-		_, _ = fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+	err := rootCmd.Execute()
+	if err == nil {
+		return
 	}
+	if errors.Is(err, context.Canceled) {
+		os.Exit(130)
+	}
+	_, _ = fmt.Fprintln(os.Stderr, "Error:", err)
+	var ee *exitError
+	if errors.As(err, &ee) {
+		os.Exit(ee.code)
+	}
+	os.Exit(1)
 }
 
 func init() {
@@ -100,6 +122,10 @@ func init() {
 	rootCmd.Flags().StringVar(&modelFlag, "model", "", "LLM model override (default per provider)")
 	rootCmd.Flags().StringVar(&tzFlag, "tz", "", "Time zone of timestamps that carry none, e.g. \"Europe/Berlin\" or \"Local\" (default: UTC); also applies to --since/--until")
 	rootCmd.Flags().StringVar(&aiTimeoutFlag, "ai-timeout", "", "Timeout for LLM API calls (e.g. \"2m\", \"30s\"; default: 5m)")
+
+	rootCmd.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
+		return fmt.Errorf("%w (see '%s --help')", err, c.CommandPath())
+	})
 
 	analyzeCmd.Flags().AddFlagSet(rootCmd.Flags())
 	rootCmd.AddCommand(analyzeCmd)

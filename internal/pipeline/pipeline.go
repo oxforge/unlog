@@ -63,7 +63,7 @@ func (p *Pipeline) Run(ctx context.Context, sources []string) (*Result, error) {
 	ing := ingest.NewIngester(ingestCh, p.opts.IngestOpts)
 	g.Go(func() error {
 		if err := ing.Run(gCtx, sources); err != nil {
-			return fmt.Errorf("pipeline: ingest: %w", err)
+			return fmt.Errorf("pipeline: %w", err)
 		}
 		return nil
 	})
@@ -84,7 +84,7 @@ func (p *Pipeline) Run(ctx context.Context, sources []string) (*Result, error) {
 	g.Go(func() error {
 		fs, ds, err := fp.Run(gCtx)
 		if err != nil {
-			return fmt.Errorf("pipeline: filter: %w", err)
+			return fmt.Errorf("pipeline: %w", err)
 		}
 		filterOutCh <- filterOut{fs, ds}
 		return nil
@@ -93,7 +93,7 @@ func (p *Pipeline) Run(ctx context.Context, sources []string) (*Result, error) {
 	ep := enrich.NewEnricher(filterCh, enrichCh, p.opts.EnrichOpts)
 	g.Go(func() error {
 		if err := ep.Run(gCtx); err != nil {
-			return fmt.Errorf("pipeline: enrich: %w", err)
+			return fmt.Errorf("pipeline: %w", err)
 		}
 		return nil
 	})
@@ -107,7 +107,7 @@ func (p *Pipeline) Run(ctx context.Context, sources []string) (*Result, error) {
 		// blocks. On error g.Wait() returns early and the value is unused.
 		compactOutCh <- s
 		if err != nil {
-			return fmt.Errorf("pipeline: compact: %w", err)
+			return fmt.Errorf("pipeline: %w", err)
 		}
 		return nil
 	})

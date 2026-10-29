@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -82,12 +84,34 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 		}
 	}
 
+	// Open --output before reading input or paying for an AI call. It is
+	// truncated only when the report is written; a file this run created is
+	// removed if the run fails before that.
+	var outFile *os.File
+	written := false
+	if outputFlag != "" {
+		_, statErr := os.Stat(outputFlag)
+		created := errors.Is(statErr, fs.ErrNotExist)
+		outFile, err = os.OpenFile(outputFlag, os.O_WRONLY|os.O_CREATE, 0o644)
+		if err != nil {
+			return fmt.Errorf("cmd: open output file: %w", err)
+		}
+		defer func() {
+			if cerr := outFile.Close(); cerr != nil && err == nil {
+				err = fmt.Errorf("cmd: close output file: %w", cerr)
+			}
+			if created && !written {
+				_ = os.Remove(outputFlag)
+			}
+		}()
+	}
+
 	result, err := pipeline.New(pipeline.Options{
 		IngestOpts: ingest.IngestOptions{Location: loc},
 		FilterOpts: filterOpts,
 	}).Run(ctx, args)
 	if err != nil {
-		return fmt.Errorf("cmd: pipeline: %w", err)
+		return fmt.Errorf("cmd: %w", err)
 	}
 
 	var ar *analyze.AnalysisResult
@@ -105,7 +129,7 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 		}
 
 		// A failed analysis still gets the report written below, with the
-		// error in it; the run then exits with the error.
+		// error in it; the run then exits with exitAIFailed.
 		ar, aiErr = analyze.Run(ctx, provider, result.Summary, cfg.SystemPrompt, streamCB)
 		if aiErr != nil {
 			if ar == nil {
@@ -124,18 +148,11 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	var out io.Writer = os.Stdout
-	if outputFlag != "" {
-		var f *os.File
-		f, err = os.Create(outputFlag)
-		if err != nil {
-			return fmt.Errorf("cmd: create output file: %w", err)
+	if outFile != nil {
+		if err := outFile.Truncate(0); err != nil {
+			return fmt.Errorf("cmd: truncate output file: %w", err)
 		}
-		defer func() {
-			if cerr := f.Close(); cerr != nil && err == nil {
-				err = fmt.Errorf("cmd: close output file: %w", cerr)
-			}
-		}()
-		out = f
+		out, written = outFile, true
 	}
 
 	effectiveNoColor := noColor
@@ -164,7 +181,7 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	if aiErr != nil {
-		return fmt.Errorf("cmd: analyze: %w", aiErr)
+		return &exitError{code: exitAIFailed, err: fmt.Errorf("cmd: %w", aiErr)}
 	}
 	return nil
 }
