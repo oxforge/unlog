@@ -121,7 +121,9 @@ func (p *OllamaProvider) Analyze(ctx context.Context, system, prompt string) (<-
 
 		if err := scanner.Err(); err != nil {
 			errCh <- fmt.Errorf("analyze: ollama: read stream: %w", err)
+			return
 		}
+		errCh <- fmt.Errorf("analyze: ollama: %w", errStreamEndedEarly)
 	}()
 
 	return tokenCh, errCh

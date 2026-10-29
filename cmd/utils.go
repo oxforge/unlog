@@ -20,7 +20,11 @@ func printStats(w io.Writer, result *pipeline.Result, ar *analyze.AnalysisResult
 	_, _ = fmt.Fprintf(w, "Survived:           %d\n", fs.TotalSurvived)
 	_, _ = fmt.Fprintf(w, "Unique signatures:  %d\n", fs.UniqueSignatures)
 	_, _ = fmt.Fprintf(w, "Duration:           %dms\n", fs.FilterDurationMs)
-	if ar != nil {
+	switch {
+	case ar == nil:
+	case ar.Error != "":
+		_, _ = fmt.Fprintf(w, "AI analysis:        failed after %.1fs\n", ar.Duration.Seconds())
+	default:
 		_, _ = fmt.Fprintf(w, "AI analysis:        %.1fs\n", ar.Duration.Seconds())
 	}
 

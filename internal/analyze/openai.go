@@ -58,6 +58,7 @@ type openaiChunk struct {
 		Delta struct {
 			Content string `json:"content"`
 		} `json:"delta"`
+		FinishReason string `json:"finish_reason"`
 	} `json:"choices"`
 }
 
@@ -103,7 +104,10 @@ func (p *OpenAIProvider) Analyze(ctx context.Context, system, prompt string) (<-
 			return
 		}
 
-		events := parseSSE(ctx, resp.Body)
+		// The stream is complete at [DONE], or after a chunk with a finish
+		// reason (some compatible servers send no [DONE]).
+		events, stopped := parseSSE(ctx, resp.Body)
+		finished := false
 		for ev := range events {
 			if ev.Data == "[DONE]" {
 				return
@@ -123,6 +127,12 @@ func (p *OpenAIProvider) Analyze(ctx context.Context, system, prompt string) (<-
 					return
 				}
 			}
+			if len(chunk.Choices) > 0 && chunk.Choices[0].FinishReason != "" {
+				finished = true
+			}
+		}
+		if err := stopped(); err != nil || !finished {
+			errCh <- fmt.Errorf("analyze: openai: %w", streamEnd(stopped))
 		}
 	}()
 

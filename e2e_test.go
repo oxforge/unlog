@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -722,6 +723,32 @@ func TestE2EErrorsPrintOnceWithoutUsage(t *testing.T) {
 	assert.Contains(t, flag.stderr, "unknown flag: --colour")
 	assert.Contains(t, flag.stderr, "unlog --help")
 	assert.NotContains(t, flag.stderr, "Usage:")
+}
+
+// --output may be a device or a pipe, not only a regular file.
+func TestE2EOutputToADevice(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no /dev on Windows")
+	}
+	logPath := writeFile(t, t.TempDir(), "app.log", levelFixture)
+
+	null := runUnlog(t, t.TempDir(), nil, "--output", "/dev/null", logPath)
+	assert.Equal(t, 0, null.exit, "stderr: %s", null.stderr)
+
+	stdout := runUnlog(t, t.TempDir(), nil, "--output", "/dev/stdout", logPath)
+	assert.Equal(t, 0, stdout.exit, "stderr: %s", stdout.stderr)
+	assert.Contains(t, stdout.stdout, "disk controller lost")
+}
+
+func TestE2EBadConfigErrorNamesEachLayerOnce(t *testing.T) {
+	home := t.TempDir()
+	writeFile(t, filepath.Join(home, ".unlog"), "config.toml", "tz = [\n")
+
+	r := runUnlog(t, home, nil, writeFile(t, t.TempDir(), "app.log", levelFixture))
+
+	assert.Equal(t, 1, r.exit)
+	assert.Contains(t, r.stderr, "config")
+	assert.NotContains(t, r.stderr, "config: config")
 }
 
 // --output is checked before any input is read or any AI call is paid for,

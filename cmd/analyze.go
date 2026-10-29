@@ -149,8 +149,12 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 
 	var out io.Writer = os.Stdout
 	if outFile != nil {
-		if err := outFile.Truncate(0); err != nil {
-			return fmt.Errorf("cmd: truncate output file: %w", err)
+		// Only a regular file has old content to drop; a device or a pipe
+		// (/dev/stdout, >(cat)) can't be truncated.
+		if info, err := outFile.Stat(); err == nil && info.Mode().IsRegular() {
+			if err := outFile.Truncate(0); err != nil {
+				return fmt.Errorf("cmd: truncate output file: %w", err)
+			}
 		}
 		out, written = outFile, true
 	}
@@ -173,7 +177,7 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	if err := r.Render(out, renderOpts); err != nil {
-		return fmt.Errorf("cmd: render: %w", err)
+		return fmt.Errorf("cmd: %w", err)
 	}
 
 	if effectiveFormat == "text" {
