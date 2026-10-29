@@ -58,7 +58,6 @@ func TestEndToEnd(t *testing.T) {
 
 	opts := DefaultFilterOptions()
 	opts.Workers = 2
-	opts.AutoWindow = false // disable auto-window for this test
 
 	p := NewFilterPipeline(input, output, opts, nil)
 
@@ -126,7 +125,6 @@ func TestSortedOutput(t *testing.T) {
 
 	opts := DefaultFilterOptions()
 	opts.Workers = 4
-	opts.AutoWindow = false
 
 	p := NewFilterPipeline(input, output, opts, nil)
 
@@ -171,7 +169,6 @@ func TestContextCancellation(t *testing.T) {
 
 	opts := DefaultFilterOptions()
 	opts.Workers = 2
-	opts.AutoWindow = false
 
 	p := NewFilterPipeline(input, output, opts, nil)
 
@@ -208,7 +205,6 @@ func TestEmptyInput(t *testing.T) {
 
 	opts := DefaultFilterOptions()
 	opts.Workers = 2
-	opts.AutoWindow = false
 
 	p := NewFilterPipeline(input, output, opts, nil)
 	fs, _, err := p.Run(context.Background())
@@ -244,8 +240,7 @@ func TestMaxSurvivorsOverflow(t *testing.T) {
 
 	opts := DefaultFilterOptions()
 	opts.Workers = 2
-	opts.MaxSurvivors = 10 // very low cap to trigger overflow
-	opts.AutoWindow = false
+	opts.MaxSurvivors = 10   // very low cap to trigger overflow
 	opts.MaxDuplicates = 100 // high so dedup doesn't interfere
 
 	p := NewFilterPipeline(input, output, opts, nil)
@@ -277,7 +272,6 @@ func TestTimeWindowIgnoresEntriesWithoutTimestamps(t *testing.T) {
 	close(input)
 
 	opts := DefaultFilterOptions()
-	opts.AutoWindow = false
 	fs, _, err := NewFilterPipeline(input, output, opts, nil).Run(context.Background())
 	require.NoError(t, err)
 	for range output {

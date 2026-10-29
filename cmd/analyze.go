@@ -53,7 +53,7 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 		return err
 	}
 
-	filterOpts, err := buildFilterOpts(cmd, args)
+	filterOpts, err := buildFilterOpts(cmd)
 	if err != nil {
 		return err
 	}

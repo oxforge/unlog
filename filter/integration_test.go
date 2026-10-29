@@ -65,8 +65,6 @@ func TestFilterPipeline_Integration_IncidentScenario(t *testing.T) {
 		FuzzyDedupCacheSize: 100,
 		MaxSurvivors:        10000,
 		SpikeMultiplier:     10,
-		IsStdin:             true,
-		AutoWindow:          false, // disabled since IsStdin=true won't use it, be explicit
 	}
 
 	p := NewFilterPipeline(input, output, opts, nil)

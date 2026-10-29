@@ -31,7 +31,6 @@ func printStats(w io.Writer, result *pipeline.Result, ar *analyze.AnalysisResult
 		_, _ = fmt.Fprintf(w, "Dropped by time window: %d\n", ds.DroppedByTimeWindow)
 		_, _ = fmt.Fprintf(w, "Dropped by noise:       %d\n", ds.DroppedByNoise)
 		_, _ = fmt.Fprintf(w, "Dropped by dedup:       %d\n", ds.DroppedByDedup)
-		_, _ = fmt.Fprintf(w, "Dropped by auto-window: %d\n", ds.DroppedByAutoWindow)
 		_, _ = fmt.Fprintf(w, "Spike events:           %d\n", ds.SpikeCount)
 
 		if len(result.IngestStats) > 0 {

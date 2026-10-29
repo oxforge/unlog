@@ -20,10 +20,6 @@ type FilterOptions struct {
 	Since time.Time
 	// Until filters entries after this time. Zero means no filter.
 	Until time.Time
-	// AutoWindow enables automatic interesting-window detection. Default: true.
-	AutoWindow bool
-	// AutoWindowPadding is the time to add around detected interesting periods. Default: 15m.
-	AutoWindowPadding time.Duration
 	// Workers is the number of parallel filter goroutines. Default: runtime.NumCPU().
 	Workers int
 	// MaxDuplicates is the max times an exact duplicate is kept. Default: 5.
@@ -38,16 +34,12 @@ type FilterOptions struct {
 	NoiseFile string
 	// SpikeMultiplier is the rate increase factor to consider a spike. Default: 10.
 	SpikeMultiplier float64
-	// IsStdin indicates that input is from stdin (disables features requiring re-read).
-	IsStdin bool
 }
 
 // DefaultFilterOptions returns FilterOptions with all defaults set.
 func DefaultFilterOptions() FilterOptions {
 	return FilterOptions{
 		MinLevel:            types.LevelWarn,
-		AutoWindow:          true,
-		AutoWindowPadding:   15 * time.Minute,
 		Workers:             runtime.NumCPU(),
 		MaxDuplicates:       5,
 		DedupShards:         16,
@@ -62,9 +54,6 @@ func withDefaults(opts FilterOptions) FilterOptions {
 	defaults := DefaultFilterOptions()
 	if opts.MinLevel == 0 {
 		opts.MinLevel = defaults.MinLevel
-	}
-	if opts.AutoWindowPadding == 0 {
-		opts.AutoWindowPadding = defaults.AutoWindowPadding
 	}
 	if opts.Workers == 0 {
 		opts.Workers = defaults.Workers
@@ -93,7 +82,6 @@ type DetailedStats struct {
 	DroppedByTimeWindow int64
 	DroppedByNoise      int64
 	DroppedByDedup      int64
-	DroppedByAutoWindow int64
 	SpikeCount          int64
 }
 
@@ -251,7 +239,7 @@ func (p *FilterPipeline) Run(ctx context.Context) (types.FilterStats, DetailedSt
 	return p.postProcess(ctx, survivors, dedup, ingested, overflowEmitted.Load(), overflow.Load(), &detailed, start)
 }
 
-// postProcess runs phase 2 (spike detection, auto-window, sort), emits results,
+// postProcess runs phase 2 (spike detection, sort), emits results,
 // and computes final stats.
 func (p *FilterPipeline) postProcess(
 	ctx context.Context,
@@ -265,12 +253,6 @@ func (p *FilterPipeline) postProcess(
 	// Phase 2 (skipped if overflow).
 	if !overflowed {
 		detailed.SpikeCount = DetectSpikes(survivors, p.opts.SpikeMultiplier)
-
-		if p.opts.AutoWindow && !p.opts.IsStdin && p.opts.Since.IsZero() && p.opts.Until.IsZero() {
-			var awDropped int64
-			survivors, awDropped = DetectAutoWindow(survivors, p.opts.AutoWindowPadding)
-			detailed.DroppedByAutoWindow = awDropped
-		}
 
 		sort.Slice(survivors, func(i, j int) bool {
 			return survivors[i].Timestamp.Before(survivors[j].Timestamp)
@@ -320,8 +302,6 @@ func (p *FilterPipeline) postProcess(
 		}
 	}
 
-	autoDetected := detailed.DroppedByAutoWindow > 0
-
 	fs := types.FilterStats{
 		TotalIngested:      ingested,
 		TotalDropped:       dropped,
@@ -329,7 +309,6 @@ func (p *FilterPipeline) postProcess(
 		UniqueSignatures:   dedup.UniqueSignatures(),
 		TimeWindowStart:    winStart,
 		TimeWindowEnd:      winEnd,
-		AutoDetectedWindow: autoDetected,
 		SourceBreakdown:    sourceBreakdown,
 		FilterDurationMs:   time.Since(start).Milliseconds(),
 	}

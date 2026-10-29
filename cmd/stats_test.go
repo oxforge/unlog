@@ -356,7 +356,7 @@ func TestStatsConsistency(t *testing.T) {
 
 			// Detailed drops should not exceed total dropped.
 			detailedSum := ds.DroppedByLevel + ds.DroppedByTimeWindow +
-				ds.DroppedByNoise + ds.DroppedByDedup + ds.DroppedByAutoWindow
+				ds.DroppedByNoise + ds.DroppedByDedup
 			assert.LessOrEqual(t, detailedSum, fs.TotalDropped,
 				"detailed drop sum ≤ total dropped")
 
