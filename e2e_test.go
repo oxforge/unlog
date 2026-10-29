@@ -539,3 +539,49 @@ func TestE2EGoldenSummaries(t *testing.T) {
 		})
 	}
 }
+
+func TestE2EMissingInputFails(t *testing.T) {
+	existing := writeFile(t, t.TempDir(), "app.log", levelFixture)
+	empty := t.TempDir()
+	tests := []struct {
+		name       string
+		args       []string
+		wantStderr string
+	}{
+		{"missing file", []string{"nope.log"}, "nope.log"},
+		{"one of several files missing", []string{existing, "nope.log"}, "nope.log"},
+		{"directory without log files", []string{empty}, "no log files found"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := runUnlog(t, t.TempDir(), nil, append([]string{"--format", "json"}, tt.args...)...)
+			assert.Equal(t, 1, r.exit, "stdout: %s", r.stdout)
+			assert.Contains(t, r.stderr, tt.wantStderr)
+		})
+	}
+}
+
+func TestE2EAnalyzeCommandIsTheDefault(t *testing.T) {
+	logPath := writeFile(t, t.TempDir(), "app.log", levelFixture)
+
+	r := runUnlog(t, t.TempDir(), nil, "analyze", "--format", "json", "--level", "error", logPath)
+
+	require.Equal(t, 0, r.exit, "stderr: %s", r.stderr)
+	var report types.AnalysisReport
+	require.NoError(t, json.Unmarshal([]byte(r.stdout), &report))
+	assert.Contains(t, report.CompactedSummary, "Events: 1 fatal, 1 error, 0 warn")
+}
+
+func TestE2EStdinAlongsideFiles(t *testing.T) {
+	logPath := writeFile(t, t.TempDir(), "app.log", levelFixture)
+	cmd := exec.Command(unlogBin, "--format", "json", "-", logPath)
+	cmd.Env = []string{"HOME=" + t.TempDir(), "PATH=" + os.Getenv("PATH")}
+	cmd.Stdin = strings.NewReader(`{"level":"error","msg":"piped failure","time":"2024-01-15T10:00:05Z"}` + "\n")
+	out, err := cmd.Output()
+	require.NoError(t, err)
+
+	var report types.AnalysisReport
+	require.NoError(t, json.Unmarshal(out, &report))
+	assert.Contains(t, report.CompactedSummary, "stdin: piped failure")
+	assert.Contains(t, report.CompactedSummary, "app.log")
+}

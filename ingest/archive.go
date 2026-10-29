@@ -94,10 +94,3 @@ func isPlainGz(path string) bool {
 	lower := strings.ToLower(path)
 	return strings.HasSuffix(lower, ".gz") && !strings.HasSuffix(lower, ".tar.gz")
 }
-
-// isLogName reports whether name (a tar entry or inner filename) has a
-// recognised log extension.
-func isLogName(name string) bool {
-	ext := strings.ToLower(filepath.Ext(name))
-	return logExtensions[ext]
-}

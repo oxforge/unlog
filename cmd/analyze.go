@@ -16,6 +16,16 @@ import (
 	"github.com/oxforge/unlog/internal/render"
 )
 
+// analyzeCmd is what bare unlog runs, under its own name: `unlog analyze
+// logs/` and `unlog logs/` are the same. Wrappers (the enterprise CLI) call it
+// by name. It shares the root command's flags, registered in root.go.
+var analyzeCmd = &cobra.Command{
+	Use:   "analyze [files...]",
+	Short: "Analyze log files (the default command)",
+	Args:  cobra.ArbitraryArgs,
+	RunE:  runAnalyze,
+}
+
 func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 	if len(args) == 0 && isTerminal(os.Stdin) {
 		return cmd.Help()
