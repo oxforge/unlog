@@ -62,3 +62,42 @@ func isTimestampLine(line string) bool {
 	}
 	return line[0] >= '0' && line[0] <= '9'
 }
+
+func TestReaderKeepsReadingAfterAnOversizedLine(t *testing.T) {
+	long := "2024-01-15T10:00:01Z " + strings.Repeat("x", maxLineSize+100)
+	input := "2024-01-15T10:00:00Z before\n" + long + "\n2024-01-15T10:00:02Z after\n"
+	r := newReader(strings.NewReader(input), "test.log", isTimestampLine)
+	lines, err := r.ReadAll()
+	assert.NoError(t, err)
+	if assert.Len(t, lines, 3) {
+		assert.Len(t, lines[1].Text, maxLineSize)
+		assert.Equal(t, long[:maxLineSize], lines[1].Text)
+		assert.Equal(t, "2024-01-15T10:00:02Z after", lines[2].Text)
+		assert.Equal(t, int64(3), lines[2].LineNumber)
+	}
+}
+
+func TestReaderCapsContinuationGroups(t *testing.T) {
+	continuation := "  " + strings.Repeat("y", 1000)
+	var b strings.Builder
+	b.WriteString("2024-01-15T10:00:00Z start\n")
+	for i := 0; i < maxLineSize/1000+10; i++ {
+		b.WriteString(continuation + "\n")
+	}
+	r := newReader(strings.NewReader(b.String()), "test.log", isTimestampLine)
+	lines, err := r.ReadAll()
+	assert.NoError(t, err)
+	assert.Greater(t, len(lines), 1)
+	for _, l := range lines {
+		assert.LessOrEqual(t, len(l.Text), maxLineSize)
+	}
+}
+
+func TestReaderHandlesCRLF(t *testing.T) {
+	r := newReader(strings.NewReader("2024-01-15T10:00:00Z a\r\n2024-01-15T10:00:01Z b\r\n"), "test.log", isTimestampLine)
+	lines, err := r.ReadAll()
+	assert.NoError(t, err)
+	if assert.Len(t, lines, 2) {
+		assert.Equal(t, "2024-01-15T10:00:00Z a", lines[0].Text)
+	}
+}

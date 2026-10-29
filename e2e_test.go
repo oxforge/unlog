@@ -267,3 +267,17 @@ func TestE2EVerboseReportsUnparsedLines(t *testing.T) {
 	assert.Contains(t, r.stderr, "format=json entries=3")
 	assert.Contains(t, r.stderr, "unparsed=1")
 }
+
+func TestE2EOversizedLineDoesNotStopTheFile(t *testing.T) {
+	long := `{"level":"error","msg":"dumped payload","payload":"` + strings.Repeat("x", 1_100_000) + `","time":"2024-01-15T10:00:01Z"}`
+	logPath := writeFile(t, t.TempDir(), "app.log",
+		`{"level":"error","msg":"first failure","time":"2024-01-15T10:00:00Z"}
+`+long+`
+{"level":"error","msg":"failure after the big line","time":"2024-01-15T10:00:02Z"}
+`)
+
+	report := runJSON(t, logPath)
+
+	assert.Contains(t, report.CompactedSummary, "failure after the big line")
+	assert.Less(t, len(report.CompactedSummary), 64*1024)
+}

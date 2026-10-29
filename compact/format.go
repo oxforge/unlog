@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/oxforge/unlog/types"
 )
@@ -25,6 +26,11 @@ const (
 	sectionAnomalies = "Rate Anomalies"
 	sectionContext   = "Context"
 )
+
+// maxMessageBytes caps how much of one entry's message the summary shows, so
+// a single huge line (a payload dump, a long stack trace) cannot fill a
+// section or the LLM prompt on its own.
+const maxMessageBytes = 2000
 
 // estimatedHeaderTokens is the approximate token cost of "## Section Name\n".
 // We subtract this from each section's budget so headers don't cause over-runs.
@@ -228,7 +234,7 @@ func formatEntry(e types.EnrichedEntry) string {
 		sb.WriteString(e.Source)
 		sb.WriteString(": ")
 	}
-	sb.WriteString(e.Message)
+	sb.WriteString(capMessage(e.Message))
 
 	var tags []string
 	if e.ChainID != "" {
@@ -260,6 +266,19 @@ func formatEntry(e types.EnrichedEntry) string {
 	}
 
 	return sb.String()
+}
+
+// capMessage cuts msg to at most maxMessageBytes on a UTF-8 boundary and says
+// how much was left out.
+func capMessage(msg string) string {
+	if len(msg) <= maxMessageBytes {
+		return msg
+	}
+	cut := maxMessageBytes
+	for cut > 0 && !utf8.RuneStart(msg[cut]) {
+		cut--
+	}
+	return fmt.Sprintf("%s …[%d more bytes]", msg[:cut], len(msg)-cut)
 }
 
 // deduplicateByChain returns at most one entry per chain ID (the highest-scored).

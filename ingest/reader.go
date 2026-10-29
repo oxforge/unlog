@@ -3,11 +3,14 @@ package ingest
 import (
 	"bufio"
 	"context"
+	"errors"
 	"io"
 	"strings"
 )
 
-// maxLineSize is the maximum size of a single log line (including multi-line continuations).
+// maxLineSize caps a physical line and a reassembled multi-line entry, in
+// bytes. A longer line keeps its first maxLineSize bytes; a continuation that
+// would grow an entry past the cap starts a new entry instead.
 const maxLineSize = 1024 * 1024 // 1MB
 
 // RawLine is a log line (or multi-line group) read from a source file.
@@ -25,7 +28,7 @@ type LineChecker func(line string) bool
 // handing them to the rest of the pipeline. Continuation lines (those that do
 // not pass the isNewEntry check) are appended to the current entry.
 type reader struct {
-	scanner    *bufio.Scanner
+	br         *bufio.Reader
 	source     string
 	isNewEntry LineChecker
 }
@@ -33,12 +36,28 @@ type reader struct {
 // newReader creates a reader that reads from r, tags lines with source, and
 // uses isNewEntry to distinguish entry boundaries from continuation lines.
 func newReader(r io.Reader, source string, isNewEntry LineChecker) *reader {
-	scanner := bufio.NewScanner(r)
-	scanner.Buffer(make([]byte, 0, 64*1024), maxLineSize)
 	return &reader{
-		scanner:    scanner,
+		br:         bufio.NewReaderSize(r, 64*1024),
 		source:     source,
 		isNewEntry: isNewEntry,
+	}
+}
+
+// readLine returns the next physical line without its line ending (\n or
+// \r\n), cut to maxLineSize bytes. It returns io.EOF when no line is left.
+func (r *reader) readLine() (string, error) {
+	var buf []byte
+	for {
+		chunk, isPrefix, err := r.br.ReadLine()
+		if err != nil {
+			return "", err
+		}
+		if room := maxLineSize - len(buf); room > 0 {
+			buf = append(buf, chunk[:min(len(chunk), room)]...)
+		}
+		if !isPrefix {
+			return string(buf), nil
+		}
 	}
 }
 
@@ -82,7 +101,14 @@ func (r *reader) ReadFuncContext(ctx context.Context, fn func(RawLine) bool) err
 		}
 	}
 
-	for r.scanner.Scan() {
+	for {
+		line, err := r.readLine()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return err
+		}
 		if stopped || ctx.Err() != nil {
 			if ctx.Err() != nil {
 				return ctx.Err()
@@ -90,29 +116,31 @@ func (r *reader) ReadFuncContext(ctx context.Context, fn func(RawLine) bool) err
 			return nil
 		}
 		lineNum++
-		line := r.scanner.Text()
 
 		if strings.TrimSpace(line) == "" {
 			flush()
 			continue
 		}
 
-		if r.isNewEntry(line) {
+		switch {
+		case r.isNewEntry(line):
 			flush()
 			current = &strings.Builder{}
 			current.WriteString(line)
 			currentLineNum = lineNum
-		} else if current != nil {
+		case current != nil && current.Len()+1+len(line) <= maxLineSize:
 			current.WriteByte('\n')
 			current.WriteString(line)
-		} else {
+		default:
+			// A continuation with nothing to attach to, or one that would
+			// push the entry past maxLineSize, becomes an entry of its own.
+			flush()
 			current = &strings.Builder{}
 			current.WriteString(line)
 			currentLineNum = lineNum
-			flush()
 		}
 	}
 
 	flush()
-	return r.scanner.Err()
+	return nil
 }

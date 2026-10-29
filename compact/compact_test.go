@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/oxforge/unlog/types"
 	"github.com/stretchr/testify/assert"
@@ -545,4 +546,23 @@ func extractSection(text, startHeader, endHeader string) string {
 		return text[start:]
 	}
 	return text[start : start+end]
+}
+
+func TestRun_LongMessageIsCutInTheSummary(t *testing.T) {
+	base := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
+	long := "payload dump: " + strings.Repeat("é", 3000) + " TAIL-MARKER"
+
+	ch := make(chan types.EnrichedEntry, 1)
+	sendAndClose(ch, []types.EnrichedEntry{makeEntry(types.LevelError, long, "svc", base)})
+
+	summary, err := Run(context.Background(), ch, Options{TokenBudget: 1_000_000})
+	require.NoError(t, err)
+
+	assert.Contains(t, summary, "payload dump: ééé")
+	assert.NotContains(t, summary, "TAIL-MARKER")
+	assert.Contains(t, summary, "more bytes]")
+	for _, line := range strings.Split(summary, "\n") {
+		assert.LessOrEqual(t, len(line), 2200, "a summary line should be capped near 2000 bytes")
+		assert.True(t, utf8.ValidString(line), "the cut must not split a UTF-8 character")
+	}
 }
