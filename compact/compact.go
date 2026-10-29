@@ -132,6 +132,7 @@ drain:
 // buildEmptySummary returns a minimal summary when no entries are provided.
 func buildEmptySummary() string {
 	return "## Incident Overview\nNo significant log entries found.\n\n" +
+		"## Deployments\n(none)\n\n" +
 		"## Critical Errors\n(none)\n\n" +
 		"## Error Chains\n(none)\n\n" +
 		"## Rate Anomalies\n(none)\n\n" +

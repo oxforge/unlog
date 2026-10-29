@@ -41,6 +41,8 @@ type DedupFilter struct {
 	shards []*dedupShard
 	nextID atomic.Uint32
 	byID   sync.Map // uint32 -> *dedupRecord
+	// exact, when set, picks entries merged only with identical messages.
+	exact func(types.LogEntry) bool
 }
 
 // NewDedupFilter creates a DedupFilter with the given number of shards.
@@ -90,10 +92,15 @@ func betterExemplar(e, cur types.LogEntry) bool {
 	}
 }
 
-// Add merges the entry into the record keyed by (Source, signature) and returns
-// the record's id. It is safe for concurrent use.
+// Add merges the entry into the record keyed by (Source, Service, signature)
+// and returns the record's id; an entry exact accepts is keyed by its whole
+// message instead. It is safe for concurrent use.
 func (d *DedupFilter) Add(entry types.LogEntry) uint32 {
-	k := dedupKey{source: entry.Source, service: entry.Service, sig: ExtractSignature(entry.Message)}
+	sig := entry.Message
+	if d.exact == nil || !d.exact(entry) {
+		sig = ExtractSignature(entry.Message)
+	}
+	k := dedupKey{source: entry.Source, service: entry.Service, sig: sig}
 	shard := d.shardFor(k)
 
 	shard.mu.Lock()

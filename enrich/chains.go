@@ -41,7 +41,7 @@ func (cm *ChainMatcher) matchesStage(entry *types.EnrichedEntry, stage chainStag
 		return false
 	}
 	if stage.Deployment {
-		return entry.IsDeployment || LooksLikeDeployment(entry.LogEntry)
+		return (entry.IsDeployment || LooksLikeDeployment(entry.LogEntry)) && !reRollback.MatchString(entry.Message)
 	}
 	return stage.MessagePattern.MatchString(entry.Message)
 }
@@ -70,8 +70,8 @@ var builtinChainPatterns = []*chainPattern{
 		Name:   "deployment-failure",
 		Window: 10 * time.Minute,
 		Stages: []chainStage{
-			// A deployment: the deploy detector's patterns, which also keep
-			// these INFO lines past the level filter.
+			// A deployment other than a rollback: the deploy detector's
+			// patterns, which also keep these INFO lines past the level filter.
 			{Deployment: true, MinLevel: types.LevelInfo},
 			{MessagePattern: regexp.MustCompile(`(?i)(health\s*check\s+(fail|timeout|unhealthy)|readiness\s+probe\s+failed|liveness\s+probe\s+failed)`), MinLevel: types.LevelWarn},
 			{MessagePattern: regexp.MustCompile(`(?i)(rollback|roll\s+back|reverting|deployment\s+failed|undo)`), MinLevel: types.LevelError},

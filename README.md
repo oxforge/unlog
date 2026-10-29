@@ -27,7 +27,7 @@ unlog --ai-provider openai logs/
 - **Services within a file** -- When lines name a service, app, container or pod, errors and bursts are reported per service (`app.log[payments]`); replicas share their service (Compose `web-1` and `web-2` are `web`, pod `api-7d9f8b6c4-x2k4p` is `api`). Errors that started within seconds of each other in different sources or services are tagged as failing together (`with=`).
 - **Burst detection** -- Finds stretches where a source logged far above its normal rate, counted on real event volume, and lists the errors behind each burst.
 - **Error chain detection** -- 10 built-in patterns (DB exhaustion, OOM cascade, circuit breaker, deployment failure, disk full, cert expiry, DNS failure, etc.); a chain is reported when at least two of its steps occur in order (any two: a log that skips a step, or starts after the first one, still counts), with its errors in order; an error can belong to more than one chain.
-- **Deployment markers** -- Deploy, restart and scaling lines are kept at any `--level` and listed before the errors, with how long before the first error the last deploy happened.
+- **Deployment markers** -- Deploy, restart, scaling and rollback lines are kept at any `--level` and listed before the errors, each version on its own line (they merge only when identical), with how long before the first error the last deploy happened.
 - **Token-budgeted compaction** -- Priority-scored entries fit within LLM context windows.
 - **LLM analysis** -- Timeline, root cause, and recommendations in a single pass via OpenAI, Anthropic, Google Gemini, or Ollama.
 - **Streaming output** -- LLM responses stream to the terminal token-by-token.
