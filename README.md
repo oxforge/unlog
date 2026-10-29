@@ -65,6 +65,8 @@ Analyze a directory of log files and print a structured summary:
 unlog /var/log/app/
 ```
 
+Directories are searched recursively for log files, including rotated ones (`app.log.1`, `app.log-20240115`) and `.gz`/`.tar.gz` archives; hidden and binary files are skipped. A path that doesn't exist, or a directory with no log files, is an error (exit code 1). `-` reads stdin and can be combined with files. `unlog analyze <paths>` is the same as `unlog <paths>`.
+
 Pipe from another command:
 
 ```bash

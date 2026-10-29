@@ -2,7 +2,9 @@ package ingest
 
 import (
 	"bufio"
+	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -16,12 +18,14 @@ import (
 )
 
 var logExtensions = map[string]bool{
-	".log":  true,
-	".txt":  true,
-	".json": true,
-	".csv":  true,
-	".out":  true,
-	"":      true, // extensionless files (e.g. /var/log/syslog, /var/log/messages)
+	".log":    true,
+	".txt":    true,
+	".json":   true,
+	".csv":    true,
+	".out":    true,
+	".jsonl":  true,
+	".ndjson": true,
+	"":        true, // extensionless files (e.g. /var/log/syslog, /var/log/messages)
 }
 
 var compressedExtensions = map[string]bool{
@@ -69,9 +73,10 @@ func (ing *Ingester) SourceStats() map[string]SourceStats {
 }
 
 // Run starts ingestion of the given sources. It closes the output channel when
-// all sources have been processed. If sources is empty or contains only "-",
-// os.Stdin is read instead. Each regular file source is processed in its own
-// goroutine.
+// all sources have been processed. A "-" source, or no sources at all, reads
+// os.Stdin. Each source is processed in its own goroutine. A missing path, or
+// no log file found among the sources, is an error; binary files (a NUL byte
+// in their first 8 KB, like /var/log/wtmp) are skipped with a warning.
 //
 // Note: when multiple files are processed concurrently, entries from different
 // files are interleaved in arbitrary order on the output channel. Downstream
@@ -80,17 +85,32 @@ func (ing *Ingester) SourceStats() map[string]SourceStats {
 func (ing *Ingester) Run(ctx context.Context, sources []string) error {
 	defer close(ing.output)
 
-	if len(sources) == 0 || (len(sources) == 1 && sources[0] == "-") {
-		return ing.processSource(ctx, "stdin", os.Stdin, time.Now())
+	readStdin := len(sources) == 0
+	var paths []string
+	for _, src := range sources {
+		if src == "-" {
+			readStdin = true
+		} else {
+			paths = append(paths, src)
+		}
 	}
 
-	files, err := ExpandSources(sources)
+	files, err := ExpandSources(paths)
 	if err != nil {
 		return err
+	}
+	if len(files) == 0 && !readStdin {
+		return fmt.Errorf("ingest: no log files found in %s", strings.Join(paths, ", "))
 	}
 
 	g, gCtx := errgroup.WithContext(ctx)
 	g.SetLimit(runtime.NumCPU())
+
+	if readStdin {
+		g.Go(func() error {
+			return ing.processSource(gCtx, "stdin", os.Stdin, time.Now())
+		})
+	}
 
 	for _, path := range files {
 		g.Go(func() error {
@@ -100,6 +120,11 @@ func (ing *Ingester) Run(ctx context.Context, sources []string) error {
 				return nil
 			}
 			defer func() { _ = f.Close() }()
+
+			if !isTarGz(path) && !isPlainGz(path) && isBinary(f) {
+				slog.Warn("ingest: skipping binary file", "path", path)
+				return nil
+			}
 
 			modTime := time.Now()
 			if info, err := f.Stat(); err == nil {
@@ -161,6 +186,15 @@ func (ing *Ingester) processSource(ctx context.Context, source string, r io.Read
 		return sendErr
 	}
 	return readErr
+}
+
+// isBinary reports whether f starts with a NUL byte in its first 8 KB, and
+// rewinds it.
+func isBinary(f io.ReadSeeker) bool {
+	buf := make([]byte, 8*1024)
+	n, _ := io.ReadFull(f, buf)
+	_, _ = f.Seek(0, io.SeekStart)
+	return bytes.IndexByte(buf[:n], 0) >= 0
 }
 
 // headerSkipper is implemented by parsers that consume a line without
