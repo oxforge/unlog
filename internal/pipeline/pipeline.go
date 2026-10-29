@@ -17,7 +17,13 @@ import (
 	"github.com/oxforge/unlog/types"
 )
 
-const chanBuffer = 100_000
+// ingestBuffer lets ingest run ahead of the filter workers. The filter and
+// enrich stages emit only after reading all their input, so the channels
+// after them need no more than a small buffer.
+const (
+	ingestBuffer = 100_000
+	stageBuffer  = 1_024
+)
 
 // Options configures the pipeline.
 type Options struct {
@@ -48,9 +54,9 @@ func New(opts Options) *Pipeline {
 func (p *Pipeline) Run(ctx context.Context, sources []string) (*Result, error) {
 	start := time.Now()
 
-	ingestCh := make(chan types.LogEntry, chanBuffer)
-	filterCh := make(chan types.FilteredEntry, chanBuffer)
-	enrichCh := make(chan types.EnrichedEntry, chanBuffer)
+	ingestCh := make(chan types.LogEntry, ingestBuffer)
+	filterCh := make(chan types.FilteredEntry, stageBuffer)
+	enrichCh := make(chan types.EnrichedEntry, stageBuffer)
 
 	g, gCtx := errgroup.WithContext(ctx)
 
