@@ -536,7 +536,7 @@ func formatSpan(start, end time.Time) string {
 const maxChainLinesPerStep = 3
 
 // formatChain renders a chain: a header with how many of its steps occurred
-// and its span, then its members in time order, each numbered with the step
+// and when, then its members in time order, each numbered with the step
 // it matched. The same error at one step from several sources is one line;
 // a step lists its first few lines, then how many more it had. brief is the
 // header alone, for when the chain doesn't fit.
@@ -559,7 +559,9 @@ func formatChain(id string, members []chainSlot) (text, brief string, start time
 	end := start
 	steps := make(map[int]bool)
 	for _, m := range sorted {
-		end = maxTime(end, maxTime(m.entry.Timestamp, m.entry.LastSeen))
+		// The span is when the steps first occurred; a member's own line
+		// shows how long it went on.
+		end = maxTime(end, m.entry.Timestamp)
 		steps[m.step] = true
 		sig := m.entry.Signature
 		if sig == "" {

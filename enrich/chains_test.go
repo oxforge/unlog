@@ -356,3 +356,67 @@ func TestFindChains_ARollbackIsNotTheFirstStep(t *testing.T) {
 
 	assert.Empty(t, NewChainMatcher().FindChains(entries))
 }
+
+// One error logged by two services can match two steps of a pattern; it is
+// still one error, not a chain.
+func TestFindChains_OneErrorFromTwoSourcesIsNotAChain(t *testing.T) {
+	msg := "proxy error: dial tcp 10.0.0.7:8080: connect: connection refused (status 502)"
+	entries := []types.EnrichedEntry{
+		makeChainEntry(msg, types.LevelError, "api.log", chainBase, 1),
+		makeChainEntry(msg, types.LevelError, "web.log", chainBase.Add(time.Second), 2),
+	}
+
+	assert.Empty(t, NewChainMatcher().FindChains(entries))
+}
+
+// An error that repeats all day is one record spanning the day; it must
+// not hold a chain open, merging incidents hours apart.
+func TestFindChains_ALongRepeatedErrorDoesNotHoldAChainOpen(t *testing.T) {
+	timeouts := makeChainEntry("upstream timeout", types.LevelError, "a.log", chainBase, 1)
+	timeouts.FirstSeen, timeouts.LastSeen, timeouts.OccurrenceCount = chainBase, chainBase.Add(8*time.Hour), 2880
+	entries := []types.EnrichedEntry{
+		timeouts,
+		makeChainEntry("circuit breaker open for payments", types.LevelWarn, "b.log", chainBase.Add(time.Minute), 2),
+		makeChainEntry("connection refused by orders", types.LevelError, "c.log", chainBase.Add(7*time.Hour), 3),
+		makeChainEntry("circuit breaker open for orders", types.LevelWarn, "c.log", chainBase.Add(7*time.Hour+time.Minute), 4),
+		makeChainEntry("fallback activated for orders", types.LevelWarn, "c.log", chainBase.Add(7*time.Hour+2*time.Minute), 5),
+	}
+
+	chains := NewChainMatcher().FindChains(entries)
+
+	require.Len(t, chains, 2)
+	assert.Equal(t, []step{{0, 1}, {1, 2}}, membersOf(chains[0]))
+	assert.Equal(t, "circuit-breaker-2", chains[1].ID)
+	assert.Equal(t, []step{{2, 1}, {3, 2}, {4, 3}}, membersOf(chains[1]))
+}
+
+// A lower step that only occurred after the chain began isn't part of it,
+// so a chain never runs backwards.
+func TestFindChains_ALowerStepAfterTheStartIsLeftOut(t *testing.T) {
+	breaker := makeChainEntry("circuit breaker open for payments", types.LevelWarn, "gw.log", chainBase, 1)
+	fallback := makeChainEntry("fallback activated: cached prices", types.LevelWarn, "gw.log", chainBase.Add(40*time.Second), 3)
+	timeout := makeChainEntry("upstream timeout calling ledger", types.LevelError, "gw.log", chainBase.Add(30*time.Second), 2)
+
+	before := NewChainMatcher().FindChains([]types.EnrichedEntry{breaker, timeout, fallback})
+	require.Len(t, before, 1, "the timeout comes between the breaker and the fallback")
+	assert.Equal(t, []step{{0, 2}, {2, 3}}, membersOf(before[0]))
+
+	fallback.Timestamp = chainBase.Add(10 * time.Second)
+	after := NewChainMatcher().FindChains([]types.EnrichedEntry{breaker, fallback, timeout})
+	require.Len(t, after, 1, "the timeout comes after the chain formed")
+	assert.Equal(t, []step{{0, 2}, {1, 3}}, membersOf(after[0]))
+}
+
+func BenchmarkFindChains_StormWithoutAChain(b *testing.B) {
+	// 5,000 different stage-1 errors inside one 2-minute window, no stage 2.
+	entries := make([]types.EnrichedEntry, 5000)
+	for i := range entries {
+		entries[i] = makeChainEntry(fmt.Sprintf("upstream timeout calling backend-%04d", i), types.LevelError, "app",
+			chainBase.Add(time.Duration(i)*20*time.Millisecond), int64(i+1))
+	}
+	m := NewChainMatcher()
+	b.ResetTimer()
+	for range b.N {
+		m.FindChains(entries)
+	}
+}

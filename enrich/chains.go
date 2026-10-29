@@ -163,18 +163,19 @@ type ChainMember struct {
 // pattern, one chain is open at a time:
 //
 //   - any entry matching a stage opens one, and an entry matching a later
-//     stage advances it; it is a chain once two different stages occurred in
-//     order (a later stage in the same second counts);
+//     stage advances it; it is a chain once two different errors matched
+//     two stages in order (the lower one first, or in the same second);
 //   - until then, it keeps only the entries within the pattern's window of
-//     the newest, so an unrelated earlier match can't hide a chain; when it
-//     forms, it begins at its lowest stage, dropping later stages' entries
-//     that ended before that;
-//   - once a chain, it takes entries matching any stage up to the pattern's
-//     window after its latest new stage, then closes.
+//     the newest, so an unrelated earlier match can't hide a chain;
+//   - it begins at the earliest error a higher stage followed: later stages'
+//     entries that ended before it, and lower stages' entries after it, are
+//     not part of it, so its timeline never runs backwards;
+//   - once a chain, it takes entries matching its stages up to the pattern's
+//     window after its latest new stage first occurred, then closes.
 //
 // A repeated error is one entry that occurred from FirstSeen to LastSeen;
-// it counts as happening at any time in that span. Chains are sorted by
-// their first member's time, then by pattern order.
+// while a chain forms, it counts as happening at any time in that span.
+// Chains are sorted by their first member's time, then by pattern order.
 func (cm *ChainMatcher) FindChains(entries []types.EnrichedEntry) []Chain {
 	var order []int
 	for i := range entries {
@@ -212,36 +213,55 @@ func span(e *types.EnrichedEntry) (time.Time, time.Time) {
 	return e.Timestamp, e.Timestamp
 }
 
-// openChain is a pattern's open chain, or a candidate for one while it has
-// not yet matched two stages in order.
+// openChain is a pattern's open chain, or a candidate for one until two
+// different errors matched two of its stages in order.
 type openChain struct {
 	members []openMember
-	formed  bool      // two stages matched in order: a chain
-	until   time.Time // once formed: the last time it takes entries
+	steps   []int // steps[s] counts the members of stage s (1-based)
+	formed  bool
+	start   openMember // once formed: the member it begins at
+	until   time.Time  // once formed: the last time it takes entries
 }
 
 type openMember struct {
 	ChainMember
 	first, last time.Time
+	sig         string // what makes two members the same error
+}
+
+func newOpenChain(stages int) *openChain {
+	return &openChain{steps: make([]int, stages+1)}
+}
+
+func (c *openChain) add(m openMember) {
+	c.members = append(c.members, m)
+	c.steps[m.Step]++
 }
 
 // top is the highest stage (1-based) any member matched.
 func (c *openChain) top() int {
-	top := 0
-	for _, m := range c.members {
-		top = max(top, m.Step)
+	for s := len(c.steps) - 1; s > 0; s-- {
+		if c.steps[s] > 0 {
+			return s
+		}
 	}
-	return top
+	return 0
 }
 
-// ordered reports whether two different stages occurred in order: a member
-// of a lower stage first occurred no later than a higher one last did.
-func (c *openChain) ordered() bool {
-	for _, lo := range c.members {
-		for _, hi := range c.members {
-			if lo.Step < hi.Step && !lo.first.After(hi.last) {
-				return true
-			}
+// formsWith reports whether m and a member already there are two different
+// errors at two stages in order. Members came no later than m, so a lower
+// one is in order, and a higher one only from the same second.
+func (c *openChain) formsWith(m openMember) bool {
+	other := false
+	for s := 1; s < len(c.steps); s++ {
+		other = other || (s != m.Step && c.steps[s] > 0)
+	}
+	if !other {
+		return false // every member is at m's stage: the usual storm
+	}
+	for _, o := range c.members {
+		if o.sig != m.sig && (o.Step < m.Step || (o.Step > m.Step && o.first.Equal(m.first))) {
+			return true
 		}
 	}
 	return false
@@ -251,28 +271,46 @@ func (c *openChain) ordered() bool {
 func (c *openChain) dropBefore(cutoff time.Time) {
 	kept := c.members[:0]
 	for _, m := range c.members {
-		if !m.last.Before(cutoff) {
-			kept = append(kept, m)
+		if m.last.Before(cutoff) {
+			c.steps[m.Step]--
+			continue
 		}
+		kept = append(kept, m)
 	}
 	c.members = kept
 }
 
-// startAtLowestStep drops the members of later stages that ended before the
-// lowest stage first occurred: a chain begins at its lowest step, so its
-// timeline never runs backwards.
-func (c *openChain) startAtLowestStep() {
-	lowest, start := 0, time.Time{}
-	for _, m := range c.members {
-		if lowest == 0 || m.Step < lowest || (m.Step == lowest && m.first.Before(start)) {
-			lowest, start = m.Step, m.first
+// begin settles where a newly formed chain begins: the earliest member that
+// a different error of a higher stage followed. It drops lower stages'
+// members after it, and higher stages' members that ended before it.
+func (c *openChain) begin() {
+	sorted := append([]openMember(nil), c.members...)
+	sort.SliceStable(sorted, func(i, j int) bool {
+		if !sorted[i].first.Equal(sorted[j].first) {
+			return sorted[i].first.Before(sorted[j].first)
+		}
+		return sorted[i].Step < sorted[j].Step
+	})
+	for _, cand := range sorted {
+		followed := false
+		for _, o := range c.members {
+			if o.Step > cand.Step && o.sig != cand.sig && !o.first.Before(cand.first) {
+				followed = true
+				break
+			}
+		}
+		if followed {
+			c.start = cand
+			break
 		}
 	}
 	kept := c.members[:0]
 	for _, m := range c.members {
-		if m.Step == lowest || !m.last.Before(start) {
-			kept = append(kept, m)
+		if m.Step < c.start.Step || (m.Step > c.start.Step && m.last.Before(c.start.first)) {
+			c.steps[m.Step]--
+			continue
 		}
+		kept = append(kept, m)
 	}
 	c.members = kept
 }
@@ -284,12 +322,14 @@ func (cm *ChainMatcher) patternChains(p *chainPattern, entries []types.EnrichedE
 	finish := func() {
 		if open != nil && open.formed {
 			c := Chain{Pattern: p.Name, Steps: len(p.Stages)}
-			stages := make(map[int]bool)
 			for _, m := range open.members {
 				c.Members = append(c.Members, m.ChainMember)
-				stages[m.Step] = true
 			}
-			c.Matched = len(stages)
+			for s := 1; s < len(open.steps); s++ {
+				if open.steps[s] > 0 {
+					c.Matched++
+				}
+			}
 			chains = append(chains, c)
 		}
 		open = nil
@@ -317,7 +357,7 @@ func (cm *ChainMatcher) patternChains(p *chainPattern, entries []types.EnrichedE
 			}
 		}
 		if open == nil {
-			open = &openChain{}
+			open = newOpenChain(len(p.Stages))
 		}
 
 		// Take the lowest stage above the chain's top, which advances it;
@@ -333,17 +373,32 @@ func (cm *ChainMatcher) patternChains(p *chainPattern, entries []types.EnrichedE
 		if step == 0 {
 			step = matched[len(matched)-1]
 		}
-		open.members = append(open.members, openMember{ChainMember{Index: i, Step: step}, first, last})
+		sig := e.Signature
+		if sig == "" {
+			sig = e.Message
+		}
+		m := openMember{ChainMember{Index: i, Step: step}, first, last, sig}
 
 		switch {
-		case !open.formed && open.ordered():
-			open.formed = true
-			open.startAtLowestStep()
-			for _, m := range open.members {
-				open.until = maxTime(open.until, m.last.Add(p.Window))
+		case !open.formed:
+			forms := open.formsWith(m)
+			open.add(m)
+			if forms {
+				open.formed = true
+				open.begin()
+				open.until = first.Add(p.Window)
 			}
-		case open.formed && step > top:
-			open.until = maxTime(open.until, last.Add(p.Window))
+		case step < open.start.Step:
+			// Before the chain's first step; in order only in the same second.
+			if first.Equal(open.start.first) {
+				open.add(m)
+				open.start = m
+			}
+		default:
+			open.add(m)
+			if step > top {
+				open.until = maxTime(open.until, first.Add(p.Window))
+			}
 		}
 	}
 	finish()

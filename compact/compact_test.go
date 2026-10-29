@@ -1043,3 +1043,17 @@ func TestRun_EmptySummaryHasEverySection(t *testing.T) {
 		assert.Contains(t, summary, header)
 	}
 }
+
+// A chain's span runs over when its steps first occurred; one member
+// repeating for hours afterwards doesn't stretch it.
+func TestRun_ChainSpanIsWhenItsStepsOccurred(t *testing.T) {
+	at := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+	entries := []types.EnrichedEntry{
+		chainMember(types.LevelError, "upstream timeout", at, at.Add(8*time.Hour), 2880, "circuit-breaker", 1, 3),
+		chainMember(types.LevelWarn, "circuit breaker open for payments", at.Add(time.Minute), at.Add(time.Minute), 1, "circuit-breaker", 2, 3),
+	}
+
+	chains := sectionOf(runEntries(t, entries, Options{}), "## Error Chains")
+
+	assert.Contains(t, chains, "circuit-breaker: 2 of 3 steps, 2024-01-15T10:00:00Z–10:01:00Z")
+}
