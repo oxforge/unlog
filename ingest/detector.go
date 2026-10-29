@@ -24,7 +24,7 @@ var (
 	// reLogfmtKey matches a key=value pair at the start of a line.
 	reLogfmtKey     = regexp.MustCompile(`^\w[\w.-]*=`)
 	reKubePrefixed  = regexp.MustCompile(`^\[[\w/.:-]+\]\s+\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}`)
-	reDockerCompose = regexp.MustCompile(`^\w[\w.-]*-\d+\s+\|\s+`)
+	reDockerCompose = regexp.MustCompile(`^\w[\w.-]*[-_]\d+\s+\|\s+`)
 	reGenericTS     = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}`)
 	reCSVData       = regexp.MustCompile(`(?i)^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}[^,]*,\s*(TRACE|DEBUG|INFO|WARN|WARNING|ERROR|FATAL|ERR)\s*,`)
 )
