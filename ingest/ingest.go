@@ -29,11 +29,6 @@ var logExtensions = map[string]bool{
 	"":        true, // extensionless files (e.g. /var/log/syslog, /var/log/messages)
 }
 
-var compressedExtensions = map[string]bool{
-	".gz":  true,
-	".tgz": true,
-}
-
 // IngestOptions controls Ingester behaviour.
 type IngestOptions struct {
 	// SampleLines is how many lines to read for format detection. Default: 100.
@@ -72,14 +67,14 @@ func (ing *Ingester) SourceStats() map[string]SourceStats {
 
 // Run starts ingestion of the given sources. It closes the output channel when
 // all sources have been processed. A "-" source, or no sources at all, reads
-// os.Stdin. Each source is processed in its own goroutine. A missing path, or
-// no log file found among the sources, is an error; sources that aren't text
-// logs (see checkText) are skipped with a warning.
+// os.Stdin. Each source is processed in its own goroutine. A missing path, no
+// log file found among the sources, or a named file (or stdin) that can't be
+// read, isn't a text log (see checkText) or is a corrupt archive, is an
+// error; such files found by walking a directory are skipped.
 //
 // Note: when multiple files are processed concurrently, entries from different
 // files are interleaved in arbitrary order on the output channel. Downstream
-// stages (filter) sort survivors by timestamp. In overflow mode, ordering is
-// not guaranteed.
+// stages (filter) sort survivors by timestamp.
 func (ing *Ingester) Run(ctx context.Context, sources []string) error {
 	defer close(ing.output)
 
@@ -93,7 +88,7 @@ func (ing *Ingester) Run(ctx context.Context, sources []string) error {
 		}
 	}
 
-	files, err := ExpandSources(paths)
+	files, err := expandSources(paths)
 	if err != nil {
 		return err
 	}
@@ -113,34 +108,44 @@ func (ing *Ingester) Run(ctx context.Context, sources []string) error {
 		})
 	}
 
-	for _, path := range files {
+	for _, src := range files {
 		g.Go(func() error {
-			f, err := os.Open(path)
-			if err != nil {
-				slog.Warn("ingest: skipping file", "path", path, "error", err)
+			err := ing.processPath(gCtx, src.path)
+			switch {
+			case err == nil:
 				return nil
-			}
-			defer func() { _ = f.Close() }()
-
-			modTime := time.Now()
-			if info, err := f.Stat(); err == nil {
-				modTime = info.ModTime()
-			}
-			if err := ing.processFile(gCtx, path, f, modTime); err != nil {
-				if gCtx.Err() != nil {
-					return gCtx.Err()
-				}
-				if isNotText(err) {
-					slog.Warn("ingest: skipping file", "path", path, "reason", err)
-					return nil
-				}
-				slog.Warn("ingest: error processing file", "path", path, "error", err)
+			case gCtx.Err() != nil:
+				return gCtx.Err()
+			case src.named:
+				return fmt.Errorf("ingest: %w", err)
+			case isNotText(err):
+				slog.Debug("ingest: skipping file", "reason", err)
+			default:
+				slog.Warn("ingest: skipping file", "error", err)
 			}
 			return nil
 		})
 	}
 
 	return g.Wait()
+}
+
+// processPath opens and reads the file at path. Its errors name the path.
+func (ing *Ingester) processPath(ctx context.Context, path string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+
+	modTime := time.Now()
+	if info, err := f.Stat(); err == nil {
+		modTime = info.ModTime()
+	}
+	if err := ing.processFile(ctx, path, f, modTime); err != nil {
+		return fmt.Errorf("%s: %w", path, err)
+	}
+	return nil
 }
 
 // processSource detects the format of r, then parses and emits all entries.
