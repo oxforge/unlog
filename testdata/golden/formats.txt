@@ -6,16 +6,16 @@ Last deployment: 2024-01-15T10:00:01Z, 1s before the first error
 
 ## Deployments
 2024-01-15T10:00:00Z [INFO] testdata/formats/kubernetes_multiline.log: Starting application v2.5.0 {deploy}
-2024-01-15T10:00:00Z [INFO] testdata/formats/docker_compose.log[web-1]: INFO Starting application on port 8080 {deploy}
+2024-01-15T10:00:00Z [INFO] testdata/formats/docker_compose.log[web]: INFO Starting application on port 8080 {deploy}
 2024-01-15T10:00:01Z [INFO] testdata/formats/csv_kibana.csv: [Thread-1] INFO com.example.Application - Listening on port 8080 {deploy}
 2024-01-15T10:00:01Z [INFO] testdata/formats/json_multiline_stack.log: Database migration complete {deploy}
 
 ## Critical Errors
-2024-01-15T10:00:02Z [ERROR] testdata/formats/docker_compose.log[web-1]: ERROR Failed to process request: connection reset by peer
+2024-01-15T10:00:02Z [ERROR] testdata/formats/docker_compose.log[web]: ERROR Failed to process request: connection reset by peer
 web-1     | java.net.SocketException: Connection reset
 web-1     |     at java.net.SocketInputStream.read(SocketInputStream.java:210)
 web-1     |     at com.example.Main.handleRequest(Main.java:42) {err=Connection}
-2024-01-15T10:00:03Z [ERROR] testdata/formats/docker_compose.log[web-1]: ERROR Upstream service unavailable after 3 retries
+2024-01-15T10:00:03Z [ERROR] testdata/formats/docker_compose.log[web]: ERROR Upstream service unavailable after 3 retries
 2024-01-15T10:00:10Z [ERROR] testdata/formats/csv_kibana.csv: [Thread-4] ERROR com.example.db.QueryExecutor - Query timeout after 30000ms: SELECT * FROM orders WHERE status = 'pending' {with=testdata/formats/cloudwatch.log}
 2024-01-15T10:00:10Z [ERROR] testdata/formats/json_epoch.json: Panic recovered in handler {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv}
 2024-01-15T10:00:10Z [ERROR] testdata/formats/json_multiline_stack.log: Unhandled exception in request handler {err=NullPointerException with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,testdata/formats/json_epoch.json}
@@ -47,11 +47,11 @@ web-1     |     at com.example.Main.handleRequest(Main.java:42) {err=Connection}
 2024-01-15T10:00:30Z [FATAL] testdata/formats/csv_kibana.csv: [Thread-1] FATAL com.example.Application - Out of memory, shutting down
 2024-01-15T17:00:05Z–17:00:07Z [ERROR] testdata/formats/apache_clf.log: GET /api/orders HTTP/1.1 500 {×3 http=500}
 2024-01-15T17:00:08Z [ERROR] testdata/formats/apache_clf.log: POST /api/checkout HTTP/1.1 503 {http=503}
-2026-03-19T14:05:09Z [ERROR] testdata/formats/k8s_deployment.log: ERROR PAYMENT_SVC APP_LOG Refund rejected by gateway for order ord-87201: insufficient merchant balance
-2026-03-19T14:05:12Z [ERROR] testdata/formats/k8s_deployment.log: ERROR PAYMENT_SVC APP_LOG Charge failed after 3 retries for order ord-90412: java.net.ConnectException: connection refused {err=connection}
-- [FATAL] testdata/formats/unstructured.log: Fatal: cannot start without database, exiting {with=testdata/formats/k8s_deployment.log}
-- [ERROR] testdata/formats/unstructured.log: Error: failed to authenticate with database {err=failed with=testdata/formats/k8s_deployment.log}
-- [ERROR] testdata/formats/unstructured.log: Error: second attempt also failed {err=second with=testdata/formats/k8s_deployment.log}
+2026-03-19T14:05:09Z [ERROR] testdata/formats/k8s_deployment.log[payment-svc]: ERROR PAYMENT_SVC APP_LOG Refund rejected by gateway for order ord-87201: insufficient merchant balance
+2026-03-19T14:05:12Z [ERROR] testdata/formats/k8s_deployment.log[payment-svc]: ERROR PAYMENT_SVC APP_LOG Charge failed after 3 retries for order ord-90412: java.net.ConnectException: connection refused {err=connection}
+- [FATAL] testdata/formats/unstructured.log: Fatal: cannot start without database, exiting {with=testdata/formats/k8s_deployment.log[payment-svc]}
+- [ERROR] testdata/formats/unstructured.log: Error: failed to authenticate with database {err=failed with=testdata/formats/k8s_deployment.log[payment-svc]}
+- [ERROR] testdata/formats/unstructured.log: Error: second attempt also failed {err=second with=testdata/formats/k8s_deployment.log[payment-svc]}
 
 ## Error Chains
 (none)
@@ -62,12 +62,12 @@ web-1     |     at com.example.Main.handleRequest(Main.java:42) {err=Connection}
 ## Context
 2024-01-15T10:00:00Z [WARN] testdata/formats/syslog_rfc5424.log[nginx]: Starting worker process
 2024-01-15T10:00:00Z [UNKNOWN] testdata/formats/cloudwatch.log: Starting Lambda function
-2024-01-15T10:00:00Z [UNKNOWN] testdata/formats/docker_compose.log[redis-1]: Ready to accept connections on port 6379
-2024-01-15T10:00:01Z [WARN] testdata/formats/docker_compose.log[web-1]: WARN High memory usage detected: 85%
+2024-01-15T10:00:00Z [UNKNOWN] testdata/formats/docker_compose.log[redis]: Ready to accept connections on port 6379
+2024-01-15T10:00:01Z [WARN] testdata/formats/docker_compose.log[web]: WARN High memory usage detected: 85%
 2024-01-15T10:00:01Z [WARN] testdata/formats/syslog_rfc5424.log[nginx]: Listening on 0.0.0.0:80
 2024-01-15T10:00:01Z [UNKNOWN] testdata/formats/cloudwatch.log: Processing 42 records
-2024-01-15T10:00:02Z [WARN] testdata/formats/docker_compose.log[redis-1]: WARN Client connection closed unexpectedly
-2024-01-15T10:00:03Z [WARN] testdata/formats/docker_compose.log[nginx-1]: WARN 502 Bad Gateway returned to client 192.168.1.100
+2024-01-15T10:00:02Z [WARN] testdata/formats/docker_compose.log[redis]: WARN Client connection closed unexpectedly
+2024-01-15T10:00:03Z [WARN] testdata/formats/docker_compose.log[nginx]: WARN 502 Bad Gateway returned to client 192.168.1.100
 2024-01-15T10:00:05Z [WARN] testdata/formats/cloudwatch.log: WARN: DynamoDB throttling detected
 2024-01-15T10:00:05Z [WARN] testdata/formats/csv_kibana.csv: [Thread-2] WARN com.example.pool.ConnectionPool - Pool utilization at 85% (17/20)
 2024-01-15T10:00:05Z [WARN] testdata/formats/docker_mixed_streams.log: [2024-01-15 10:00:05] WARN: Deprecated API version v1 used by client 10.0.0.5
@@ -102,10 +102,10 @@ web-1     |     at com.example.Main.handleRequest(Main.java:42) {err=Connection}
 2024-04-30T12:41:17Z [UNKNOWN] testdata/formats/syslog_rsyslog_iso.log[systemd]: nginx.service: Main process exited, code=killed, status=9/KILL
 2024-04-30T12:41:17Z [UNKNOWN] testdata/formats/syslog_rsyslog_iso.log[systemd]: nginx.service: Failed with result 'oom-kill'.
 2024-04-30T12:41:22Z [UNKNOWN] testdata/formats/syslog_rsyslog_iso.log[CRON]: (root) CMD (/usr/lib/sysstat/debian-sa1 1 1)
-2026-03-19T14:05:08Z [WARN] testdata/formats/k8s_deployment.log: WARN PAYMENT_SVC APP_LOG Refund amount exceeds original charge, capping to max
-2026-03-19T14:05:10Z [WARN] testdata/formats/k8s_deployment.log: WARN PAYMENT_SVC APP_LOG Gateway response slow: 677ms exceeds 500ms threshold
-2026-03-19T14:05:10Z–14:05:12Z [WARN] testdata/formats/k8s_deployment.log: WARN PAYMENT_SVC APP_LOG Retrying charge for order ord-90412 (attempt 1/3) {×3}
-2026-03-19T14:05:11Z–14:05:12Z [WARN] testdata/formats/k8s_deployment.log: WARN PAYMENT_SVC APP_LOG Gateway returned HTTP 503: service temporarily unavailable {×2}
+2026-03-19T14:05:08Z [WARN] testdata/formats/k8s_deployment.log[payment-svc]: WARN PAYMENT_SVC APP_LOG Refund amount exceeds original charge, capping to max
+2026-03-19T14:05:10Z [WARN] testdata/formats/k8s_deployment.log[payment-svc]: WARN PAYMENT_SVC APP_LOG Gateway response slow: 677ms exceeds 500ms threshold
+2026-03-19T14:05:10Z–14:05:12Z [WARN] testdata/formats/k8s_deployment.log[payment-svc]: WARN PAYMENT_SVC APP_LOG Retrying charge for order ord-90412 (attempt 1/3) {×3}
+2026-03-19T14:05:11Z–14:05:12Z [WARN] testdata/formats/k8s_deployment.log[payment-svc]: WARN PAYMENT_SVC APP_LOG Gateway returned HTTP 503: service temporarily unavailable {×2}
 - [WARN] testdata/formats/unstructured.log: Warning: connection pool size is low
 - [UNKNOWN] testdata/formats/unstructured.log: Application starting up
 - [UNKNOWN] testdata/formats/unstructured.log: Loading configuration from /etc/app/config.yaml

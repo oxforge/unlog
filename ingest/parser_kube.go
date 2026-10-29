@@ -83,6 +83,14 @@ func (p *kubeParser) parsePrefixed(line string, lineNum int64, source string) (t
 			"resource": resource,
 		},
 	}
+	// "pod/<name>/<container>": the container names the service; without
+	// one, the pod does.
+	if parts := strings.Split(resource, "/"); len(parts) >= 2 && parts[0] == "pod" {
+		entry.Metadata["pod"] = parts[1]
+		if len(parts) >= 3 {
+			entry.Metadata["container"] = parts[2]
+		}
+	}
 	applyInnerLine(&entry, strings.TrimSpace(rest[msgStart:]), &p.tsCache)
 
 	return entry, true

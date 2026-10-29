@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -202,14 +203,39 @@ func (ing *Ingester) processSource(ctx context.Context, source string, r io.Read
 
 // serviceKeys are the metadata fields, in order of preference, that name the
 // service a line came from: a JSON or logfmt "service", a syslog program
-// ("app"), a Docker Compose "container", a Kubernetes "pod".
+// ("app"), a container (Docker Compose, kubectl --prefix), a Kubernetes pod.
 var serviceKeys = []string{"service", "app", "container", "pod"}
+
+// replicaSuffix strips what tells replicas of one service apart, so they
+// share the service: a Compose index ("web-1", "web_1"), or a Kubernetes
+// pod's generated suffix: a Deployment's ReplicaSet hash and pod id
+// ("api-7d9f8b6c4-x2k4p"), a StatefulSet ordinal ("db-0"), a DaemonSet pod
+// id ("fluentd-x7k2p"). Generated ids use Kubernetes' vowel-free alphabet,
+// so a name like "api-proxy" is left alone.
+var replicaSuffix = map[string]*regexp.Regexp{
+	"container": regexp.MustCompile(`^(.+?)[-_]\d+$`),
+	"pod":       regexp.MustCompile(`^(.+?)(?:-[bcdfghjklmnpqrstvwxz24-9]{6,10})?-(?:[bcdfghjklmnpqrstvwxz24-9]{5}|\d+)$`),
+}
+
+// reServiceName is what a service name may contain; anything else (a JSON
+// null or object, RFC 5424's nil "-", control characters) names none.
+var reServiceName = regexp.MustCompile(`^[\w.:@/-]+$`)
+
+// maxServiceLen caps a service name, which is shown on every summary line.
+const maxServiceLen = 64
 
 func serviceOf(metadata map[string]string) string {
 	for _, key := range serviceKeys {
-		if v := metadata[key]; v != "" {
-			return v
+		v := metadata[key]
+		if v == "-" || !reServiceName.MatchString(v) {
+			continue
 		}
+		if re := replicaSuffix[key]; re != nil {
+			if m := re.FindStringSubmatch(v); m != nil {
+				v = m[1]
+			}
+		}
+		return v[:min(len(v), maxServiceLen)]
 	}
 	return ""
 }
