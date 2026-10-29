@@ -29,7 +29,7 @@ type burstOrigin struct {
 	service string
 }
 
-// detectBursts finds, per source and service, runs of seconds far above the source's median
+// detectBursts finds, per source and service, runs of seconds far above its median
 // rate, marks every record with an occurrence inside one, and returns the bursts
 // sorted by Start, then Source. The result does not depend on the order of notes.
 // Call it only after all DedupFilter.Add calls.
@@ -60,7 +60,8 @@ func detectBursts(notes []occurrence, d *DedupFilter, multiplier float64, minEve
 	return bursts
 }
 
-// sourceBursts detects the bursts of one source and marks their records.
+// sourceBursts detects the bursts of one source and service and marks their
+// records.
 func sourceBursts(src burstOrigin, notes []occurrence, d *DedupFilter, multiplier float64, minEvents int64) []types.Burst {
 	sort.Slice(notes, func(i, j int) bool {
 		if notes[i].second != notes[j].second {

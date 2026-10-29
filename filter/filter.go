@@ -24,9 +24,10 @@ type FilterOptions struct {
 	DedupShards int
 	// NoiseFile is the path to a custom noise patterns file. Empty = use built-in only.
 	NoiseFile string
-	// SpikeMultiplier sets how far above its source's normal rate a second
-	// must be to count toward a burst: more than SpikeMultiplier × the median
-	// per-second count, and at least 2 events. Default: 10.
+	// SpikeMultiplier sets how far above its source's (or service's) normal
+	// rate a second must be to count toward a burst: more than
+	// SpikeMultiplier × the median per-second count, and at least 2 events.
+	// Default: 10.
 	SpikeMultiplier float64
 	// MinBurstEvents is the fewest events a burst must hold. Default: 20.
 	MinBurstEvents int

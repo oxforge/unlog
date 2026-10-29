@@ -23,9 +23,9 @@ unlog --ai-provider openai logs/
 - **12 log format parsers** -- JSON, logfmt, CSV, syslog (RFC 3164/5424 and rsyslog's file formats), Apache CLF, Docker JSON, Docker Compose, Kubernetes, CloudWatch, generic timestamped, and raw fallback. Format auto-detected via majority vote.
 - **Compressed file support** -- Reads `.gz`, `.tar.gz`, and `.tgz` files transparently.
 - **Noise removal** -- Built-in noise patterns (health checks, Prometheus scrapes, k8s internals) plus custom pattern files.
-- **One line per error** -- Normalizes UUIDs, IPs, timestamps, and paths to group similar messages; each distinct error per source becomes one line with when it started and stopped and how many times it occurred. The same input always gives the same summary.
+- **One line per error** -- Normalizes UUIDs, IPs, timestamps, and paths to group similar messages; each distinct error per source (and service) becomes one line with when it started and stopped and how many times it occurred. The same input always gives the same summary.
 - **Services within a file** -- When lines name a service, app, container or pod, errors and bursts are reported per service (`app.log[payments]`); replicas share their service (Compose `web-1` and `web-2` are `web`, pod `api-7d9f8b6c4-x2k4p` is `api`). Errors that started within seconds of each other in different sources or services are tagged as failing together (`with=`).
-- **Burst detection** -- Finds stretches where a source logged far above its normal rate, counted on real event volume, and lists the errors behind each burst.
+- **Burst detection** -- Finds stretches where a source or service logged far above its normal rate, counted on real event volume, and lists the errors behind each burst.
 - **Error chain detection** -- 10 built-in patterns (DB exhaustion, OOM cascade, circuit breaker, deployment failure, disk full, cert expiry, DNS failure, etc.); a chain is reported when at least two of its steps occur in order (any two: a log that skips a step, or starts after the first one, still counts), with its errors in order; an error can belong to more than one chain.
 - **Deployment markers** -- Deploy, restart, scaling and rollback lines are kept at any `--level` and listed before the errors, each version on its own line (they merge only when identical), with how long before the first error the last deploy happened.
 - **Token-budgeted compaction** -- Priority-scored entries fit within LLM context windows.
@@ -225,7 +225,7 @@ unlog uses a 6-stage streaming pipeline connected by buffered Go channels:
 |-------|---------|-------------|
 | 1. Ingest | `ingest/` | Read files, detect format, parse into structured entries |
 | 2. Filter | `filter/` | Level filter, time window, noise removal, one record per error, burst detection |
-| 3. Enrich | `enrich/` | Error chain detection, deployment events, field extraction |
+| 3. Enrich | `enrich/` | Error chain detection, deployment events, cross-source correlation, field extraction |
 | 4. Compact | `compact/` | Priority scoring, token-budgeted compaction |
 | 5. Analyze | `internal/analyze/` | Optional single-pass LLM analysis |
 | 6. Render | `internal/render/` | Terminal, JSON, and Markdown output |
@@ -282,7 +282,7 @@ When using `--format json`, the output includes:
 }
 ```
 
-Every key is always present. `survived` counts the distinct errors (one per source) that reach the summary, and `dropped` includes the merged repeats, so `ingested = dropped + survived`. `source_breakdown` counts ERROR and FATAL occurrences per source. `auto_detected_window` is always `false` (unlog never narrows the time range on its own; use `--since`/`--until`). With `--ai-provider`, `model_used`, `analysis` and `ai_duration_ms` are filled in. If the AI call fails, the report is still written, with the reason in `analysis_error` (and any partial `analysis`), and unlog exits with code 3. The provider name, API key and `--output` path are checked before any log is read.
+Every key is always present. `survived` counts the distinct errors (one per source and service) that reach the summary, and `dropped` includes the merged repeats, so `ingested = dropped + survived`. `source_breakdown` counts ERROR and FATAL occurrences per source. `auto_detected_window` is always `false` (unlog never narrows the time range on its own; use `--since`/`--until`). With `--ai-provider`, `model_used`, `analysis` and `ai_duration_ms` are filled in. If the AI call fails, the report is still written, with the reason in `analysis_error` (and any partial `analysis`), and unlog exits with code 3. The provider name, API key and `--output` path are checked before any log is read.
 
 ## Development
 
