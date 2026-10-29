@@ -312,3 +312,33 @@ func TestE2EDockerStderrIsNotAnError(t *testing.T) {
 	assert.NotContains(t, critical, "server listening")
 	assert.NotContains(t, critical, "cache warmed")
 }
+
+// The enterprise app validates the report with a Zod schema
+// (unlog-enterprise/packages/shared/src/report-schema.ts) that requires these
+// keys even when there is no AI analysis and no error.
+func TestE2EReportHasEveryKeyTheEnterpriseSchemaRequires(t *testing.T) {
+	logPath := writeFile(t, t.TempDir(), "app.log",
+		`{"level":"warn","msg":"queue depth rising","time":"2024-01-15T10:00:00Z"}
+{"level":"warn","msg":"retry budget low","time":"2024-01-15T10:00:01Z"}
+`)
+	r := runUnlog(t, t.TempDir(), nil, "--format", "json", logPath)
+	require.Equal(t, 0, r.exit, "stderr: %s", r.stderr)
+
+	var report map[string]any
+	require.NoError(t, json.Unmarshal([]byte(r.stdout), &report))
+	for _, key := range []string{"generated_at", "unlog_version", "model_used", "analysis_duration_ms",
+		"ai_duration_ms", "stats", "analysis", "compacted_summary"} {
+		assert.Contains(t, report, key)
+	}
+	stats, ok := report["stats"].(map[string]any)
+	require.True(t, ok, "stats should be an object")
+	for _, key := range []string{"ingested", "dropped", "survived", "unique_signatures", "time_window_start",
+		"time_window_end", "auto_detected_window", "source_breakdown", "file_count", "bytes_processed", "duration_ms"} {
+		assert.Contains(t, stats, key)
+	}
+	_, isObject := stats["source_breakdown"].(map[string]any)
+	assert.True(t, isObject, "source_breakdown should be an object, got %v", stats["source_breakdown"])
+	assert.Equal(t, "", report["model_used"])
+	assert.Equal(t, "", report["analysis"])
+	assert.Equal(t, 0.0, report["ai_duration_ms"])
+}
