@@ -153,8 +153,17 @@ func (c *formatCache) ParseFromPrefix(s string) (time.Time, int, bool) {
 }
 
 // Parse attempts to parse s using the cached format first, then falls back to
-// the full format list and updates the cache on success.
+// the full format list and updates the cache on success. A time outside
+// years 1-9999, which JSON can't carry, is no timestamp.
 func (c *formatCache) Parse(s string) (time.Time, bool) {
+	t, ok := c.parseCached(s)
+	if !ok || t.Year() < 1 || t.Year() > 9999 {
+		return time.Time{}, false
+	}
+	return t, true
+}
+
+func (c *formatCache) parseCached(s string) (time.Time, bool) {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return time.Time{}, false

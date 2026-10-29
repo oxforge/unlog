@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"path/filepath"
@@ -51,12 +52,20 @@ func (ing *Ingester) processTarGz(ctx context.Context, path string, r io.Reader)
 	defer func() { _ = gr.Close() }()
 
 	tr := tar.NewReader(gr)
+	read := false
+	var firstErr error
 	for {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
 		hdr, err := tr.Next()
 		if err == io.EOF {
+			if !read {
+				if firstErr != nil {
+					return fmt.Errorf("%w: %w", errNoLogs, firstErr)
+				}
+				return errNoLogs
+			}
 			return nil
 		}
 		if err != nil {
@@ -74,7 +83,13 @@ func (ing *Ingester) processTarGz(ctx context.Context, path string, r io.Reader)
 			continue
 		}
 		source := path + ":" + hdr.Name
-		if err := ing.processSource(ctx, source, tr, hdr.ModTime); err != nil {
+		err = ing.processSource(ctx, source, tr, hdr.ModTime)
+		if err == nil {
+			read = true
+		} else if firstErr == nil {
+			firstErr = fmt.Errorf("%s: %w", hdr.Name, err)
+		}
+		if err != nil {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}

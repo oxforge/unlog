@@ -7,11 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"os"
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -36,6 +38,9 @@ type IngestOptions struct {
 	SampleLines int
 	// Location is the zone of timestamps that carry none. Default: UTC.
 	Location *time.Location
+	// Exclude lists files never read, such as the report being written into
+	// a directory that is being searched.
+	Exclude []string
 }
 
 func (o IngestOptions) withDefaults() IngestOptions {
@@ -93,6 +98,9 @@ func (ing *Ingester) Run(ctx context.Context, sources []string) error {
 	if err != nil {
 		return err
 	}
+	if files, err = ing.withoutExcluded(files); err != nil {
+		return err
+	}
 	if len(files) == 0 && !readStdin {
 		return fmt.Errorf("ingest: no log files found in %s", strings.Join(paths, ", "))
 	}
@@ -109,9 +117,23 @@ func (ing *Ingester) Run(ctx context.Context, sources []string) error {
 		})
 	}
 
+	// Per directory or glob searched: whether any file it found was read,
+	// else the first file's error.
+	var mu sync.Mutex
+	read := make(map[string]bool)
+	firstErr := make(map[string]error)
 	for _, src := range files {
 		g.Go(func() error {
 			err := ing.processPath(gCtx, src.path)
+			if src.from != "" {
+				mu.Lock()
+				if err == nil {
+					read[src.from] = true
+				} else if firstErr[src.from] == nil {
+					firstErr[src.from] = err
+				}
+				mu.Unlock()
+			}
 			switch {
 			case err == nil:
 				return nil
@@ -119,16 +141,50 @@ func (ing *Ingester) Run(ctx context.Context, sources []string) error {
 				return gCtx.Err()
 			case src.named:
 				return fmt.Errorf("ingest: %w", err)
-			case isNotText(err):
+			case isQuietSkip(err):
 				slog.Debug("ingest: skipping file", "reason", err)
-			default:
+			case errors.Is(err, fs.ErrPermission) || errors.Is(err, fs.ErrNotExist):
 				slog.Warn("ingest: skipping file", "error", err)
+			default:
+				slog.Warn("ingest: stopped reading file; kept the lines before the error", "error", err)
 			}
 			return nil
 		})
 	}
 
-	return g.Wait()
+	if err := g.Wait(); err != nil {
+		return err
+	}
+	// A directory or glob that found files but could read none of them fails
+	// like a named file would: the run must not pass with nothing read.
+	for _, src := range files {
+		if src.from != "" && !read[src.from] {
+			return fmt.Errorf("ingest: nothing could be read in %s: %w", src.from, firstErr[src.from])
+		}
+	}
+	return nil
+}
+
+// withoutExcluded drops the files opts.Exclude lists; naming one is an
+// error.
+func (ing *Ingester) withoutExcluded(files []source) ([]source, error) {
+	if len(ing.opts.Exclude) == 0 {
+		return files, nil
+	}
+	excluded := make(map[string]bool)
+	for _, p := range ing.opts.Exclude {
+		excluded[resolvedPath(p)] = true
+	}
+	kept := files[:0]
+	for _, f := range files {
+		switch {
+		case !excluded[resolvedPath(f.path)]:
+			kept = append(kept, f)
+		case f.named:
+			return nil, fmt.Errorf("ingest: %s is excluded from the input", f.path)
+		}
+	}
+	return kept, nil
 }
 
 // processPath opens and reads the file at path. Its errors name the path.
@@ -153,6 +209,9 @@ func (ing *Ingester) processPath(ctx context.Context, path string) error {
 // modTime is when the source was last written; it dates year-less timestamps.
 func (ing *Ingester) processSource(ctx context.Context, source string, r io.Reader, modTime time.Time) error {
 	br := bufio.NewReaderSize(r, 64*1024)
+	if err := skipLeadingNULs(br); err != nil {
+		return err
+	}
 	if err := checkText(br); err != nil {
 		return err
 	}
@@ -261,6 +320,32 @@ func checkText(br *bufio.Reader) error {
 }
 
 func isNotText(err error) bool { return errors.Is(err, errNotText) }
+
+// errNoLogs marks an archive with no log file in it that could be read.
+var errNoLogs = errors.New("no log file in it could be read")
+
+// isQuietSkip reports whether err only says a file found by a search holds
+// no log (binary data, an archive of other files): skipped at debug level.
+func isQuietSkip(err error) bool { return isNotText(err) || errors.Is(err, errNoLogs) }
+
+// skipLeadingNULs discards a run of NUL bytes at the start of br. A log
+// truncated in place (logrotate's copytruncate) while its writer kept its
+// offset starts with one, and the text after it is the log.
+func skipLeadingNULs(br *bufio.Reader) error {
+	for {
+		head, err := br.Peek(8 * 1024)
+		n := len(head) - len(bytes.TrimLeft(head, "\x00"))
+		if _, derr := br.Discard(n); derr != nil {
+			return derr
+		}
+		if n < len(head) || err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+	}
+}
 
 // headerSkipper is implemented by parsers that consume a line without
 // producing an entry on purpose (the CSV header), so it is not a rejection.
