@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -72,8 +73,8 @@ func (ing *Ingester) SourceStats() map[string]SourceStats {
 // Run starts ingestion of the given sources. It closes the output channel when
 // all sources have been processed. A "-" source, or no sources at all, reads
 // os.Stdin. Each source is processed in its own goroutine. A missing path, or
-// no log file found among the sources, is an error; binary files (a NUL byte
-// in their first 8 KB, like /var/log/wtmp) are skipped with a warning.
+// no log file found among the sources, is an error; sources that aren't text
+// logs (see checkText) are skipped with a warning.
 //
 // Note: when multiple files are processed concurrently, entries from different
 // files are interleaved in arbitrary order on the output channel. Downstream
@@ -105,7 +106,10 @@ func (ing *Ingester) Run(ctx context.Context, sources []string) error {
 
 	if readStdin {
 		g.Go(func() error {
-			return ing.processSource(gCtx, "stdin", os.Stdin, time.Now())
+			if err := ing.processSource(gCtx, "stdin", os.Stdin, time.Now()); err != nil {
+				return fmt.Errorf("ingest: stdin: %w", err)
+			}
+			return nil
 		})
 	}
 
@@ -118,11 +122,6 @@ func (ing *Ingester) Run(ctx context.Context, sources []string) error {
 			}
 			defer func() { _ = f.Close() }()
 
-			if !isTarGz(path) && !isPlainGz(path) && isBinary(f) {
-				slog.Warn("ingest: skipping binary file", "path", path)
-				return nil
-			}
-
 			modTime := time.Now()
 			if info, err := f.Stat(); err == nil {
 				modTime = info.ModTime()
@@ -130,6 +129,10 @@ func (ing *Ingester) Run(ctx context.Context, sources []string) error {
 			if err := ing.processFile(gCtx, path, f, modTime); err != nil {
 				if gCtx.Err() != nil {
 					return gCtx.Err()
+				}
+				if isNotText(err) {
+					slog.Warn("ingest: skipping file", "path", path, "reason", err)
+					return nil
 				}
 				slog.Warn("ingest: error processing file", "path", path, "error", err)
 			}
@@ -143,7 +146,11 @@ func (ing *Ingester) Run(ctx context.Context, sources []string) error {
 // processSource detects the format of r, then parses and emits all entries.
 // modTime is when the source was last written; it dates year-less timestamps.
 func (ing *Ingester) processSource(ctx context.Context, source string, r io.Reader, modTime time.Time) error {
-	detectionLines, rawSample, remainder, err := ing.sampleInput(r)
+	br := bufio.NewReaderSize(r, 64*1024)
+	if err := checkText(br); err != nil {
+		return err
+	}
+	detectionLines, rawSample, remainder, err := ing.sampleInput(br)
 	if err != nil {
 		return err
 	}
@@ -202,14 +209,27 @@ func serviceOf(metadata map[string]string) string {
 	return ""
 }
 
-// isBinary reports whether f starts with a NUL byte in its first 8 KB, and
-// rewinds it.
-func isBinary(f io.ReadSeeker) bool {
-	buf := make([]byte, 8*1024)
-	n, _ := io.ReadFull(f, buf)
-	_, _ = f.Seek(0, io.SeekStart)
-	return bytes.IndexByte(buf[:n], 0) >= 0
+// errNotText marks a source that isn't a text log.
+var errNotText = errors.New("not a text log")
+
+// checkText peeks at the first 8 KB of br, consuming nothing, so it works on
+// pipes and decompressed streams alike. It rejects binary data (a NUL byte,
+// like /var/log/wtmp) and UTF-16 text (a byte-order mark).
+func checkText(br *bufio.Reader) error {
+	head, err := br.Peek(8 * 1024)
+	if err != nil && err != io.EOF {
+		return err
+	}
+	if bytes.HasPrefix(head, []byte{0xFF, 0xFE}) || bytes.HasPrefix(head, []byte{0xFE, 0xFF}) {
+		return fmt.Errorf("%w: UTF-16 text, convert it to UTF-8", errNotText)
+	}
+	if bytes.IndexByte(head, 0) >= 0 {
+		return fmt.Errorf("%w: binary data (a NUL byte in its first 8 KB)", errNotText)
+	}
+	return nil
 }
+
+func isNotText(err error) bool { return errors.Is(err, errNotText) }
 
 // headerSkipper is implemented by parsers that consume a line without
 // producing an entry on purpose (the CSV header), so it is not a rejection.
