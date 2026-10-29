@@ -35,6 +35,7 @@ func RenderJSON(w io.Writer, result *pipeline.Result, ar *analyze.AnalysisResult
 		report.Analysis = ar.Analysis
 		report.ModelUsed = ar.ModelUsed
 		report.AIDurationMs = ar.Duration.Milliseconds()
+		report.AnalysisError = ar.Error
 	}
 
 	enc := json.NewEncoder(w)

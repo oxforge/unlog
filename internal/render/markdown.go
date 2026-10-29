@@ -3,6 +3,7 @@ package render
 import (
 	"fmt"
 	"io"
+	"strings"
 	"time"
 )
 
@@ -22,7 +23,11 @@ func (r *MarkdownRenderer) Render(w io.Writer, opts Options) error {
 	_, _ = fmt.Fprintln(ew, meta)
 
 	if opts.Analysis != nil {
-		writeMDSection(ew, "Analysis", opts.Analysis.Analysis)
+		body := opts.Analysis.Analysis
+		if opts.Analysis.Error != "" {
+			body = strings.TrimSpace(body + "\n\n**AI analysis failed:** " + opts.Analysis.Error)
+		}
+		writeMDSection(ew, "Analysis", body)
 	}
 
 	if opts.Result != nil && opts.Result.Summary != "" {
