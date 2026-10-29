@@ -580,6 +580,21 @@ func formatChain(id string, members []chainSlot) (text, brief string, start time
 		lines = append(lines, l)
 	}
 
+	// A merged line's own sources are not other failures alongside it.
+	for _, l := range lines {
+		if len(l.origins) > 1 {
+			var with []string
+			for _, name := range l.entry.CorrelatedWith {
+				if !l.origins[name] {
+					with = append(with, name)
+				}
+			}
+			count := max(l.entry.CorrelatedCount, len(l.entry.CorrelatedWith))
+			l.entry.CorrelatedWith = with
+			l.entry.CorrelatedCount = max(len(with), count-(len(l.origins)-1))
+		}
+	}
+
 	header := fmt.Sprintf("%s: %d of %d steps, %s", id, len(steps), sorted[0].steps, formatSpan(start, end))
 	var sb strings.Builder
 	sb.WriteString(header)

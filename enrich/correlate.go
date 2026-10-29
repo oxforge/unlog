@@ -17,9 +17,10 @@ type Correlator struct {
 	window time.Duration
 }
 
-// NewCorrelator creates a Correlator with the given correlation window.
+// NewCorrelator creates a Correlator with the given correlation window; a
+// negative one is 0.
 func NewCorrelator(window time.Duration) *Correlator {
-	return &Correlator{window: window}
+	return &Correlator{window: max(window, 0)}
 }
 
 // Correlate sets CorrelatedWith and CorrelatedCount on every dated ERROR or
@@ -58,41 +59,57 @@ func (c *Correlator) Correlate(entries []types.EnrichedEntry) {
 	}
 }
 
-// windowSet counts the errors of each origin inside the window.
-type windowSet struct {
-	count   map[string]int // origin → errors in the window
-	files   map[string]int // source → its origins in the window
-	origins []windowOrigin // the origins in the window, sorted by name
+// origin is where an error came from: a source, and the service in it when
+// the line names one. Two origins can display alike (file "x[y]", service y
+// in file x), so they are compared as pairs, and names only sort and show.
+type origin struct{ source, service string }
+
+func (o origin) name() string {
+	return types.LogEntry{Source: o.source, Service: o.service}.Origin()
 }
 
-type windowOrigin struct{ name, source, service string }
+// windowSet counts the errors of each origin inside the window.
+type windowSet struct {
+	count   map[origin]int // errors in the window
+	files   map[string]int // source → its origins in the window
+	origins []origin       // the origins in the window, sorted by name
+}
 
 func newWindowSet() *windowSet {
-	return &windowSet{count: map[string]int{}, files: map[string]int{}}
+	return &windowSet{count: map[origin]int{}, files: map[string]int{}}
+}
+
+// at is where o is, or would go, in the sorted origins.
+func (w *windowSet) at(o origin) int {
+	name := o.name()
+	return sort.Search(len(w.origins), func(k int) bool {
+		n := w.origins[k].name()
+		return n > name || (n == name && w.origins[k].source >= o.source)
+	})
 }
 
 func (w *windowSet) add(e *types.EnrichedEntry) {
-	name := e.Origin()
-	w.count[name]++
-	if w.count[name] > 1 {
+	o := origin{e.Source, e.Service}
+	w.count[o]++
+	if w.count[o] > 1 {
 		return
 	}
-	w.files[e.Source]++
-	at := sort.Search(len(w.origins), func(k int) bool { return w.origins[k].name >= name })
-	w.origins = append(w.origins, windowOrigin{})
+	w.files[o.source]++
+	at := w.at(o)
+	w.origins = append(w.origins, origin{})
 	copy(w.origins[at+1:], w.origins[at:])
-	w.origins[at] = windowOrigin{name: name, source: e.Source, service: e.Service}
+	w.origins[at] = o
 }
 
 func (w *windowSet) remove(e *types.EnrichedEntry) {
-	name := e.Origin()
-	w.count[name]--
-	if w.count[name] > 0 {
+	o := origin{e.Source, e.Service}
+	w.count[o]--
+	if w.count[o] > 0 {
 		return
 	}
-	delete(w.count, name)
-	w.files[e.Source]--
-	at := sort.Search(len(w.origins), func(k int) bool { return w.origins[k].name >= name })
+	delete(w.count, o)
+	w.files[o.source]--
+	at := w.at(o)
 	w.origins = append(w.origins[:at], w.origins[at+1:]...)
 }
 
@@ -103,7 +120,7 @@ func (w *windowSet) tag(e *types.EnrichedEntry) {
 	skipped := 1
 	if e.Service == "" {
 		skipped = w.files[e.Source]
-	} else if w.count[e.Source] > 0 {
+	} else if w.count[origin{e.Source, ""}] > 0 {
 		skipped++
 	}
 	total := len(w.origins) - skipped
@@ -118,7 +135,7 @@ func (w *windowSet) tag(e *types.EnrichedEntry) {
 		if o.source == e.Source && (o.service == e.Service || o.service == "" || e.Service == "") {
 			continue
 		}
-		names = append(names, o.name)
+		names = append(names, o.name())
 	}
 	e.CorrelatedWith, e.CorrelatedCount = names, total
 }
