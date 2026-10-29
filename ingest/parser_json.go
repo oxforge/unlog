@@ -32,7 +32,15 @@ func (p *jsonParser) Parse(line string, lineNum int64, source string) (types.Log
 		Source:     source,
 		Metadata:   make(map[string]string),
 	}
+	applyJSONFields(&entry, obj, &p.tsCache)
 
+	return entry, true
+}
+
+// applyJSONFields sets Message, Level and Timestamp from obj's well-known
+// keys, when present, and copies the other keys into entry.Metadata without
+// overwriting a key already there. entry.Metadata must not be nil.
+func applyJSONFields(entry *types.LogEntry, obj map[string]interface{}, tsCache *formatCache) {
 	for _, key := range []string{"msg", "message", "log"} {
 		if v, ok := obj[key]; ok {
 			entry.Message = fmt.Sprint(v)
@@ -51,7 +59,7 @@ func (p *jsonParser) Parse(line string, lineNum int64, source string) (types.Log
 
 	for _, key := range []string{"timestamp", "ts", "time", "@timestamp", "t"} {
 		if v, ok := obj[key]; ok {
-			if ts, ok := p.tsCache.Parse(fmt.Sprint(v)); ok {
+			if ts, ok := tsCache.Parse(fmt.Sprint(v)); ok {
 				entry.Timestamp = ts
 			}
 			delete(obj, key)
@@ -60,10 +68,10 @@ func (p *jsonParser) Parse(line string, lineNum int64, source string) (types.Log
 	}
 
 	for k, v := range obj {
-		entry.Metadata[k] = fmt.Sprint(v)
+		if _, taken := entry.Metadata[k]; !taken {
+			entry.Metadata[k] = fmt.Sprint(v)
+		}
 	}
-
-	return entry, true
 }
 
 // decodeJSONObject decodes line as a single JSON object. Numbers are kept as

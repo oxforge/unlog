@@ -37,25 +37,17 @@ func (p *dockerComposeParser) Parse(line string, lineNum int64, source string) (
 		RawLine:    line,
 		LineNumber: lineNum,
 		Source:     source,
-		Message:    rest,
 		Metadata: map[string]string{
 			"container": container,
 		},
 	}
 
+	msg := rest
 	if ts, msgStart, ok := p.tsCache.ParseFromPrefix(rest); ok {
 		entry.Timestamp = ts
-		entry.Message = strings.TrimSpace(rest[msgStart:])
+		msg = strings.TrimSpace(rest[msgStart:])
 	}
-
-	// Extract level from the first word of the message.
-	msg := entry.Message
-	if spaceIdx := strings.IndexByte(msg, ' '); spaceIdx > 0 {
-		candidate := strings.TrimRight(msg[:spaceIdx], ":")
-		if level := types.ParseLevel(candidate); level != types.LevelUnknown {
-			entry.Level = level
-		}
-	}
+	applyInnerLine(&entry, msg, &p.tsCache)
 
 	return entry, true
 }

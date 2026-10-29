@@ -27,7 +27,15 @@ func (p *logfmtParser) Parse(line string, lineNum int64, source string) (types.L
 		Source:     source,
 		Metadata:   make(map[string]string),
 	}
+	applyLogfmtFields(&entry, pairs, &p.tsCache)
 
+	return entry, true
+}
+
+// applyLogfmtFields sets Message, Level and Timestamp from the well-known keys
+// in pairs, when present, and copies the other pairs into entry.Metadata
+// without overwriting a key already there. entry.Metadata must not be nil.
+func applyLogfmtFields(entry *types.LogEntry, pairs map[string]string, tsCache *formatCache) {
 	for k, v := range pairs {
 		switch k {
 		case "msg", "message":
@@ -35,15 +43,15 @@ func (p *logfmtParser) Parse(line string, lineNum int64, source string) (types.L
 		case "level", "lvl", "severity":
 			entry.Level = types.ParseLevel(v)
 		case "ts", "time", "timestamp", "t":
-			if ts, ok := p.tsCache.Parse(v); ok {
+			if ts, ok := tsCache.Parse(v); ok {
 				entry.Timestamp = ts
 			}
 		default:
-			entry.Metadata[k] = v
+			if _, taken := entry.Metadata[k]; !taken {
+				entry.Metadata[k] = v
+			}
 		}
 	}
-
-	return entry, true
 }
 
 // parseLogfmtPairs parses a logfmt-encoded string into a map of key→value pairs.
