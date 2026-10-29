@@ -119,6 +119,7 @@ type entrySection struct {
 	lines  []string    // one rendered item each; a burst spans several lines
 	tokens []int       // tokens[i] is the cost of lines[i] with its newline
 	at     []time.Time // at[i] is when item i happened, for listing in time order
+	brief  []string    // brief[i], if set, stands in for item i when it doesn't fit
 	budget int
 }
 
@@ -126,6 +127,7 @@ func (sec *entrySection) add(text string, at time.Time) {
 	sec.lines = append(sec.lines, text)
 	sec.tokens = append(sec.tokens, EstimateTokens(text+"\n"))
 	sec.at = append(sec.at, at)
+	sec.brief = append(sec.brief, "")
 }
 
 func newEntrySection(title string, items []scoredEntry, budget int) *entrySection {
@@ -142,12 +144,14 @@ type chainSlot struct {
 	step, steps int
 }
 
-// newChainSection lists each chain as one item, in the order of ids.
+// newChainSection lists each chain as one item, in the order of ids; a
+// chain without room for its entries is still listed by its header.
 func newChainSection(title string, ids []string, chains map[string][]chainSlot, budget int) *entrySection {
 	sec := &entrySection{title: title, budget: budget}
 	for _, id := range ids {
-		text, start := formatChain(id, chains[id])
+		text, brief, start := formatChain(id, chains[id])
 		sec.add(text, start)
+		sec.brief[len(sec.brief)-1] = brief
 	}
 	return sec
 }
@@ -203,8 +207,12 @@ func shareUnusedBudget(sections []*entrySection) {
 	}
 }
 
-// write renders the section: the highest-scored entries that fit the budget
-// (always at least one), listed in time order with undated entries last.
+// write renders the section: the highest-scored items that fit the budget,
+// listed in time order with undated items last. The best item is cut to the
+// lines that fit when it alone is over the budget. Items with a brief form
+// are listed by it when they don't fit; room for the briefs of the items
+// after one (up to half the budget) is kept before placing it in full, so a
+// few large items can't crowd the others out. The rest are counted.
 func (sec *entrySection) write(sb *strings.Builder) {
 	sb.WriteString("## ")
 	sb.WriteString(sec.title)
@@ -215,31 +223,75 @@ func (sec *entrySection) write(sb *strings.Builder) {
 		return
 	}
 
-	var chosen []int
-	used := 0
-	for i := range sec.lines {
-		if used+sec.tokens[i] > sec.budget && len(chosen) > 0 {
-			break
+	type shown struct {
+		item int
+		text string
+	}
+	briefAfter := make([]int, len(sec.lines)) // tokens of the briefs after item i
+	for i := len(sec.lines) - 2; i >= 0; i-- {
+		briefAfter[i] = briefAfter[i+1]
+		if b := sec.brief[i+1]; b != "" {
+			briefAfter[i] += EstimateTokens(b + "\n")
 		}
-		chosen = append(chosen, i)
-		used += sec.tokens[i]
 	}
 
-	sort.SliceStable(chosen, func(a, b int) bool {
-		ta, tb := sec.at[chosen[a]], sec.at[chosen[b]]
+	var out []shown
+	used, full := 0, true
+	for i := range sec.lines {
+		switch {
+		case full && used+sec.tokens[i]+min(briefAfter[i], sec.budget/2) <= sec.budget:
+			out = append(out, shown{i, sec.lines[i]})
+			used += sec.tokens[i]
+		case len(out) == 0:
+			text := cutToBudget(sec.lines[i], sec.budget-min(briefAfter[i], sec.budget/2))
+			out = append(out, shown{i, text})
+			used += EstimateTokens(text + "\n")
+			full = false
+		default:
+			full = false
+			if b := sec.brief[i]; b != "" && used+EstimateTokens(b+"\n") <= sec.budget {
+				out = append(out, shown{i, b})
+				used += EstimateTokens(b + "\n")
+			}
+		}
+	}
+
+	sort.SliceStable(out, func(a, b int) bool {
+		ta, tb := sec.at[out[a].item], sec.at[out[b].item]
 		if ta.IsZero() != tb.IsZero() {
 			return tb.IsZero()
 		}
 		return ta.Before(tb)
 	})
-	for _, i := range chosen {
-		sb.WriteString(sec.lines[i])
+	for _, s := range out {
+		sb.WriteString(s.text)
 		sb.WriteString("\n")
 	}
-	if omitted := len(sec.lines) - len(chosen); omitted > 0 {
+	if omitted := len(sec.lines) - len(out); omitted > 0 {
 		fmt.Fprintf(sb, "... (%d more entries omitted)\n", omitted)
 	}
 	sb.WriteString("\n")
+}
+
+// cutToBudget keeps text's first line and as many of the next as fit in
+// budget tokens, then says how many lines it left out.
+func cutToBudget(text string, budget int) string {
+	lines := strings.Split(text, "\n")
+	kept := lines[:1]
+	used := EstimateTokens(lines[0] + "\n")
+	const marker = 10 // tokens reserved for the "more lines" note
+	for _, l := range lines[1:] {
+		t := EstimateTokens(l + "\n")
+		if used+t+marker > budget {
+			break
+		}
+		kept = append(kept, l)
+		used += t
+	}
+	if rest := len(lines) - len(kept); rest > 0 {
+		kept = append(kept, fmt.Sprintf("  … (%d more lines)", rest))
+	}
+	return strings.Join(kept, "\n")
 }
 
 // sectionBudget computes the token budget for a section, subtracting the
@@ -476,10 +528,16 @@ func formatSpan(start, end time.Time) string {
 	return span + "–" + end.Format(full)
 }
 
+// maxChainLinesPerStep caps the lines a chain lists for one step, so a
+// step matched by many errors leaves room for the later steps.
+const maxChainLinesPerStep = 3
+
 // formatChain renders a chain: a header with how many of its steps occurred
 // and its span, then its members in time order, each numbered with the step
-// it matched.
-func formatChain(id string, members []chainSlot) (string, time.Time) {
+// it matched. The same error at one step from several sources is one line;
+// a step lists its first few lines, then how many more it had. brief is the
+// header alone, for when the chain doesn't fit.
+func formatChain(id string, members []chainSlot) (text, brief string, start time.Time) {
 	sorted := append([]chainSlot(nil), members...)
 	sort.SliceStable(sorted, func(i, j int) bool {
 		if !sorted[i].entry.Timestamp.Equal(sorted[j].entry.Timestamp) {
@@ -487,18 +545,57 @@ func formatChain(id string, members []chainSlot) (string, time.Time) {
 		}
 		return sorted[i].step < sorted[j].step
 	})
-	start, end := sorted[0].entry.Timestamp, sorted[0].entry.Timestamp
+
+	type chainLine struct {
+		chainSlot
+		origins map[string]bool
+	}
+	var lines []*chainLine
+	byError := make(map[string]*chainLine)
+	start = sorted[0].entry.Timestamp
+	end := start
 	steps := make(map[int]bool)
 	for _, m := range sorted {
 		end = maxTime(end, maxTime(m.entry.Timestamp, m.entry.LastSeen))
 		steps[m.step] = true
+		sig := m.entry.Signature
+		if sig == "" {
+			sig = m.entry.Message
+		}
+		key := fmt.Sprintf("%d\x00%s", m.step, sig)
+		if l, ok := byError[key]; ok {
+			l.entry.LastSeen = maxTime(maxTime(l.entry.LastSeen, l.entry.Timestamp), maxTime(m.entry.LastSeen, m.entry.Timestamp))
+			l.entry.OccurrenceCount += max(m.entry.OccurrenceCount, 1)
+			l.origins[m.entry.Origin()] = true
+			continue
+		}
+		l := &chainLine{chainSlot: m, origins: map[string]bool{m.entry.Origin(): true}}
+		l.entry.OccurrenceCount = max(l.entry.OccurrenceCount, 1)
+		byError[key] = l
+		lines = append(lines, l)
 	}
+
+	header := fmt.Sprintf("%s: %d of %d steps, %s", id, len(steps), sorted[0].steps, formatSpan(start, end))
 	var sb strings.Builder
-	fmt.Fprintf(&sb, "%s: %d of %d steps, %s", id, len(steps), sorted[0].steps, formatSpan(start, end))
-	for _, m := range sorted {
-		fmt.Fprintf(&sb, "\n  %d. %s", m.step, formatEntry(m.entry))
+	sb.WriteString(header)
+	shown, hidden := make(map[int]int), make(map[int]int)
+	for _, l := range lines {
+		if shown[l.step] == maxChainLinesPerStep {
+			hidden[l.step]++
+			continue
+		}
+		shown[l.step]++
+		fmt.Fprintf(&sb, "\n  %d. %s", l.step, formatEntry(l.entry))
+		if n := len(l.origins); n > 1 {
+			fmt.Fprintf(&sb, " (also from %d other sources)", n-1)
+		}
 	}
-	return sb.String(), start
+	for step := 1; step <= sorted[0].steps; step++ {
+		if n := hidden[step]; n > 0 {
+			fmt.Fprintf(&sb, "\n  … and %d more at step %d", n, step)
+		}
+	}
+	return sb.String(), fmt.Sprintf("%s (%d entries not shown)", header, len(members)), start
 }
 
 func maxTime(a, b time.Time) time.Time {

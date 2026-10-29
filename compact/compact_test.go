@@ -921,3 +921,103 @@ func TestRun_BurstHeaderShowsTheService(t *testing.T) {
 
 	assert.Contains(t, summary, "2024-01-15T10:05:00Z–10:05:09Z agg.log[payments]: 401 events in 10s")
 }
+
+// chainOf builds a chain's members: n step-1 errors (from n sources when
+// sameError, else n different errors from one source) and one step-2 line.
+func chainOf(id string, at time.Time, n int, sameError bool) []types.EnrichedEntry {
+	var entries []types.EnrichedEntry
+	for i := range n {
+		msg, source := "timeout connecting to payment-api", fmt.Sprintf("svc-%03d.log", i)
+		if !sameError {
+			msg, source = fmt.Sprintf("timeout connecting to shard %03d of the ledger cluster", i), "app.log"
+		}
+		e := chainMember(types.LevelError, msg, at.Add(time.Duration(i)*100*time.Millisecond),
+			at.Add(time.Duration(i)*100*time.Millisecond), 1, id, 1, 3)
+		e.Source, e.Signature = source, msg
+		entries = append(entries, e)
+	}
+	breaker := chainMember(types.LevelWarn, "circuit breaker open for payment-api", at.Add(time.Minute), at.Add(time.Minute), 1, id, 2, 3)
+	breaker.Signature = breaker.Message
+	return append(entries, breaker)
+}
+
+func runEntries(t *testing.T, entries []types.EnrichedEntry, opts Options) string {
+	t.Helper()
+	ch := make(chan types.EnrichedEntry, len(entries))
+	sendAndClose(ch, entries)
+	summary, err := Run(context.Background(), ch, opts)
+	require.NoError(t, err)
+	return summary
+}
+
+// The same error at one step, from many sources, is one line.
+func TestRun_ChainCollapsesTheSameErrorAcrossSources(t *testing.T) {
+	at := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+
+	chains := sectionOf(runEntries(t, chainOf("circuit-breaker", at, 400, true), Options{}), "## Error Chains")
+
+	assert.Equal(t, 1, strings.Count(chains, "timeout connecting to payment-api"), chains)
+	assert.Contains(t, chains, "1. 2024-01-15T10:00:00Z–10:00:39Z [ERROR] svc-000.log: timeout connecting to payment-api {×400} (also from 399 other sources)")
+	assert.Contains(t, chains, "2. 2024-01-15T10:01:00Z [WARN]")
+}
+
+// Many different errors at one step show the first few, then a count, so
+// the later steps stay visible.
+func TestRun_ChainCapsTheLinesOfAStep(t *testing.T) {
+	at := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+
+	chains := sectionOf(runEntries(t, chainOf("circuit-breaker", at, 300, false), Options{}), "## Error Chains")
+
+	assert.Equal(t, 3, strings.Count(chains, "  1. "), chains)
+	assert.Contains(t, chains, "  … and 297 more at step 1")
+	assert.Contains(t, chains, "  2. 2024-01-15T10:01:00Z [WARN]")
+}
+
+// Chains stay within the budget, and one that doesn't fit still shows its
+// header instead of vanishing.
+func TestRun_ChainsStayWithinTheBudget(t *testing.T) {
+	at := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+	entries := chainOf("circuit-breaker", at, 300, false)
+	for i := range 20 {
+		id := fmt.Sprintf("circuit-breaker-%d", i+2)
+		entries = append(entries, chainOf(id, at.Add(time.Duration(i+1)*time.Hour), 30, false)...)
+	}
+
+	summary := runEntries(t, entries, Options{TokenBudget: 2000})
+
+	assert.LessOrEqual(t, EstimateTokens(summary), 2000+50)
+	chains := sectionOf(summary, "## Error Chains")
+	assert.Contains(t, chains, "circuit-breaker: 2 of 3 steps")
+	assert.Contains(t, chains, "circuit-breaker-21: 2 of 3 steps", "a chain without room for its entries keeps its header")
+}
+
+// The best item of a section alone may be over its budget; it is cut to the
+// lines that fit, its first line kept.
+func TestRun_AnItemOverTheBudgetIsCut(t *testing.T) {
+	at := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+	entries := chainOf("circuit-breaker", at, 3, false)
+	for i := range entries[:3] {
+		entries[i].Message += " " + strings.Repeat("detail ", 200)
+		entries[i].Signature = entries[i].Message
+	}
+
+	summary := runEntries(t, entries, Options{TokenBudget: 600})
+
+	chains := sectionOf(summary, "## Error Chains")
+	assert.Contains(t, chains, "circuit-breaker: 2 of 3 steps")
+	assert.Contains(t, chains, "more lines")
+	assert.LessOrEqual(t, EstimateTokens(summary), 600+50)
+}
+
+// sectionOf returns the body of the summary section that starts at header.
+func sectionOf(summary, header string) string {
+	start := strings.Index(summary, header)
+	if start < 0 {
+		return ""
+	}
+	body := summary[start+len(header):]
+	if end := strings.Index(body, "\n## "); end >= 0 {
+		body = body[:end]
+	}
+	return body
+}
