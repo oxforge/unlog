@@ -11,8 +11,6 @@ type logfmtParser struct {
 	tsCache formatCache
 }
 
-func (p *logfmtParser) Name() string { return "logfmt" }
-
 // Parse extracts well-known fields from a logfmt line into a LogEntry.
 // Unknown key=value pairs are stored in Metadata.
 func (p *logfmtParser) Parse(line string, lineNum int64, source string) (types.LogEntry, bool) {

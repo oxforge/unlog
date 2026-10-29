@@ -11,8 +11,6 @@ type dockerParser struct {
 	tsCache formatCache
 }
 
-func (p *dockerParser) Name() string { return "docker-json" }
-
 // Parse extracts a LogEntry from a single Docker JSON log line.
 // Docker JSON format: {"log":"...","stream":"stdout|stderr","time":"..."}
 func (p *dockerParser) Parse(line string, lineNum int64, source string) (types.LogEntry, bool) {

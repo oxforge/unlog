@@ -34,9 +34,6 @@ const (
 	// summary. 8 192 fits comfortably in the context window of every major LLM
 	// while leaving room for system prompts and the response.
 	DefaultTokenBudget = 8_192
-
-	// DefaultChannelBuffer is the default input channel buffer size.
-	DefaultChannelBuffer = 100_000
 )
 
 // Options configures the compact stage.

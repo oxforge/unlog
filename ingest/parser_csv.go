@@ -19,8 +19,6 @@ type csvParser struct {
 	headerSkipped bool
 }
 
-func (p *csvParser) Name() string { return "csv" }
-
 // knownHeaders are column names that signal a CSV header row.
 var knownHeaders = map[string]bool{
 	"timestamp": true, "@timestamp": true, "time": true, "ts": true, "date": true, "datetime": true,

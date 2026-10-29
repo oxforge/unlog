@@ -10,8 +10,6 @@ type kubeParser struct {
 	tsCache formatCache
 }
 
-func (p *kubeParser) Name() string { return "kubernetes" }
-
 // Parse extracts a LogEntry from a single Kubernetes log line.
 // Supports two variants:
 //   - CRI format: <timestamp> <stream> <flag> <message>

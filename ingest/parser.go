@@ -62,7 +62,6 @@ func (f Format) String() string {
 // create one Parser per source (this is already the pattern in processSource).
 type Parser interface {
 	Parse(line string, lineNum int64, source string) (types.LogEntry, bool)
-	Name() string
 }
 
 // parserForFormat returns the appropriate Parser for a detected format. ref

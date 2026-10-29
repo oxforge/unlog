@@ -11,8 +11,6 @@ type cloudwatchParser struct {
 	tsCache formatCache
 }
 
-func (p *cloudwatchParser) Name() string { return "cloudwatch" }
-
 // Parse extracts a LogEntry from a single AWS CloudWatch JSON log line.
 // CloudWatch JSON format uses @timestamp and @message fields.
 func (p *cloudwatchParser) Parse(line string, lineNum int64, source string) (types.LogEntry, bool) {

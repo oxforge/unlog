@@ -15,8 +15,6 @@ type clfParser struct {
 	tsCache formatCache
 }
 
-func (p *clfParser) Name() string { return "clf" }
-
 // Parse extracts a LogEntry from a single CLF log line.
 func (p *clfParser) Parse(line string, lineNum int64, source string) (types.LogEntry, bool) {
 	m := reCLFFull.FindStringSubmatch(line)

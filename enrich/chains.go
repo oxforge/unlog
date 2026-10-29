@@ -9,15 +9,15 @@ import (
 	"github.com/oxforge/unlog/types"
 )
 
-// ChainPattern defines a sequence of log events that form a known error chain.
-type ChainPattern struct {
+// chainPattern defines a sequence of log events that form a known error chain.
+type chainPattern struct {
 	Name   string
 	Window time.Duration
-	Stages []ChainStage
+	Stages []chainStage
 }
 
-// ChainStage defines one step in an error chain pattern.
-type ChainStage struct {
+// chainStage defines one step in an error chain pattern.
+type chainStage struct {
 	SourcePattern  *regexp.Regexp // nil = any source
 	MessagePattern *regexp.Regexp
 	MinLevel       types.Level
@@ -25,7 +25,7 @@ type ChainStage struct {
 
 // ChainMatcher detects error chain patterns across a run's entries.
 type ChainMatcher struct {
-	patterns []*ChainPattern
+	patterns []*chainPattern
 }
 
 // NewChainMatcher creates a ChainMatcher with the built-in patterns.
@@ -35,7 +35,7 @@ func NewChainMatcher() *ChainMatcher {
 	}
 }
 
-func (cm *ChainMatcher) matchesStage(entry *types.EnrichedEntry, stage ChainStage) bool {
+func (cm *ChainMatcher) matchesStage(entry *types.EnrichedEntry, stage chainStage) bool {
 	if stage.MinLevel != types.LevelUnknown && !entry.Level.Meets(stage.MinLevel) {
 		return false
 	}
@@ -46,11 +46,11 @@ func (cm *ChainMatcher) matchesStage(entry *types.EnrichedEntry, stage ChainStag
 }
 
 // builtinChainPatterns defines the 10 built-in error chain patterns.
-var builtinChainPatterns = []*ChainPattern{
+var builtinChainPatterns = []*chainPattern{
 	{
 		Name:   "db-connection-exhaustion",
 		Window: 5 * time.Minute,
-		Stages: []ChainStage{
+		Stages: []chainStage{
 			{MessagePattern: regexp.MustCompile(`(?i)(deadlock|lock\s+timeout|lock\s+wait)`), MinLevel: types.LevelWarn},
 			{MessagePattern: regexp.MustCompile(`(?i)(connection\s+pool\s+exhausted|no\s+available\s+connections|too\s+many\s+connections)`), MinLevel: types.LevelError},
 			{MessagePattern: regexp.MustCompile(`(?i)(query\s+failed|cannot\s+execute|database\s+error|sql\s+error)`), MinLevel: types.LevelError},
@@ -59,7 +59,7 @@ var builtinChainPatterns = []*ChainPattern{
 	{
 		Name:   "oom-cascade",
 		Window: 3 * time.Minute,
-		Stages: []ChainStage{
+		Stages: []chainStage{
 			{MessagePattern: regexp.MustCompile(`(?i)(memory\s+(warning|threshold|pressure|limit)|heap\s+(usage|size)\s*(>|exceed))`), MinLevel: types.LevelWarn},
 			{MessagePattern: regexp.MustCompile(`(?i)(OOM\s*kill|out\s+of\s+memory|memory\s+limit\s+exceeded|killed\s+process)`), MinLevel: types.LevelError},
 			{MessagePattern: regexp.MustCompile(`(?i)(pod\s+restart|service\s+unavailable|container\s+(restart|crash)|exit\s+code\s+137)`), MinLevel: types.LevelError},
@@ -68,7 +68,7 @@ var builtinChainPatterns = []*ChainPattern{
 	{
 		Name:   "deployment-failure",
 		Window: 10 * time.Minute,
-		Stages: []ChainStage{
+		Stages: []chainStage{
 			{MessagePattern: regexp.MustCompile(`(?i)(deploy(ing|ment)\s+start|rolling\s+update|new\s+version|pulling\s+image)`), MinLevel: types.LevelInfo},
 			{MessagePattern: regexp.MustCompile(`(?i)(health\s*check\s+(fail|timeout|unhealthy)|readiness\s+probe\s+failed|liveness\s+probe\s+failed)`), MinLevel: types.LevelWarn},
 			{MessagePattern: regexp.MustCompile(`(?i)(rollback|roll\s+back|reverting|deployment\s+failed|undo)`), MinLevel: types.LevelError},
@@ -77,7 +77,7 @@ var builtinChainPatterns = []*ChainPattern{
 	{
 		Name:   "circuit-breaker",
 		Window: 2 * time.Minute,
-		Stages: []ChainStage{
+		Stages: []chainStage{
 			{MessagePattern: regexp.MustCompile(`(?i)(timeout|connection\s+refused|connect\s+failed|ECONNREFUSED)`), MinLevel: types.LevelError},
 			{MessagePattern: regexp.MustCompile(`(?i)(circuit\s+(open|breaker\s+open|breaker\s+tripped))`), MinLevel: types.LevelWarn},
 			{MessagePattern: regexp.MustCompile(`(?i)(fallback\s+(activated|triggered|used)|degraded\s+mode)`), MinLevel: types.LevelWarn},
@@ -86,7 +86,7 @@ var builtinChainPatterns = []*ChainPattern{
 	{
 		Name:   "disk-full",
 		Window: 5 * time.Minute,
-		Stages: []ChainStage{
+		Stages: []chainStage{
 			{MessagePattern: regexp.MustCompile(`(?i)(disk\s+space\s+(warning|low|critical)|filesystem\s+(full|usage).*\d{2,3}%)`), MinLevel: types.LevelWarn},
 			{MessagePattern: regexp.MustCompile(`(?i)(write\s+fail|no\s+space\s+left|ENOSPC|cannot\s+write|disk\s+full)`), MinLevel: types.LevelError},
 			{MessagePattern: regexp.MustCompile(`(?i)(crash|exit|abort|fatal|service\s+(stopped|terminated))`), MinLevel: types.LevelError},
@@ -95,7 +95,7 @@ var builtinChainPatterns = []*ChainPattern{
 	{
 		Name:   "certificate-expiry",
 		Window: 5 * time.Minute,
-		Stages: []ChainStage{
+		Stages: []chainStage{
 			{MessagePattern: regexp.MustCompile(`(?i)(certificate?\s+(expir|near\s+expiry|will\s+expire)|TLS\s+warning|cert\s+renewal)`), MinLevel: types.LevelWarn},
 			{MessagePattern: regexp.MustCompile(`(?i)(TLS\s+handshake\s+(fail|error)|SSL\s+error|certificate?\s+(invalid|expired|verify\s+fail))`), MinLevel: types.LevelError},
 			{MessagePattern: regexp.MustCompile(`(?i)(connection\s+refused|connection\s+closed|cannot\s+connect|ECONNREFUSED)`), MinLevel: types.LevelError},
@@ -104,7 +104,7 @@ var builtinChainPatterns = []*ChainPattern{
 	{
 		Name:   "dns-failure",
 		Window: 3 * time.Minute,
-		Stages: []ChainStage{
+		Stages: []chainStage{
 			{MessagePattern: regexp.MustCompile(`(?i)(DNS\s+(timeout|resolution\s+fail|lookup\s+fail|NXDOMAIN)|name\s+resolution\s+fail)`), MinLevel: types.LevelError},
 			{MessagePattern: regexp.MustCompile(`(?i)(connection\s+failed|cannot\s+connect|dial\s+(tcp|error)|ECONNREFUSED)`), MinLevel: types.LevelError},
 			{MessagePattern: regexp.MustCompile(`(?i)(upstream\s+(unavailable|error|timeout)|service\s+unavailable|bad\s+gateway|502|503)`), MinLevel: types.LevelError},
@@ -113,7 +113,7 @@ var builtinChainPatterns = []*ChainPattern{
 	{
 		Name:   "rate-limiting",
 		Window: 5 * time.Minute,
-		Stages: []ChainStage{
+		Stages: []chainStage{
 			{MessagePattern: regexp.MustCompile(`(?i)(rate\s+limit\s+(warning|approaching|threshold)|throttl(e|ing))`), MinLevel: types.LevelWarn},
 			{MessagePattern: regexp.MustCompile(`(?i)(429|too\s+many\s+requests|rate\s+limit\s+(exceeded|hit))`), MinLevel: types.LevelError},
 			{MessagePattern: regexp.MustCompile(`(?i)(client\s+error|request\s+failed|service\s+degraded|dropped\s+request)`), MinLevel: types.LevelError},
@@ -122,7 +122,7 @@ var builtinChainPatterns = []*ChainPattern{
 	{
 		Name:   "queue-backlog",
 		Window: 10 * time.Minute,
-		Stages: []ChainStage{
+		Stages: []chainStage{
 			{MessagePattern: regexp.MustCompile(`(?i)(consumer\s+lag|processing\s+behind|queue\s+(depth|size)\s*(>|exceed|growing))`), MinLevel: types.LevelWarn},
 			{MessagePattern: regexp.MustCompile(`(?i)(queue\s+full|buffer\s+(full|overflow)|message\s+(dropped|rejected))`), MinLevel: types.LevelError},
 			{MessagePattern: regexp.MustCompile(`(?i)(producer\s+blocked|publish\s+failed|backpressure|send\s+timeout)`), MinLevel: types.LevelError},
@@ -131,7 +131,7 @@ var builtinChainPatterns = []*ChainPattern{
 	{
 		Name:   "cascade-failure",
 		Window: 5 * time.Minute,
-		Stages: []ChainStage{
+		Stages: []chainStage{
 			{MessagePattern: regexp.MustCompile(`(?i)(failed|error|exception).*service`), MinLevel: types.LevelError},
 			{MessagePattern: regexp.MustCompile(`(?i)(timeout|timed?\s+out).*upstream`), MinLevel: types.LevelError},
 			{MessagePattern: regexp.MustCompile(`(?i)(HTTP\s+5\d{2}|status[=: ]+5\d{2}|5\d{2}\s+(error|response))`), MinLevel: types.LevelError},
@@ -182,7 +182,7 @@ func (cm *ChainMatcher) FindChains(entries []types.EnrichedEntry) []Chain {
 }
 
 // patternChains runs one pattern over entries.
-func (cm *ChainMatcher) patternChains(p *ChainPattern, entries []types.EnrichedEntry) []Chain {
+func (cm *ChainMatcher) patternChains(p *chainPattern, entries []types.EnrichedEntry) []Chain {
 	var chains []Chain
 	var open *Chain
 	var openedAt time.Time

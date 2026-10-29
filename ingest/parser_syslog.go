@@ -39,13 +39,6 @@ func newSyslogParser(rfc5424 bool, ref time.Time) *syslogParser {
 	return &syslogParser{rfc5424: rfc5424, ref: ref.UTC()}
 }
 
-func (p *syslogParser) Name() string {
-	if p.rfc5424 {
-		return "syslog-rfc5424"
-	}
-	return "syslog-rfc3164"
-}
-
 // Parse extracts a LogEntry from a single syslog line.
 func (p *syslogParser) Parse(line string, lineNum int64, source string) (types.LogEntry, bool) {
 	if p.rfc5424 {

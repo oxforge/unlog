@@ -12,8 +12,6 @@ type genericParser struct {
 	tsCache formatCache
 }
 
-func (p *genericParser) Name() string { return "generic" }
-
 // Parse attempts to extract a timestamp from the beginning of the line and
 // the remainder becomes the message. Level is inferred from the first word of
 // the message when it matches a known level keyword. Trailing key=value pairs
