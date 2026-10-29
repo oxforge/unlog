@@ -3,6 +3,7 @@ package filter
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"sort"
 	"testing"
 	"time"
@@ -75,23 +76,21 @@ func TestEndToEnd(t *testing.T) {
 		"invariant: ingested == dropped + survived")
 	assert.Equal(t, int64(17), fs.TotalIngested)
 
-	// 10 info dropped + 1 noise dropped = 11 dropped.
-	assert.Equal(t, int64(11), fs.TotalDropped)
-	assert.Equal(t, int64(6), fs.TotalSurvived) // 5 errors + 1 unknown
+	// 17 ingested; 10 info + 1 noise dropped; of the 6 that pass, the 5
+	// "error number N" lines share one signature and merge into one record
+	// (4 merged), plus the sidecar line: 2 survive, 15 dropped.
+	assert.Equal(t, int64(15), fs.TotalDropped)
+	assert.Equal(t, int64(2), fs.TotalSurvived)
 
 	// Detailed stats.
 	assert.Equal(t, int64(10), detailed.DroppedByLevel)
 	assert.Equal(t, int64(1), detailed.DroppedByNoise)
+	assert.Equal(t, int64(4), detailed.DroppedByDedup)
 
-	// Results should contain 6 real entries (may also have summaries).
-	// Count non-summary results: those are entries from survivors.
-	realCount := 0
-	for _, r := range results {
-		if r.OccurrenceCount <= opts.MaxDuplicates {
-			realCount++
-		}
-	}
-	assert.Equal(t, 6, realCount)
+	require.Len(t, results, 2)
+	assert.Equal(t, 5, results[0].OccurrenceCount)
+	assert.Equal(t, "error number 0", results[0].Message)
+	assert.Equal(t, 1, results[1].OccurrenceCount)
 }
 
 func TestSortedOutput(t *testing.T) {
@@ -136,17 +135,9 @@ func TestSortedOutput(t *testing.T) {
 		results = append(results, fe)
 	}
 
-	// Filter out any dedup summaries for sorting check.
-	var real []types.FilteredEntry
-	for _, r := range results {
-		if r.OccurrenceCount <= opts.MaxDuplicates {
-			real = append(real, r)
-		}
-	}
-
-	require.Len(t, real, 10)
-	assert.True(t, sort.SliceIsSorted(real, func(i, j int) bool {
-		return real[i].Timestamp.Before(real[j].Timestamp)
+	require.Len(t, results, 10)
+	assert.True(t, sort.SliceIsSorted(results, func(i, j int) bool {
+		return results[i].Timestamp.Before(results[j].Timestamp)
 	}), "output should be sorted by timestamp")
 }
 
@@ -221,46 +212,6 @@ func TestEmptyInput(t *testing.T) {
 	assert.Equal(t, int64(0), fs.TotalSurvived)
 }
 
-func TestMaxSurvivorsOverflow(t *testing.T) {
-	input := make(chan types.LogEntry, 200)
-	output := make(chan types.FilteredEntry, 200)
-
-	base := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
-
-	// Feed 100 unique error entries — more than MaxSurvivors=10
-	for i := 0; i < 100; i++ {
-		input <- types.LogEntry{
-			Timestamp: base.Add(time.Duration(i) * time.Second),
-			Level:     types.LevelError,
-			Source:    "app",
-			Message:   fmt.Sprintf("unique error message number %d in test", i),
-		}
-	}
-	close(input)
-
-	opts := DefaultFilterOptions()
-	opts.Workers = 2
-	opts.MaxSurvivors = 10   // very low cap to trigger overflow
-	opts.MaxDuplicates = 100 // high so dedup doesn't interfere
-
-	p := NewFilterPipeline(input, output, opts, nil)
-	fs, _, err := p.Run(context.Background())
-	require.NoError(t, err)
-
-	var results []types.FilteredEntry
-	for fe := range output {
-		results = append(results, fe)
-	}
-
-	// All 100 entries should reach output (either buffered or streamed)
-	assert.Equal(t, int64(100), fs.TotalIngested)
-	assert.Greater(t, len(results), 0)
-	// In overflow mode, some entries were streamed directly and aren't counted
-	// in survivors slice, so TotalSurvived only counts buffered ones.
-	// The key assertion is that all entries made it to output.
-	assert.Equal(t, 100, len(results), "all entries should reach output despite overflow")
-}
-
 func TestTimeWindowIgnoresEntriesWithoutTimestamps(t *testing.T) {
 	input := make(chan types.LogEntry, 3)
 	output := make(chan types.FilteredEntry, 10)
@@ -279,4 +230,85 @@ func TestTimeWindowIgnoresEntriesWithoutTimestamps(t *testing.T) {
 
 	assert.True(t, first.Equal(fs.TimeWindowStart), "start: got %s", fs.TimeWindowStart)
 	assert.True(t, last.Equal(fs.TimeWindowEnd), "end: got %s", fs.TimeWindowEnd)
+}
+
+func TestFilterStatsCountMergedDuplicates(t *testing.T) {
+	input := make(chan types.LogEntry, 100)
+	output := make(chan types.FilteredEntry, 100)
+	base := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+	for i := 0; i < 10; i++ {
+		input <- types.LogEntry{Timestamp: base, Level: types.LevelInfo, Source: "app", Message: "started"}
+	}
+	for i := 0; i < 30; i++ {
+		input <- types.LogEntry{Timestamp: base.Add(time.Duration(i) * time.Second), Level: types.LevelError,
+			Source: "app", Message: "upstream timeout", LineNumber: int64(i + 1)}
+	}
+	input <- types.LogEntry{Timestamp: base.Add(30 * time.Second), Level: types.LevelFatal,
+		Source: "app", Message: "out of memory", LineNumber: 31}
+	for i := 0; i < 5; i++ {
+		input <- types.LogEntry{Timestamp: base.Add(time.Duration(i) * time.Second), Level: types.LevelError,
+			Source: "db", Message: "deadlock detected", LineNumber: int64(i + 1)}
+	}
+	close(input)
+
+	fs, detailed, err := NewFilterPipeline(input, output, DefaultFilterOptions(), nil).Run(context.Background())
+	require.NoError(t, err)
+	for range output {
+	}
+
+	assert.Equal(t, int64(46), fs.TotalIngested)
+	assert.Equal(t, int64(10), detailed.DroppedByLevel)
+	assert.Equal(t, int64(3), fs.TotalSurvived)
+	assert.Equal(t, int64(33), detailed.DroppedByDedup)
+	assert.Equal(t, int64(43), fs.TotalDropped)
+	assert.Equal(t, map[string]int64{"app": 31, "db": 5}, fs.SourceBreakdown)
+	assert.True(t, base.Equal(fs.TimeWindowStart), "start: %s", fs.TimeWindowStart)
+	assert.True(t, base.Add(30*time.Second).Equal(fs.TimeWindowEnd), "end: %s", fs.TimeWindowEnd)
+}
+
+func TestFilterOutputIsDeterministic(t *testing.T) {
+	base := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+	msgs := []string{"upstream timeout for order %d", "disk %d%% full", "cache miss for key %d",
+		"auth rejected for user %d", "queue lag at %d ms"}
+	sources := []string{"a.log", "b.log", "c.log"}
+	var all []types.LogEntry
+	for i := 0; i < 3500; i++ {
+		lvl := types.LevelError
+		if i%7 == 0 {
+			lvl = types.LevelWarn
+		}
+		all = append(all, types.LogEntry{
+			Timestamp:  base.Add(time.Duration(i/2) * time.Second),
+			Level:      lvl,
+			Source:     sources[i%3],
+			Message:    fmt.Sprintf(msgs[i%5], i),
+			LineNumber: int64(i),
+		})
+	}
+
+	run := func(seed int64) []types.FilteredEntry {
+		entries := append([]types.LogEntry(nil), all...)
+		rand.New(rand.NewSource(seed)).Shuffle(len(entries), func(i, j int) { entries[i], entries[j] = entries[j], entries[i] })
+		input := make(chan types.LogEntry, len(entries))
+		output := make(chan types.FilteredEntry, len(entries))
+		for _, e := range entries {
+			input <- e
+		}
+		close(input)
+		opts := DefaultFilterOptions()
+		opts.Workers = 8
+		_, _, err := NewFilterPipeline(input, output, opts, nil).Run(context.Background())
+		require.NoError(t, err)
+		var out []types.FilteredEntry
+		for fe := range output {
+			out = append(out, fe)
+		}
+		return out
+	}
+
+	first := run(0)
+	require.NotEmpty(t, first)
+	for seed := int64(1); seed < 20; seed++ {
+		require.Equal(t, first, run(seed), "run %d differs", seed)
+	}
 }

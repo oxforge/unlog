@@ -37,7 +37,7 @@ func TestFilterPipeline_Integration_IncidentScenario(t *testing.T) {
 		}
 	}
 
-	// 20 similar DB errors with different IPs — fuzzy deduped, maxDups=3.
+	// 20 similar DB errors with different IPs — fuzzy merged into one record.
 	for i := 0; i < 20; i++ {
 		input <- types.LogEntry{
 			Timestamp: base.Add(time.Duration(150+i) * time.Second),
@@ -58,13 +58,10 @@ func TestFilterPipeline_Integration_IncidentScenario(t *testing.T) {
 	close(input)
 
 	opts := FilterOptions{
-		MinLevel:            types.LevelWarn,
-		Workers:             4,
-		MaxDuplicates:       3,
-		DedupShards:         4,
-		FuzzyDedupCacheSize: 100,
-		MaxSurvivors:        10000,
-		SpikeMultiplier:     10,
+		MinLevel:        types.LevelWarn,
+		Workers:         4,
+		DedupShards:     4,
+		SpikeMultiplier: 10,
 	}
 
 	p := NewFilterPipeline(input, output, opts, nil)
@@ -83,28 +80,21 @@ func TestFilterPipeline_Integration_IncidentScenario(t *testing.T) {
 		"invariant: ingested == dropped + survived")
 	assert.Equal(t, int64(171), fs.TotalIngested)
 
-	// Verify per-filter drops.
-	assert.Greater(t, detailed.DroppedByLevel, int64(0), "should have dropped entries by level")
-	assert.Greater(t, detailed.DroppedByNoise, int64(0), "should have dropped entries by noise")
-	assert.Greater(t, detailed.DroppedByDedup, int64(0), "should have dropped entries by dedup")
+	// 100 info dropped by level, 50 health checks by noise, 20 DB errors
+	// share one signature: 19 merged. Survivors: 1 DB record + 1 FATAL.
+	assert.Equal(t, int64(100), detailed.DroppedByLevel)
+	assert.Equal(t, int64(50), detailed.DroppedByNoise)
+	assert.Equal(t, int64(19), detailed.DroppedByDedup)
+	assert.Equal(t, int64(2), fs.TotalSurvived)
+	assert.Equal(t, int64(169), fs.TotalDropped)
+	require.Len(t, results, 2)
 
-	// FATAL entry must survive.
-	foundFatal := false
-	for _, r := range results {
-		if r.Level == types.LevelFatal && r.Message == "out of memory: cannot allocate heap" {
-			foundFatal = true
-			break
-		}
-	}
-	assert.True(t, foundFatal, "FATAL entry must survive filtering")
+	assert.Equal(t, "db-proxy", results[0].Source)
+	assert.Equal(t, 20, results[0].OccurrenceCount)
+	assert.True(t, base.Add(150*time.Second).Equal(results[0].FirstSeen))
+	assert.True(t, base.Add(169*time.Second).Equal(results[0].LastSeen))
 
-	// At least one dedup summary entry with OccurrenceCount > MaxDuplicates.
-	foundSummary := false
-	for _, r := range results {
-		if r.OccurrenceCount > opts.MaxDuplicates {
-			foundSummary = true
-			break
-		}
-	}
-	assert.True(t, foundSummary, "should have at least one dedup summary entry")
+	assert.Equal(t, types.LevelFatal, results[1].Level)
+	assert.Equal(t, "out of memory: cannot allocate heap", results[1].Message)
+	assert.Equal(t, 1, results[1].OccurrenceCount)
 }

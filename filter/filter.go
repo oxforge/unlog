@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"runtime"
-	"sort"
-	"sync/atomic"
 	"time"
 
 	"github.com/oxforge/unlog/types"
@@ -22,14 +20,8 @@ type FilterOptions struct {
 	Until time.Time
 	// Workers is the number of parallel filter goroutines. Default: runtime.NumCPU().
 	Workers int
-	// MaxDuplicates is the max times an exact duplicate is kept. Default: 5.
-	MaxDuplicates int
-	// DedupShards is the number of shards for the dedup cache. Default: 16.
+	// DedupShards is the number of shards for the dedup records. Default: 16.
 	DedupShards int
-	// FuzzyDedupCacheSize is the LRU size for fuzzy signatures. Default: 10_000.
-	FuzzyDedupCacheSize int
-	// MaxSurvivors is the maximum number of entries that survive filtering. Default: 1_000_000.
-	MaxSurvivors int
 	// NoiseFile is the path to a custom noise patterns file. Empty = use built-in only.
 	NoiseFile string
 	// SpikeMultiplier is the rate increase factor to consider a spike. Default: 10.
@@ -39,13 +31,10 @@ type FilterOptions struct {
 // DefaultFilterOptions returns FilterOptions with all defaults set.
 func DefaultFilterOptions() FilterOptions {
 	return FilterOptions{
-		MinLevel:            types.LevelWarn,
-		Workers:             runtime.NumCPU(),
-		MaxDuplicates:       5,
-		DedupShards:         16,
-		FuzzyDedupCacheSize: 10_000,
-		MaxSurvivors:        1_000_000,
-		SpikeMultiplier:     10,
+		MinLevel:        types.LevelWarn,
+		Workers:         runtime.NumCPU(),
+		DedupShards:     16,
+		SpikeMultiplier: 10,
 	}
 }
 
@@ -58,17 +47,8 @@ func withDefaults(opts FilterOptions) FilterOptions {
 	if opts.Workers == 0 {
 		opts.Workers = defaults.Workers
 	}
-	if opts.MaxDuplicates == 0 {
-		opts.MaxDuplicates = defaults.MaxDuplicates
-	}
 	if opts.DedupShards == 0 {
 		opts.DedupShards = defaults.DedupShards
-	}
-	if opts.FuzzyDedupCacheSize == 0 {
-		opts.FuzzyDedupCacheSize = defaults.FuzzyDedupCacheSize
-	}
-	if opts.MaxSurvivors == 0 {
-		opts.MaxSurvivors = defaults.MaxSurvivors
 	}
 	if opts.SpikeMultiplier == 0 {
 		opts.SpikeMultiplier = defaults.SpikeMultiplier
@@ -133,32 +113,27 @@ func (p *FilterPipeline) Run(ctx context.Context) (types.FilterStats, DetailedSt
 
 	chain = append(chain, p.filters...)
 
-	dedup := NewDedupFilter(p.opts.MaxDuplicates, p.opts.DedupShards, p.opts.FuzzyDedupCacheSize)
+	dedup := NewDedupFilter(p.opts.DedupShards)
 	p.dedup = dedup
 
 	// Phase 1: Fan-out workers.
-	var survivorCount atomic.Int64
-	var overflowEmitted atomic.Int64
-	var overflow atomic.Bool
-
 	allWorkerStats := make([]workerStats, p.opts.Workers)
-	allSurvivors := make([][]types.FilteredEntry, p.opts.Workers)
+	for i := range allWorkerStats {
+		allWorkerStats[i].errorsBySource = make(map[string]int64)
+	}
 
 	g, gctx := errgroup.WithContext(ctx)
 
 	for w := 0; w < p.opts.Workers; w++ {
 		g.Go(func() error {
 			ws := &allWorkerStats[w]
-			var locals []types.FilteredEntry
 
 			for {
 				select {
 				case <-gctx.Done():
-					allSurvivors[w] = locals
 					return gctx.Err()
 				case entry, ok := <-p.input:
 					if !ok {
-						allSurvivors[w] = locals
 						return nil
 					}
 
@@ -183,39 +158,11 @@ func (p *FilterPipeline) Run(ctx context.Context) (types.FilterStats, DetailedSt
 						continue
 					}
 
-					fe, kept := dedup.Apply(entry)
-					if !kept {
-						ws.droppedByDedup++
-						continue
+					ws.passed++
+					if entry.Level == types.LevelError || entry.Level == types.LevelFatal {
+						ws.errorsBySource[entry.Source]++
 					}
-
-					if overflow.Load() {
-						// Emit directly to output, skip local buffering.
-						select {
-						case p.output <- fe:
-							overflowEmitted.Add(1)
-						case <-gctx.Done():
-							allSurvivors[w] = locals
-							return gctx.Err()
-						}
-						continue
-					}
-
-					cur := survivorCount.Add(1)
-					if cur > int64(p.opts.MaxSurvivors) {
-						overflow.Store(true)
-						// Emit directly.
-						select {
-						case p.output <- fe:
-							overflowEmitted.Add(1)
-						case <-gctx.Done():
-							allSurvivors[w] = locals
-							return gctx.Err()
-						}
-						continue
-					}
-
-					locals = append(locals, fe)
+					dedup.Add(entry)
 				}
 			}
 		})
@@ -225,92 +172,58 @@ func (p *FilterPipeline) Run(ctx context.Context) (types.FilterStats, DetailedSt
 		return types.FilterStats{}, DetailedStats{}, fmt.Errorf("filter: %w", err)
 	}
 
-	ingested, detailed := mergeWorkerStats(allWorkerStats)
+	totals := mergeWorkerStats(allWorkerStats)
+	detailed := totals.detailed
 
-	var totalLen int
-	for _, s := range allSurvivors {
-		totalLen += len(s)
-	}
-	survivors := make([]types.FilteredEntry, 0, totalLen)
-	for _, s := range allSurvivors {
-		survivors = append(survivors, s...)
-	}
-
-	return p.postProcess(ctx, survivors, dedup, ingested, overflowEmitted.Load(), overflow.Load(), &detailed, start)
+	return p.postProcess(ctx, dedup, totals, &detailed, start)
 }
 
-// postProcess runs phase 2 (spike detection, sort), emits results,
-// and computes final stats.
+// postProcess runs phase 2 (spike detection), emits one entry per record in
+// sorted order, and computes final stats.
 func (p *FilterPipeline) postProcess(
 	ctx context.Context,
-	survivors []types.FilteredEntry,
 	dedup *DedupFilter,
-	ingested, overflowEmitted int64,
-	overflowed bool,
+	totals mergedStats,
 	detailed *DetailedStats,
 	start time.Time,
 ) (types.FilterStats, DetailedStats, error) {
-	// Phase 2 (skipped if overflow).
-	if !overflowed {
-		detailed.SpikeCount = DetectSpikes(survivors, p.opts.SpikeMultiplier)
+	records := dedup.Entries()
+	detailed.SpikeCount = DetectSpikes(records, p.opts.SpikeMultiplier)
 
-		sort.Slice(survivors, func(i, j int) bool {
-			return survivors[i].Timestamp.Before(survivors[j].Timestamp)
-		})
-	}
-
-	for i := range survivors {
+	for i := range records {
 		select {
-		case p.output <- survivors[i]:
+		case p.output <- records[i]:
 		case <-ctx.Done():
 			return types.FilterStats{}, DetailedStats{}, ctx.Err()
 		}
 	}
 
-	summaries := dedup.Summaries()
-	for i := range summaries {
-		summaries[i].IsDedupSummary = true
-		select {
-		case p.output <- summaries[i]:
-		case <-ctx.Done():
-			return types.FilterStats{}, DetailedStats{}, ctx.Err()
-		}
-	}
+	survived := int64(len(records))
+	detailed.DroppedByDedup = totals.passed - survived
 
-	survived := int64(len(survivors)) + overflowEmitted + int64(len(summaries))
-	dropped := ingested - survived
-
-	sourceBreakdown := make(map[string]int64)
-	for i := range survivors {
-		if survivors[i].Level == types.LevelError || survivors[i].Level == types.LevelFatal {
-			sourceBreakdown[survivors[i].Source]++
-		}
-	}
-
-	// The window covers dated survivors only; undated ones sort first.
+	// The window covers dated records only.
 	var winStart, winEnd time.Time
-	for i := range survivors {
-		ts := survivors[i].Timestamp
-		if ts.IsZero() {
+	for i := range records {
+		if records[i].FirstSeen.IsZero() {
 			continue
 		}
-		if winStart.IsZero() || ts.Before(winStart) {
-			winStart = ts
+		if winStart.IsZero() || records[i].FirstSeen.Before(winStart) {
+			winStart = records[i].FirstSeen
 		}
-		if ts.After(winEnd) {
-			winEnd = ts
+		if records[i].LastSeen.After(winEnd) {
+			winEnd = records[i].LastSeen
 		}
 	}
 
 	fs := types.FilterStats{
-		TotalIngested:      ingested,
-		TotalDropped:       dropped,
-		TotalSurvived:      survived,
-		UniqueSignatures:   dedup.UniqueSignatures(),
-		TimeWindowStart:    winStart,
-		TimeWindowEnd:      winEnd,
-		SourceBreakdown:    sourceBreakdown,
-		FilterDurationMs:   time.Since(start).Milliseconds(),
+		TotalIngested:    totals.ingested,
+		TotalDropped:     totals.ingested - survived,
+		TotalSurvived:    survived,
+		UniqueSignatures: dedup.UniqueSignatures(),
+		TimeWindowStart:  winStart,
+		TimeWindowEnd:    winEnd,
+		SourceBreakdown:  totals.errorsBySource,
+		FilterDurationMs: time.Since(start).Milliseconds(),
 	}
 
 	return fs, *detailed, nil
