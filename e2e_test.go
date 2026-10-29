@@ -342,3 +342,21 @@ func TestE2EReportHasEveryKeyTheEnterpriseSchemaRequires(t *testing.T) {
 	assert.Equal(t, "", report["analysis"])
 	assert.Equal(t, 0.0, report["ai_duration_ms"])
 }
+
+func TestE2ETwoIncidentsHoursApartAreBothReported(t *testing.T) {
+	logPath := writeFile(t, t.TempDir(), "app.log",
+		`{"level":"error","msg":"payment gateway refused card","time":"2024-01-15T10:00:01Z"}
+{"level":"error","msg":"payment gateway refused card again","time":"2024-01-15T10:00:02Z"}
+{"level":"error","msg":"order rollback","time":"2024-01-15T10:00:03Z"}
+{"level":"error","msg":"disk quota exceeded on /data","time":"2024-01-15T14:00:01Z"}
+{"level":"error","msg":"write failed for batch","time":"2024-01-15T14:00:02Z"}
+{"level":"error","msg":"batch job aborted","time":"2024-01-15T14:00:03Z"}
+`)
+
+	first := runJSON(t, logPath).CompactedSummary
+	assert.Contains(t, first, "order rollback")
+	assert.Contains(t, first, "batch job aborted")
+	for i := 0; i < 9; i++ {
+		assert.Equal(t, first, runJSON(t, logPath).CompactedSummary, "run %d differs", i+2)
+	}
+}

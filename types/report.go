@@ -24,6 +24,8 @@ type FilterStats struct {
 	UniqueSignatures   int              `json:"unique_signatures"`
 	TimeWindowStart    time.Time        `json:"time_window_start"`
 	TimeWindowEnd      time.Time        `json:"time_window_end"`
+	// Deprecated: always false; unlog no longer narrows the time range on its
+	// own. Kept for report consumers.
 	AutoDetectedWindow bool             `json:"auto_detected_window"`
 	SourceBreakdown    map[string]int64 `json:"source_breakdown"`
 	FileCount          int              `json:"file_count"`

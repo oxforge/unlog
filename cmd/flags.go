@@ -32,7 +32,7 @@ func resolveFormat(cmd *cobra.Command) (string, error) {
 }
 
 // buildFilterOpts merges CLI flags over config and returns pipeline-ready filter options.
-func buildFilterOpts(cmd *cobra.Command, args []string) (filter.FilterOptions, error) {
+func buildFilterOpts(cmd *cobra.Command) (filter.FilterOptions, error) {
 	effectiveLevel := cfg.Level
 	if cmd.Flags().Changed("level") {
 		effectiveLevel = levelFlag
@@ -77,14 +77,11 @@ func buildFilterOpts(cmd *cobra.Command, args []string) (filter.FilterOptions, e
 		until = t
 	}
 
-	isStdin := len(args) == 0 || (len(args) == 1 && args[0] == "-")
-
 	opts := filter.DefaultFilterOptions()
 	opts.MinLevel = minLevel
 	opts.Since = since
 	opts.Until = until
 	opts.NoiseFile = effectiveNoise
-	opts.IsStdin = isStdin
 
 	return opts, nil
 }
