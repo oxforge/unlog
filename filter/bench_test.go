@@ -116,30 +116,28 @@ func BenchmarkLevelFilter(b *testing.B) {
 	}
 }
 
-func BenchmarkSpikeDetection(b *testing.B) {
+func BenchmarkBurstDetection(b *testing.B) {
 	base := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
 	sources := []string{"api", "db", "cache", "queue", "worker"}
 
-	// Build 10K entries across 5 sources and ~100 seconds with burst patterns.
-	// Normal rate: ~20 entries/second across all sources.
-	// Burst: seconds 40-42 and 80-82 get 10x normal rate to trigger spike detection.
-	entries := make([]types.FilteredEntry, 0, 10_000)
+	// 10K entries across 5 sources and ~100 seconds; seconds 40-42 and 80-82 run at 10x.
+	d := NewDedupFilter(16)
+	var notes []occurrence
 	idx := 0
 	for sec := 0; sec < 100; sec++ {
 		countPerSec := 20
 		if (sec >= 40 && sec <= 42) || (sec >= 80 && sec <= 82) {
-			countPerSec = 200 // 10x burst
+			countPerSec = 200
 		}
 		for j := 0; j < countPerSec && idx < 10_000; j++ {
-			entries = append(entries, types.FilteredEntry{
-				LogEntry: types.LogEntry{
-					Timestamp: base.Add(time.Duration(sec)*time.Second + time.Duration(j)*time.Millisecond),
-					Level:     types.LevelError,
-					Source:    sources[idx%len(sources)],
-					Message:   "error occurred in request handler",
-				},
-				Signature: "error occurred in request handler",
+			ts := base.Add(time.Duration(sec)*time.Second + time.Duration(j)*time.Millisecond)
+			id := d.Add(types.LogEntry{
+				Timestamp: ts,
+				Level:     types.LevelError,
+				Source:    sources[idx%len(sources)],
+				Message:   "error occurred in request handler",
 			})
+			notes = append(notes, occurrence{record: id, second: ts.Unix()})
 			idx++
 		}
 	}
@@ -147,10 +145,6 @@ func BenchmarkSpikeDetection(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		// Reset spike flags before each iteration.
-		for j := range entries {
-			entries[j].IsSpike = false
-		}
-		DetectSpikes(entries, 10.0)
+		detectBursts(append([]occurrence(nil), notes...), d, 10, 20)
 	}
 }

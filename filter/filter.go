@@ -26,6 +26,8 @@ type FilterOptions struct {
 	NoiseFile string
 	// SpikeMultiplier is the rate increase factor to consider a spike. Default: 10.
 	SpikeMultiplier float64
+	// MinBurstEvents is the fewest events a burst must hold. Default: 20.
+	MinBurstEvents int
 }
 
 // DefaultFilterOptions returns FilterOptions with all defaults set.
@@ -35,6 +37,7 @@ func DefaultFilterOptions() FilterOptions {
 		Workers:         runtime.NumCPU(),
 		DedupShards:     16,
 		SpikeMultiplier: 10,
+		MinBurstEvents:  20,
 	}
 }
 
@@ -53,6 +56,9 @@ func withDefaults(opts FilterOptions) FilterOptions {
 	if opts.SpikeMultiplier == 0 {
 		opts.SpikeMultiplier = defaults.SpikeMultiplier
 	}
+	if opts.MinBurstEvents == 0 {
+		opts.MinBurstEvents = defaults.MinBurstEvents
+	}
 	return opts
 }
 
@@ -62,7 +68,7 @@ type DetailedStats struct {
 	DroppedByTimeWindow int64
 	DroppedByNoise      int64
 	DroppedByDedup      int64
-	SpikeCount          int64
+	BurstCount          int64
 }
 
 // FilterPipeline connects stages 1 and 3 via streaming filters.
@@ -72,7 +78,14 @@ type FilterPipeline struct {
 	opts    FilterOptions
 	filters []EntryFilter
 	// dedup is the dedup filter, tracked separately for flush at end.
-	dedup *DedupFilter
+	dedup  *DedupFilter
+	bursts []types.Burst
+}
+
+// Bursts returns the bursts found by Run. It is set before any entry is emitted,
+// so it is safe to read once the output channel is closed.
+func (p *FilterPipeline) Bursts() []types.Burst {
+	return p.bursts
 }
 
 // NewFilterPipeline creates a new FilterPipeline with defaults applied.
@@ -121,6 +134,7 @@ func (p *FilterPipeline) Run(ctx context.Context) (types.FilterStats, DetailedSt
 	for i := range allWorkerStats {
 		allWorkerStats[i].errorsBySource = make(map[string]int64)
 	}
+	allNotes := make([][]occurrence, p.opts.Workers)
 
 	g, gctx := errgroup.WithContext(ctx)
 
@@ -162,7 +176,10 @@ func (p *FilterPipeline) Run(ctx context.Context) (types.FilterStats, DetailedSt
 					if entry.Level == types.LevelError || entry.Level == types.LevelFatal {
 						ws.errorsBySource[entry.Source]++
 					}
-					dedup.Add(entry)
+					id := dedup.Add(entry)
+					if !entry.Timestamp.IsZero() {
+						allNotes[w] = append(allNotes[w], occurrence{record: id, second: entry.Timestamp.Unix()})
+					}
 				}
 			}
 		})
@@ -175,20 +192,26 @@ func (p *FilterPipeline) Run(ctx context.Context) (types.FilterStats, DetailedSt
 	totals := mergeWorkerStats(allWorkerStats)
 	detailed := totals.detailed
 
-	return p.postProcess(ctx, dedup, totals, &detailed, start)
+	var notes []occurrence
+	for _, n := range allNotes {
+		notes = append(notes, n...)
+	}
+	return p.postProcess(ctx, dedup, notes, totals, &detailed, start)
 }
 
-// postProcess runs phase 2 (spike detection), emits one entry per record in
+// postProcess runs phase 2 (burst detection), emits one entry per record in
 // sorted order, and computes final stats.
 func (p *FilterPipeline) postProcess(
 	ctx context.Context,
 	dedup *DedupFilter,
+	notes []occurrence,
 	totals mergedStats,
 	detailed *DetailedStats,
 	start time.Time,
 ) (types.FilterStats, DetailedStats, error) {
+	p.bursts = detectBursts(notes, dedup, p.opts.SpikeMultiplier, int64(p.opts.MinBurstEvents))
+	detailed.BurstCount = int64(len(p.bursts))
 	records := dedup.Entries()
-	detailed.SpikeCount = DetectSpikes(records, p.opts.SpikeMultiplier)
 
 	for i := range records {
 		select {

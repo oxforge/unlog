@@ -430,3 +430,16 @@ func TestE2EOneLinePerSource(t *testing.T) {
 	assert.Contains(t, summary, "api-1.log: payment declined")
 	assert.Contains(t, summary, "api-2.log: payment declined")
 }
+
+func TestE2EVerboseStatsLabels(t *testing.T) {
+	logPath := writeFile(t, t.TempDir(), "app.log", strings.Repeat(
+		`{"level":"error","msg":"disk full","time":"2024-01-15T10:00:00Z"}`+"\n", 30))
+
+	r := runUnlog(t, t.TempDir(), nil, "-v", logPath)
+
+	require.Equal(t, 0, r.exit, "stderr: %s", r.stderr)
+	assert.Regexp(t, `Merged duplicates:\s+29`, r.stderr)
+	assert.Contains(t, r.stderr, "Bursts:")
+	assert.NotContains(t, r.stderr, "Spike events")
+	assert.NotContains(t, r.stderr, "auto-window")
+}
