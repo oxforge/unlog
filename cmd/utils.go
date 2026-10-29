@@ -57,6 +57,9 @@ func printStats(w io.Writer, result *pipeline.Result, ar *analyze.AnalysisResult
 				if c := ss.Levels[types.LevelUnknown]; c > 0 {
 					_, _ = fmt.Fprintf(w, " unknown=%d", c)
 				}
+				if ss.Unparsed > 0 {
+					_, _ = fmt.Fprintf(w, " unparsed=%d", ss.Unparsed)
+				}
 				_, _ = fmt.Fprintln(w)
 			}
 		}

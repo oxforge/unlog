@@ -236,3 +236,34 @@ func sectionOf(summary, header string) string {
 	}
 	return body
 }
+
+func TestE2EJSONErrorKeepsTraceback(t *testing.T) {
+	logPath := writeFile(t, t.TempDir(), "worker.log",
+		`{"level":"info","msg":"starting","time":"2024-01-15T10:00:00Z"}
+{"level":"error","msg":"unhandled exception in worker","time":"2024-01-15T10:00:01Z"}
+Traceback (most recent call last):
+  File "worker.py", line 10, in run
+ValueError: bad input
+{"level":"info","msg":"recovered","time":"2024-01-15T10:00:02Z"}
+`)
+
+	report := runJSON(t, logPath)
+
+	critical := sectionOf(report.CompactedSummary, "## Critical Errors")
+	assert.Contains(t, critical, "unhandled exception in worker")
+	assert.Contains(t, critical, "ValueError: bad input")
+}
+
+func TestE2EVerboseReportsUnparsedLines(t *testing.T) {
+	logPath := writeFile(t, t.TempDir(), "app.log",
+		`starting app v2 (build 1f3a)
+{"level":"error","msg":"bind failed","time":"2024-01-15T10:00:01Z"}
+{"level":"info","msg":"retrying","time":"2024-01-15T10:00:02Z"}
+`)
+
+	r := runUnlog(t, t.TempDir(), nil, "-v", logPath)
+
+	require.Equal(t, 0, r.exit, "stderr: %s", r.stderr)
+	assert.Contains(t, r.stderr, "format=json entries=3")
+	assert.Contains(t, r.stderr, "unparsed=1")
+}

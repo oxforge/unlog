@@ -135,14 +135,14 @@ func (ing *Ingester) processSource(ctx context.Context, source string, r io.Read
 
 	var sendErr error
 	readErr := rd.ReadFuncContext(ctx, func(raw RawLine) bool {
-		entry, ok := parser.Parse(raw.Text, raw.LineNumber, raw.Source)
-		if !ok {
+		entry, unparsed, keep := parseOrFallback(parser, raw)
+		if !keep {
 			return true
 		}
 		if entry.Level == types.LevelUnknown && entry.Message != "" {
 			entry.Level = InferLevel(entry.Message)
 		}
-		ing.stats.record(source, entry.Level)
+		ing.stats.record(source, entry.Level, unparsed)
 		select {
 		case ing.output <- entry:
 			return true
@@ -155,6 +155,43 @@ func (ing *Ingester) processSource(ctx context.Context, source string, r io.Read
 		return sendErr
 	}
 	return readErr
+}
+
+// headerSkipper is implemented by parsers that consume a line without
+// producing an entry on purpose (the CSV header), so it is not a rejection.
+type headerSkipper interface {
+	consumedHeader() bool
+}
+
+// parseOrFallback parses a reassembled line with the detected format's
+// parser, so that no input is lost when the parser rejects it:
+//   - a multi-line group the parser rejects as a whole (a JSON line followed
+//     by a plain-text traceback) is parsed by its first line, and the other
+//     lines are appended to the message, as other formats keep stack traces;
+//   - anything else the parser rejects becomes a raw entry, and unparsed is
+//     true.
+//
+// keep is false only for a line the parser skipped on purpose.
+func parseOrFallback(parser Parser, raw RawLine) (entry types.LogEntry, unparsed, keep bool) {
+	if entry, ok := parser.Parse(raw.Text, raw.LineNumber, raw.Source); ok {
+		return entry, false, true
+	}
+	if hs, ok := parser.(headerSkipper); ok && hs.consumedHeader() {
+		return types.LogEntry{}, false, false
+	}
+	if first, rest, multiLine := strings.Cut(raw.Text, "\n"); multiLine {
+		if entry, ok := parser.Parse(first, raw.LineNumber, raw.Source); ok {
+			if entry.Message == "" {
+				entry.Message = rest
+			} else {
+				entry.Message += "\n" + rest
+			}
+			entry.RawLine = raw.Text
+			return entry, false, true
+		}
+	}
+	entry, _ = (&rawParser{}).Parse(raw.Text, raw.LineNumber, raw.Source)
+	return entry, true, true
 }
 
 // sampleInput reads up to SampleLines lines from r and returns them along with

@@ -15,6 +15,8 @@ type csvParser struct {
 	columns    []string
 	configured bool
 	noHeader   bool
+	// headerSkipped is true when the last Parse call consumed the header.
+	headerSkipped bool
 }
 
 func (p *csvParser) Name() string { return "csv" }
@@ -41,7 +43,12 @@ func isHeaderRow(fields []string) bool {
 	return matches >= 2
 }
 
+// consumedHeader reports whether the last Parse call read the header row,
+// which is not a rejected line.
+func (p *csvParser) consumedHeader() bool { return p.headerSkipped }
+
 func (p *csvParser) Parse(line string, lineNum int64, source string) (types.LogEntry, bool) {
+	p.headerSkipped = false
 	if p.noHeader {
 		return types.LogEntry{}, false
 	}
@@ -62,7 +69,8 @@ func (p *csvParser) Parse(line string, lineNum int64, source string) (types.LogE
 		for i, f := range fields {
 			p.columns[i] = strings.ToLower(strings.TrimSpace(f))
 		}
-		return types.LogEntry{}, false // skip header
+		p.headerSkipped = true
+		return types.LogEntry{}, false
 	}
 
 	entry := types.LogEntry{

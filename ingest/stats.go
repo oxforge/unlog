@@ -11,6 +11,9 @@ type SourceStats struct {
 	Format  string
 	Entries int64
 	Levels  map[types.Level]int64
+	// Unparsed counts entries the detected format's parser rejected, which
+	// were kept as raw text instead.
+	Unparsed int64
 }
 
 // statsCollector is a thread-safe collector of per-source stats.
@@ -32,11 +35,14 @@ func (sc *statsCollector) register(source, format string) {
 	sc.mu.Unlock()
 }
 
-func (sc *statsCollector) record(source string, level types.Level) {
+func (sc *statsCollector) record(source string, level types.Level, unparsed bool) {
 	sc.mu.Lock()
 	if s, ok := sc.sources[source]; ok {
 		s.Entries++
 		s.Levels[level]++
+		if unparsed {
+			s.Unparsed++
+		}
 	}
 	sc.mu.Unlock()
 }
