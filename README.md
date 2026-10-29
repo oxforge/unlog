@@ -20,7 +20,7 @@ unlog --ai-provider openai logs/
 
 ## Features
 
-- **12 log format parsers** -- JSON, logfmt, CSV, syslog (RFC 3164/5424), Apache CLF, Docker JSON, Docker Compose, Kubernetes, CloudWatch, generic timestamped, and raw fallback. Format auto-detected via majority vote.
+- **12 log format parsers** -- JSON, logfmt, CSV, syslog (RFC 3164/5424 and rsyslog's file formats), Apache CLF, Docker JSON, Docker Compose, Kubernetes, CloudWatch, generic timestamped, and raw fallback. Format auto-detected via majority vote.
 - **Compressed file support** -- Reads `.gz`, `.tar.gz`, and `.tgz` files transparently.
 - **Noise removal** -- Built-in noise patterns (health checks, Prometheus scrapes, k8s internals) plus custom pattern files.
 - **Fuzzy deduplication** -- Normalizes UUIDs, IPs, timestamps, and paths to group similar messages. Sharded LRU cache for concurrent access.
@@ -177,6 +177,7 @@ unlog auto-detects the format of each input file by sampling lines and using maj
 | **logfmt** | `ts=2024-01-15T10:00:00Z level=error msg="timeout"` |
 | **CSV** | `2024-01-15T10:00:00Z,ERROR,timeout,api` (with header row) |
 | **Syslog RFC 3164** | `<131>Jan 15 10:00:00 app-1 myapp[1234]: ERROR timeout` |
+| **Syslog files** | `Jan 15 10:00:00 app-1 myapp[1234]: ERROR timeout` or `2024-01-15T10:00:00.123456+00:00 app-1 myapp[1234]: ...` (what rsyslog writes to `/var/log`) |
 | **Syslog RFC 5424** | `<165>1 2024-01-15T10:00:00Z host app 1234 - - timeout` |
 | **Apache CLF** | `10.0.0.1 - - [15/Jan/2024:10:00:00 -0700] "GET /api HTTP/1.1" 500 789` |
 | **Docker JSON** | `{"log":"timeout\n","stream":"stderr","time":"2024-01-15T..."}` |

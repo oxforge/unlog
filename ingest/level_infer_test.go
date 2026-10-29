@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/oxforge/unlog/types"
 	"github.com/stretchr/testify/assert"
@@ -57,7 +58,7 @@ func TestIngesterCSVWithoutLevelColumn(t *testing.T) {
 	output := make(chan types.LogEntry, 100)
 	ingester := NewIngester(output, IngestOptions{SampleLines: 100})
 
-	err := ingester.processSource(context.Background(), "test.csv", strings.NewReader(csv))
+	err := ingester.processSource(context.Background(), "test.csv", strings.NewReader(csv), time.Now())
 	close(output)
 	assert.NoError(t, err)
 

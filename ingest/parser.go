@@ -2,6 +2,7 @@ package ingest
 
 import (
 	"strings"
+	"time"
 
 	"github.com/oxforge/unlog/types"
 )
@@ -64,8 +65,10 @@ type Parser interface {
 	Name() string
 }
 
-// parserForFormat returns the appropriate Parser for a detected format.
-func parserForFormat(format Format) Parser {
+// parserForFormat returns the appropriate Parser for a detected format. ref
+// is when the source was last written (its mtime), which dates timestamps that
+// carry no year.
+func parserForFormat(format Format, ref time.Time) Parser {
 	switch format {
 	case FormatDockerJSON:
 		return &dockerParser{}
@@ -78,9 +81,9 @@ func parserForFormat(format Format) Parser {
 	case FormatJSON:
 		return &jsonParser{}
 	case FormatSyslog5424:
-		return newSyslogParser(true)
+		return newSyslogParser(true, ref)
 	case FormatSyslog3164:
-		return newSyslogParser(false)
+		return newSyslogParser(false, ref)
 	case FormatCLF:
 		return &clfParser{}
 	case FormatLogfmt:
@@ -119,9 +122,7 @@ func lineCheckerForFormat(format Format) LineChecker {
 			return reSyslog5424.MatchString(line)
 		}
 	case FormatSyslog3164:
-		return func(line string) bool {
-			return reSyslog3164.MatchString(line)
-		}
+		return isSyslog3164Line
 	case FormatCLF:
 		return func(line string) bool {
 			return reCLF.MatchString(line)

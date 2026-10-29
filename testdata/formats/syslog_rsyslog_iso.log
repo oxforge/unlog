@@ -1,0 +1,6 @@
+2024-04-30T12:34:56.789012+00:00 web-1 systemd[1]: Started nginx.service - A high performance web server.
+2024-04-30T12:35:02.104233+00:00 web-1 nginx[812]: worker process 815 started
+2024-04-30T12:41:17.551902+00:00 web-1 kernel: [ 4021.118230] Out of memory: Killed process 815 (nginx) total-vm:812004kB
+2024-04-30T12:41:17.602311+00:00 web-1 systemd[1]: nginx.service: Main process exited, code=killed, status=9/KILL
+2024-04-30T12:41:17.602590+00:00 web-1 systemd[1]: nginx.service: Failed with result 'oom-kill'.
+2024-04-30T12:41:22.880014+00:00 web-1 CRON[1904]: (root) CMD (/usr/lib/sysstat/debian-sa1 1 1)

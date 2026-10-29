@@ -18,7 +18,7 @@ func ingestText(t *testing.T, source, text string) ([]types.LogEntry, SourceStat
 	t.Helper()
 	output := make(chan types.LogEntry, 1000)
 	ing := NewIngester(output, IngestOptions{})
-	require.NoError(t, ing.processSource(context.Background(), source, strings.NewReader(text)))
+	require.NoError(t, ing.processSource(context.Background(), source, strings.NewReader(text), time.Now()))
 	close(output)
 	var entries []types.LogEntry
 	for e := range output {

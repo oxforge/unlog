@@ -279,6 +279,31 @@ func TestAllFormats(t *testing.T) {
 			},
 		},
 		{
+			// rsyslog's default file format: no <PRI>, so levels come from
+			// the message prefix postgres writes (LOG stays unknown).
+			name:    "syslog file without priority",
+			file:    "../testdata/formats/syslog_file.log",
+			firstTS: "0000-01-15T10:29:55Z",
+			format:  "syslog-rfc3164",
+			count:   18,
+			levels: map[types.Level]int{
+				types.LevelUnknown: 5,
+				types.LevelWarn:    3,
+				types.LevelError:   8,
+				types.LevelFatal:   2,
+			},
+		},
+		{
+			name:    "syslog rsyslog high-precision",
+			file:    "../testdata/formats/syslog_rsyslog_iso.log",
+			firstTS: "2024-04-30T12:34:56.789012Z",
+			format:  "syslog-rfc3164",
+			count:   6,
+			levels: map[types.Level]int{
+				types.LevelUnknown: 6,
+			},
+		},
+		{
 			// Syslog 5424 severity = priority % 8
 			name:    "syslog rfc5424",
 			file:    "../testdata/formats/syslog_rfc5424.log",
@@ -399,7 +424,7 @@ func TestAllFormats(t *testing.T) {
 			}
 			defer func() { _ = f.Close() }()
 
-			err = ingester.processSource(context.Background(), tt.file, f)
+			err = ingester.processSource(context.Background(), tt.file, f, time.Now())
 			close(output)
 			assert.NoError(t, err)
 

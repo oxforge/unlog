@@ -9,7 +9,7 @@ import (
 )
 
 func TestSyslogParser3164(t *testing.T) {
-	p := newSyslogParser(false)
+	p := newSyslogParser(false, time.Now())
 	tests := []struct {
 		name      string
 		line      string
@@ -52,7 +52,7 @@ func TestSyslogParser3164(t *testing.T) {
 }
 
 func TestSyslogParser5424(t *testing.T) {
-	p := newSyslogParser(true)
+	p := newSyslogParser(true, time.Now())
 	tests := []struct {
 		name      string
 		line      string
@@ -91,6 +91,55 @@ func TestSyslogParser5424(t *testing.T) {
 					assert.Equal(t, "app", entry.Metadata["app"])
 				}
 			}
+		})
+	}
+}
+
+func TestSyslogParserFileFormatWithoutPriority(t *testing.T) {
+	ref := time.Date(2026, 10, 29, 12, 0, 0, 0, time.UTC)
+	p := newSyslogParser(false, ref)
+
+	entry, ok := p.Parse(`Jan 15 10:29:55 db-01 postgres[1234]: ERROR:  max_connections limit reached: 50/50`, 1, "db.log")
+
+	assert.True(t, ok)
+	assert.True(t, time.Date(2026, 1, 15, 10, 29, 55, 0, time.UTC).Equal(entry.Timestamp), "got %s", entry.Timestamp)
+	assert.Equal(t, types.LevelUnknown, entry.Level, "no PRI, so the level is left to inference")
+	assert.Equal(t, "ERROR:  max_connections limit reached: 50/50", entry.Message)
+	assert.Equal(t, map[string]string{"hostname": "db-01", "app": "postgres", "pid": "1234"}, entry.Metadata)
+}
+
+func TestSyslogParserRsyslogISOFormat(t *testing.T) {
+	p := newSyslogParser(false, time.Now())
+
+	entry, ok := p.Parse(`2024-04-30T12:35:02.104233+02:00 web-1 nginx[812]: worker process 815 started`, 1, "syslog")
+
+	assert.True(t, ok)
+	assert.True(t, time.Date(2024, 4, 30, 10, 35, 2, 104233000, time.UTC).Equal(entry.Timestamp), "got %s", entry.Timestamp)
+	assert.Equal(t, "worker process 815 started", entry.Message)
+	assert.Equal(t, map[string]string{"hostname": "web-1", "app": "nginx", "pid": "812"}, entry.Metadata)
+}
+
+func TestSyslogParserYearFromReference(t *testing.T) {
+	tests := []struct {
+		name string
+		ref  time.Time
+		line string
+		want time.Time
+	}{
+		{"same year", time.Date(2026, 10, 29, 12, 0, 0, 0, time.UTC),
+			`Jan 15 10:00:00 host app: x`, time.Date(2026, 1, 15, 10, 0, 0, 0, time.UTC)},
+		{"December read in January is last year", time.Date(2027, 1, 2, 0, 0, 0, 0, time.UTC),
+			`Dec 31 23:59:00 host app: x`, time.Date(2026, 12, 31, 23, 59, 0, 0, time.UTC)},
+		{"January read in January is this year", time.Date(2027, 1, 2, 0, 0, 0, 0, time.UTC),
+			`Jan  1 00:00:01 host app: x`, time.Date(2027, 1, 1, 0, 0, 1, 0, time.UTC)},
+		{"within a day of the reference is this year", time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC),
+			`<34>Mar  1 12:00:00 host app: x`, time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			entry, ok := newSyslogParser(false, tt.ref).Parse(tt.line, 1, "syslog")
+			assert.True(t, ok)
+			assert.True(t, tt.want.Equal(entry.Timestamp), "want %s, got %s", tt.want, entry.Timestamp)
 		})
 	}
 }

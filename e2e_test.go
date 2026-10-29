@@ -92,9 +92,10 @@ func TestE2EIncidentDBConnection(t *testing.T) {
 	assert.Contains(t, report.CompactedSummary, "app.log")
 	assert.Contains(t, report.CompactedSummary, "connection pool exhausted, shutting down")
 	assert.Contains(t, report.CompactedSummary, "circuit breaker open")
-	// db.log holds the root cause; it must reach the summary.
-	assert.Contains(t, report.CompactedSummary, "db_connection/db.log")
-	assert.Contains(t, report.CompactedSummary, "max_connections limit reached")
+	// db.log holds the root cause; it must reach the summary as errors.
+	critical := sectionOf(report.CompactedSummary, "## Critical Errors")
+	assert.Contains(t, critical, "2024-01-15T10:31:10Z [FATAL] testdata/incidents/db_connection/db.log: FATAL:  out of memory: shared buffers exhausted")
+	assert.Contains(t, report.CompactedSummary, "[ERROR] testdata/incidents/db_connection/db.log: ERROR:  max_connections limit reached")
 }
 
 func TestE2EDebugLevelReachesSummary(t *testing.T) {

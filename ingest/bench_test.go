@@ -3,6 +3,7 @@ package ingest
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 // Sample lines from testdata/formats/ — realistic production log lines.
@@ -60,7 +61,7 @@ func BenchmarkParseLogfmt(b *testing.B) {
 }
 
 func BenchmarkParseSyslog3164(b *testing.B) {
-	p := newSyslogParser(false)
+	p := newSyslogParser(false, time.Now())
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -69,7 +70,7 @@ func BenchmarkParseSyslog3164(b *testing.B) {
 }
 
 func BenchmarkParseSyslog5424(b *testing.B) {
-	p := newSyslogParser(true)
+	p := newSyslogParser(true, time.Now())
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

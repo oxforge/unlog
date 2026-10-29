@@ -8,31 +8,38 @@ import (
 	"log/slog"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // processFile routes to the appropriate handler based on file extension.
-func (ing *Ingester) processFile(ctx context.Context, path string, f io.ReadSeeker) error {
+// modTime is the file's mtime.
+func (ing *Ingester) processFile(ctx context.Context, path string, f io.ReadSeeker, modTime time.Time) error {
 	if isTarGz(path) {
 		return ing.processTarGz(ctx, path, f)
 	}
 	if isPlainGz(path) {
-		return ing.processGz(ctx, path, f)
+		return ing.processGz(ctx, path, f, modTime)
 	}
-	return ing.processSource(ctx, path, f)
+	return ing.processSource(ctx, path, f, modTime)
 }
 
 // processGz decompresses a .gz file and processes the inner stream as a single source.
 // The source name strips the .gz suffix (e.g. "app.log.gz" → "app.log.gz:app.log").
-func (ing *Ingester) processGz(ctx context.Context, path string, r io.Reader) error {
+// The gzip header's modification time, when set, dates year-less timestamps;
+// otherwise the .gz file's own mtime does.
+func (ing *Ingester) processGz(ctx context.Context, path string, r io.Reader, modTime time.Time) error {
 	gr, err := gzip.NewReader(r)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = gr.Close() }()
 
+	if !gr.ModTime.IsZero() {
+		modTime = gr.ModTime
+	}
 	inner := strings.TrimSuffix(filepath.Base(path), ".gz")
 	source := path + ":" + inner
-	return ing.processSource(ctx, source, gr)
+	return ing.processSource(ctx, source, gr, modTime)
 }
 
 // processTarGz decompresses a .tar.gz/.tgz archive and processes each log file entry.
@@ -67,7 +74,7 @@ func (ing *Ingester) processTarGz(ctx context.Context, path string, r io.Reader)
 			continue
 		}
 		source := path + ":" + hdr.Name
-		if err := ing.processSource(ctx, source, tr); err != nil {
+		if err := ing.processSource(ctx, source, tr, hdr.ModTime); err != nil {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}

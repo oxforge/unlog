@@ -8,6 +8,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 
@@ -80,7 +81,7 @@ func (ing *Ingester) Run(ctx context.Context, sources []string) error {
 	defer close(ing.output)
 
 	if len(sources) == 0 || (len(sources) == 1 && sources[0] == "-") {
-		return ing.processSource(ctx, "stdin", os.Stdin)
+		return ing.processSource(ctx, "stdin", os.Stdin, time.Now())
 	}
 
 	files, err := ExpandSources(sources)
@@ -100,7 +101,11 @@ func (ing *Ingester) Run(ctx context.Context, sources []string) error {
 			}
 			defer func() { _ = f.Close() }()
 
-			if err := ing.processFile(gCtx, path, f); err != nil {
+			modTime := time.Now()
+			if info, err := f.Stat(); err == nil {
+				modTime = info.ModTime()
+			}
+			if err := ing.processFile(gCtx, path, f, modTime); err != nil {
 				if gCtx.Err() != nil {
 					return gCtx.Err()
 				}
@@ -114,7 +119,8 @@ func (ing *Ingester) Run(ctx context.Context, sources []string) error {
 }
 
 // processSource detects the format of r, then parses and emits all entries.
-func (ing *Ingester) processSource(ctx context.Context, source string, r io.Reader) error {
+// modTime is when the source was last written; it dates year-less timestamps.
+func (ing *Ingester) processSource(ctx context.Context, source string, r io.Reader, modTime time.Time) error {
 	detectionLines, rawSample, remainder, err := ing.sampleInput(r)
 	if err != nil {
 		return err
@@ -124,7 +130,7 @@ func (ing *Ingester) processSource(ctx context.Context, source string, r io.Read
 	if format == FormatUnknown {
 		format = detectFormat(detectionLines)
 	}
-	parser := parserForFormat(format)
+	parser := parserForFormat(format, modTime)
 	checker := lineCheckerForFormat(format)
 
 	slog.Debug("ingest: detected format", "source", source, "format", format.String())

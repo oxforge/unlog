@@ -5,12 +5,20 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/oxforge/unlog/types"
 )
 
 var (
 	reKubernetes = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\s+(stdout|stderr)\s+[FP]\s+`)
 	reSyslog5424 = regexp.MustCompile(`^<\d+>\d+\s+`)
-	reSyslog3164 = regexp.MustCompile(`^<\d+>(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s`)
+	// reSyslog3164 matches BSD syslog: "<34>Jan 15 10:00:00 host" on the wire,
+	// "Jan 15 10:00:00 host" in files rsyslog writes (no priority).
+	reSyslog3164 = regexp.MustCompile(`^(?:<\d+>)?(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\S+\s`)
+	// reSyslogISO matches rsyslog's high-precision file format: an RFC 3339
+	// timestamp with microseconds and a numeric offset, then host and tag.
+	// Group 1 is the host.
+	reSyslogISO  = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+[+-]\d{2}:\d{2}\s+(\S+)\s+[^\s\[:]+(?:\[\d+\])?:\s`)
 	reCLF        = regexp.MustCompile(`^\S+\s+\S+\s+\S+\s+\[\d{2}/[A-Z]`)
 	reLogfmtPair = regexp.MustCompile(`\b\w+=(?:"[^"]*"|\S+)`)
 	// reLogfmtKey matches a key=value pair at the start of a line.
@@ -62,7 +70,7 @@ func classifyLine(line string) Format {
 		return FormatSyslog5424
 	}
 
-	if reSyslog3164.MatchString(line) {
+	if isSyslog3164Line(line) {
 		return FormatSyslog3164
 	}
 
@@ -87,6 +95,17 @@ func classifyLine(line string) Format {
 	}
 
 	return FormatRaw
+}
+
+// isSyslog3164Line reports whether line is BSD-style syslog, with a
+// month-day timestamp or rsyslog's high-precision one. A "host" that is a level
+// keyword ("2024-... ERROR db: lost") marks an application log, not syslog.
+func isSyslog3164Line(line string) bool {
+	if reSyslog3164.MatchString(line) {
+		return true
+	}
+	m := reSyslogISO.FindStringSubmatch(line)
+	return m != nil && types.ParseLevel(m[1]) == types.LevelUnknown
 }
 
 // isLogfmtLine reports whether line is logfmt: it starts with a key=value

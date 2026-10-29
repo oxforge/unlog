@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/oxforge/unlog/types"
 	"github.com/stretchr/testify/assert"
@@ -61,7 +62,7 @@ func TestIngesterStdin(t *testing.T) {
 
 	lines := "{\"level\":\"error\",\"msg\":\"test error\",\"ts\":\"2024-01-15T10:00:00Z\"}\n{\"level\":\"info\",\"msg\":\"test info\",\"ts\":\"2024-01-15T10:00:01Z\"}\n"
 
-	err := ingester.processSource(context.Background(), "-", strings.NewReader(lines))
+	err := ingester.processSource(context.Background(), "-", strings.NewReader(lines), time.Now())
 	close(output)
 	assert.NoError(t, err)
 

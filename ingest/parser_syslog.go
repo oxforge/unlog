@@ -10,7 +10,12 @@ import (
 )
 
 var (
-	reSyslog3164Full = regexp.MustCompile(`^<(\d+)>(\w{3})\s+(\d{1,2})\s+(\d{2}:\d{2}:\d{2})\s+(\S+)\s+(\S+?)(?:\[(\d+)])?:\s*(.*)$`)
+	// reSyslog3164Full matches BSD syslog with or without the priority.
+	// Groups: priority (optional), month, day, time, hostname, app, pid, message.
+	reSyslog3164Full = regexp.MustCompile(`^(?:<(\d+)>)?(\w{3})\s+(\d{1,2})\s+(\d{2}:\d{2}:\d{2})\s+(\S+)\s+([^\s\[:]+)(?:\[(\d+)])?:\s*(.*)$`)
+	// reSyslogISOFull matches rsyslog's high-precision file format.
+	// Groups: timestamp, hostname, app, pid, message.
+	reSyslogISOFull = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+[+-]\d{2}:\d{2})\s+(\S+)\s+([^\s\[:]+)(?:\[(\d+)])?:\s*(.*)$`)
 	// reSyslog5424Header matches the fixed header fields of RFC 5424.
 	// Groups: priority, version, timestamp, hostname, app, procid, msgid, rest
 	reSyslog5424Header = regexp.MustCompile(`^<(\d+)>(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(.*)$`)
@@ -21,11 +26,17 @@ var (
 type syslogParser struct {
 	rfc5424 bool
 	tsCache formatCache
-	refYear int // captured once at creation for RFC 3164 year inference
+	// ref is when the source was last written. RFC 3164 timestamps carry no
+	// year; they get ref's year, or the year before when that would put them
+	// more than a day after ref (December lines read in January).
+	ref time.Time
 }
 
-func newSyslogParser(rfc5424 bool) *syslogParser {
-	return &syslogParser{rfc5424: rfc5424, refYear: time.Now().Year()}
+func newSyslogParser(rfc5424 bool, ref time.Time) *syslogParser {
+	if ref.IsZero() {
+		ref = time.Now()
+	}
+	return &syslogParser{rfc5424: rfc5424, ref: ref.UTC()}
 }
 
 func (p *syslogParser) Name() string {
@@ -46,47 +57,72 @@ func (p *syslogParser) Parse(line string, lineNum int64, source string) (types.L
 func (p *syslogParser) parse3164(line string, lineNum int64, source string) (types.LogEntry, bool) {
 	m := reSyslog3164Full.FindStringSubmatch(line)
 	if m == nil {
-		return types.LogEntry{}, false
+		return p.parseISO(line, lineNum, source)
 	}
-
-	priority, _ := strconv.Atoi(m[1])
-	// RFC 3164 timestamps have no year. Assume the current year, adjusting
-	// if the resulting time is in the future (e.g., Dec logs parsed in Jan).
-	tsStr := m[2] + " " + m[3] + " " + m[4]
 
 	entry := types.LogEntry{
 		RawLine:    line,
 		LineNumber: lineNum,
 		Source:     source,
 		Message:    m[8],
-		Level:      syslogSeverityToLevel(priority % 8),
 		Metadata: map[string]string{
 			"hostname": m[5],
 			"app":      m[6],
 		},
 	}
-
-	if ts, ok := p.tsCache.Parse(tsStr); ok {
-		// Infer year: syslog 3164 timestamps lack a year component.
-		// Only add the reference year if the parsed time has year 0 (no year
-		// in the format string). This guards against timestamp cache formats
-		// that include a year, which would cause double-counting.
-		// The reference year is captured once at parser creation to avoid
-		// per-line time.Now() calls and ensure deterministic behavior.
-		if ts.Year() == 0 {
-			ts = ts.AddDate(p.refYear, 0, 0)
-			if ts.After(time.Date(p.refYear+1, 1, 1, 0, 0, 0, 0, time.UTC)) {
-				ts = ts.AddDate(-1, 0, 0)
-			}
-		}
-		entry.Timestamp = ts
+	// Files rsyslog writes carry no priority; their level is inferred from
+	// the message later.
+	if m[1] != "" {
+		priority, _ := strconv.Atoi(m[1])
+		entry.Level = syslogSeverityToLevel(priority % 8)
 	}
-
+	if ts, ok := p.tsCache.Parse(m[2] + " " + m[3] + " " + m[4]); ok {
+		entry.Timestamp = p.withYear(ts)
+	}
 	if m[7] != "" {
 		entry.Metadata["pid"] = m[7]
 	}
 
 	return entry, true
+}
+
+// parseISO parses rsyslog's high-precision file format.
+func (p *syslogParser) parseISO(line string, lineNum int64, source string) (types.LogEntry, bool) {
+	m := reSyslogISOFull.FindStringSubmatch(line)
+	if m == nil {
+		return types.LogEntry{}, false
+	}
+
+	entry := types.LogEntry{
+		RawLine:    line,
+		LineNumber: lineNum,
+		Source:     source,
+		Message:    m[5],
+		Metadata: map[string]string{
+			"hostname": m[2],
+			"app":      m[3],
+		},
+	}
+	if ts, ok := p.tsCache.Parse(m[1]); ok {
+		entry.Timestamp = ts
+	}
+	if m[4] != "" {
+		entry.Metadata["pid"] = m[4]
+	}
+
+	return entry, true
+}
+
+// withYear dates a year-less timestamp (year 0) from the parser's reference.
+func (p *syslogParser) withYear(ts time.Time) time.Time {
+	if ts.Year() != 0 {
+		return ts
+	}
+	ts = ts.AddDate(p.ref.Year(), 0, 0)
+	if ts.After(p.ref.Add(24 * time.Hour)) {
+		ts = ts.AddDate(-1, 0, 0)
+	}
+	return ts
 }
 
 func (p *syslogParser) parse5424(line string, lineNum int64, source string) (types.LogEntry, bool) {
