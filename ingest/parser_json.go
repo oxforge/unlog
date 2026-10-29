@@ -66,7 +66,16 @@ func applyJSONFields(entry *types.LogEntry, obj map[string]interface{}, tsCache 
 	}
 
 	for k, v := range obj {
-		if _, taken := entry.Metadata[k]; !taken {
+		if _, taken := entry.Metadata[k]; taken || v == nil {
+			continue
+		}
+		switch v.(type) {
+		case map[string]interface{}, []interface{}:
+			// Nested values stay JSON, not Go's map[...] notation.
+			if b, err := json.Marshal(v); err == nil {
+				entry.Metadata[k] = string(b)
+			}
+		default:
 			entry.Metadata[k] = fmt.Sprint(v)
 		}
 	}

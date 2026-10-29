@@ -117,6 +117,16 @@ func TestServiceComesFromTheLine(t *testing.T) {
 		{"JSON object", "agg.log", `{"level":"error","service":{"name":"pay"},"msg":"x"}` + "\n", ""},
 		{"a newline", "agg.log", `{"level":"error","service":"pay\n## Forged","msg":"x"}` + "\n", ""},
 		{"too long", "agg.log", `{"level":"error","service":"` + strings.Repeat("s", 100) + `","msg":"x"}` + "\n", strings.Repeat("s", 64)},
+		{"too long, cut between characters", "agg.log", `{"level":"error","service":"` + strings.Repeat("ü", 40) + `","msg":"x"}` + "\n", strings.Repeat("ü", 32)},
+
+		// Names are free text otherwise.
+		{"spaces", "svc.json", `{"level":"error","service":"Order API","msg":"x"}` + "\n", "Order API"},
+		{"non-ASCII", "svc.json", `{"level":"error","service":"zahlungsdienst-für-kunden","msg":"x"}` + "\n", "zahlungsdienst-für-kunden"},
+		// Only Compose's prefix carries a replica index; elsewhere digits are the name.
+		{"a container name with a version", "c.json", `{"level":"error","container":"postgres-14","msg":"x"}` + "\n", "postgres-14"},
+		{"kubectl container with digits", "kube.log", "[pod/db-0/postgres-14] 2024-01-15T10:00:00Z ERROR x\n", "postgres-14"},
+		{"cronjob pod", "k.json", `{"level":"error","pod":"backup-28456789-x7k2p","msg":"x"}` + "\n", "backup"},
+		{"another run of the cronjob", "k.json", `{"level":"error","pod":"backup-28456790-b4v9q","msg":"x"}` + "\n", "backup"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

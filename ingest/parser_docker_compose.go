@@ -1,6 +1,7 @@
 package ingest
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/oxforge/unlog/types"
@@ -22,6 +23,9 @@ type dockerComposeParser struct {
 	tsCache formatCache
 }
 
+// reComposeReplica splits a Compose prefix into its service and replica index.
+var reComposeReplica = regexp.MustCompile(`^(.+?)[-_]\d+$`)
+
 func (p *dockerComposeParser) Parse(line string, lineNum int64, source string) (types.LogEntry, bool) {
 	idx := strings.Index(line, " | ")
 	if idx < 0 {
@@ -31,12 +35,19 @@ func (p *dockerComposeParser) Parse(line string, lineNum int64, source string) (
 	container := strings.TrimSpace(line[:idx])
 	rest := line[idx+3:] // skip " | "
 
+	// The prefix is the service and its replica index (web-1, or web_1 in
+	// Compose v1); replicas share the service.
+	service := container
+	if m := reComposeReplica.FindStringSubmatch(container); m != nil {
+		service = m[1]
+	}
 	entry := types.LogEntry{
 		RawLine:    line,
 		LineNumber: lineNum,
 		Source:     source,
 		Metadata: map[string]string{
 			"container": container,
+			"service":   service,
 		},
 	}
 
