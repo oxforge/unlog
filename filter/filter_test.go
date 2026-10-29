@@ -396,9 +396,10 @@ func TestKeepAtAnyLevelPassesTheLevelFilter(t *testing.T) {
 	assert.Equal(t, int64(1), detailed.DroppedByLevel)
 }
 
-// Lines kept at any level (deployments) are merged only when identical:
-// what tells two of them apart, a version, is what matters.
-func TestKeepAtAnyLevelLinesMergeOnlyWhenIdentical(t *testing.T) {
+// Lines kept at any level (deployments) merge like other lines, except that
+// the versions they name stay apart: what tells two deploys apart is the
+// version, while a crash loop's pids and attempts still merge.
+func TestKeepAtAnyLevelLinesKeepTheirVersions(t *testing.T) {
 	at := time.Date(2024, 1, 15, 8, 0, 0, 0, time.UTC)
 	lines := []types.LogEntry{
 		{Timestamp: at, Level: types.LevelInfo, Message: "deployment started: checkout to version 3.1.0"},
@@ -407,6 +408,10 @@ func TestKeepAtAnyLevelLinesMergeOnlyWhenIdentical(t *testing.T) {
 		{Timestamp: at.Add(3*time.Hour + time.Minute), Level: types.LevelInfo, Message: "deployment started: checkout to version 4.0.0"},
 		{Timestamp: at.Add(3*time.Hour + 2*time.Minute), Level: types.LevelError, Message: "payment 1001 declined"},
 		{Timestamp: at.Add(3*time.Hour + 3*time.Minute), Level: types.LevelError, Message: "payment 1002 declined"},
+	}
+	for i := range 300 {
+		lines = append(lines, types.LogEntry{Timestamp: at.Add(time.Duration(i) * 10 * time.Second), Level: types.LevelInfo,
+			Message: fmt.Sprintf("Starting server on :8080 (pid %d, attempt %d)", 4000+i, i+1)})
 	}
 	input := make(chan types.LogEntry, len(lines))
 	output := make(chan types.FilteredEntry, len(lines))
@@ -417,7 +422,9 @@ func TestKeepAtAnyLevelLinesMergeOnlyWhenIdentical(t *testing.T) {
 	close(input)
 
 	opts := DefaultFilterOptions()
-	opts.KeepAtAnyLevel = func(e types.LogEntry) bool { return strings.HasPrefix(e.Message, "deployment started") }
+	opts.KeepAtAnyLevel = func(e types.LogEntry) bool {
+		return strings.HasPrefix(e.Message, "deployment started") || strings.HasPrefix(e.Message, "Starting server")
+	}
 	_, _, err := NewFilterPipeline(input, output, opts, nil).Run(context.Background())
 	require.NoError(t, err)
 
@@ -426,9 +433,10 @@ func TestKeepAtAnyLevelLinesMergeOnlyWhenIdentical(t *testing.T) {
 		counts[e.Message] = e.OccurrenceCount
 	}
 	assert.Equal(t, map[string]int{
-		"deployment started: checkout to version 3.1.0": 1,
-		"deployment started: checkout to version 3.1.1": 1,
-		"deployment started: checkout to version 4.0.0": 2,
-		"payment 1001 declined":                         2, // errors still merge by signature
+		"deployment started: checkout to version 3.1.0":  1,
+		"deployment started: checkout to version 3.1.1":  1,
+		"deployment started: checkout to version 4.0.0":  2,
+		"payment 1001 declined":                          2,
+		"Starting server on :8080 (pid 4000, attempt 1)": 300,
 	}, counts)
 }
