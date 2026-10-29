@@ -16,7 +16,9 @@ func (p *genericParser) Name() string { return "generic" }
 
 // Parse attempts to extract a timestamp from the beginning of the line and
 // the remainder becomes the message. Level is inferred from the first word of
-// the message when it matches a known level keyword.
+// the message when it matches a known level keyword. Trailing key=value pairs
+// ("payment failed user=42 amount=10") are lifted into Metadata; when the
+// whole remainder is logfmt, its level and msg keys fill Level and Message.
 func (p *genericParser) Parse(line string, lineNum int64, source string) (types.LogEntry, bool) {
 	entry := types.LogEntry{
 		RawLine:    line,
@@ -43,5 +45,48 @@ func (p *genericParser) Parse(line string, lineNum int64, source string) (types.
 		}
 	}
 
+	text, pairs := splitTrailingPairs(msg)
+	if len(pairs) == 0 {
+		return entry, true
+	}
+	for _, key := range []string{"level", "lvl", "severity"} {
+		if v, ok := pairs[key]; ok {
+			if entry.Level == types.LevelUnknown {
+				entry.Level = types.ParseLevel(v)
+			}
+			delete(pairs, key)
+		}
+	}
+	for _, key := range []string{"msg", "message"} {
+		if v, ok := pairs[key]; ok {
+			if text == "" {
+				entry.Message = v
+			}
+			delete(pairs, key)
+		}
+	}
+	if len(pairs) > 0 {
+		entry.Metadata = pairs
+	}
+
 	return entry, true
+}
+
+// splitTrailingPairs splits msg at its first key=value token into the free
+// text before it and the parsed pairs from there on.
+func splitTrailingPairs(msg string) (string, map[string]string) {
+	rest := msg
+	offset := 0
+	for rest != "" {
+		if reLogfmtKey.MatchString(rest) {
+			return strings.TrimSpace(msg[:offset]), parseLogfmtPairs(rest)
+		}
+		i := strings.IndexByte(rest, ' ')
+		if i < 0 {
+			break
+		}
+		offset += i + 1
+		rest = rest[i+1:]
+	}
+	return msg, nil
 }

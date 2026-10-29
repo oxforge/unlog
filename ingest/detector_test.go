@@ -153,3 +153,22 @@ func TestDetectFormatBelowThreshold(t *testing.T) {
 	format := detectFormat(lines)
 	assert.Equal(t, FormatRaw, format)
 }
+
+func TestClassifyLineKeyValuePairs(t *testing.T) {
+	tests := []struct {
+		name string
+		line string
+		want Format
+	}{
+		{"timestamped text with trailing pairs", `2024-01-15 10:00:01 ERROR payment failed user=42 amount=10 currency=USD`, FormatGeneric},
+		{"compose line carrying logfmt", `api-1  | ts=2024-01-15T10:00:00Z level=info msg="ready" port=8080`, FormatDockerCompose},
+		{"logfmt with two pairs", `level=info msg="cache warmed"`, FormatLogfmt},
+		{"logfmt starting with a quoted pair", `time="2024-01-15T10:30:00Z" level=info msg="service started" source=app`, FormatLogfmt},
+		{"untimestamped text with pairs", `payment failed user=42 amount=10 currency=USD`, FormatRaw},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, classifyLine(tt.line))
+		})
+	}
+}

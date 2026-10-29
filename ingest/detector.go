@@ -13,10 +13,12 @@ var (
 	reSyslog3164 = regexp.MustCompile(`^<\d+>(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s`)
 	reCLF        = regexp.MustCompile(`^\S+\s+\S+\s+\S+\s+\[\d{2}/[A-Z]`)
 	reLogfmtPair = regexp.MustCompile(`\b\w+=(?:"[^"]*"|\S+)`)
+	// reLogfmtKey matches a key=value pair at the start of a line.
+	reLogfmtKey     = regexp.MustCompile(`^\w[\w.-]*=`)
 	reKubePrefixed  = regexp.MustCompile(`^\[[\w/.:-]+\]\s+\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}`)
 	reDockerCompose = regexp.MustCompile(`^\w[\w.-]*-\d+\s+\|\s+`)
-	reGenericTS    = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}`)
-	reCSVData    = regexp.MustCompile(`(?i)^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}[^,]*,\s*(TRACE|DEBUG|INFO|WARN|WARNING|ERROR|FATAL|ERR)\s*,`)
+	reGenericTS     = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}`)
+	reCSVData       = regexp.MustCompile(`(?i)^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}[^,]*,\s*(TRACE|DEBUG|INFO|WARN|WARNING|ERROR|FATAL|ERR)\s*,`)
 )
 
 // classifyLine returns the most specific Format that matches line.
@@ -72,7 +74,7 @@ func classifyLine(line string) Format {
 		return FormatCSV
 	}
 
-	if matches := reLogfmtPair.FindAllString(line, -1); len(matches) >= 3 {
+	if isLogfmtLine(line) {
 		return FormatLogfmt
 	}
 
@@ -85,6 +87,14 @@ func classifyLine(line string) Format {
 	}
 
 	return FormatRaw
+}
+
+// isLogfmtLine reports whether line is logfmt: it starts with a key=value
+// pair and has at least two. Pairs after free text ("2024-01-15 10:00:01 ERROR
+// payment failed user=42") do not count; that line is generic text whose
+// trailing pairs the generic parser lifts into metadata.
+func isLogfmtLine(line string) bool {
+	return reLogfmtKey.MatchString(line) && len(reLogfmtPair.FindAllString(line, 2)) == 2
 }
 
 // isCSVHeaderLine parses line as a quoted CSV row and checks whether it looks

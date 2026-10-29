@@ -51,3 +51,29 @@ func TestGenericParser(t *testing.T) {
 		})
 	}
 }
+
+func TestGenericParserTrailingPairs(t *testing.T) {
+	p := &genericParser{}
+	entry, ok := p.Parse(`2024-01-15 10:00:01 ERROR payment failed user=42 amount=10 currency=USD`, 1, "app.log")
+	assert.True(t, ok)
+	assert.Equal(t, types.LevelError, entry.Level)
+	assert.Equal(t, "ERROR payment failed user=42 amount=10 currency=USD", entry.Message)
+	assert.Equal(t, map[string]string{"user": "42", "amount": "10", "currency": "USD"}, entry.Metadata)
+}
+
+func TestGenericParserLogfmtAfterTimestamp(t *testing.T) {
+	p := &genericParser{}
+	entry, ok := p.Parse(`2024-01-15T10:00:01Z level=error msg="disk full" path=/data`, 1, "app.log")
+	assert.True(t, ok)
+	assert.Equal(t, types.LevelError, entry.Level)
+	assert.Equal(t, "disk full", entry.Message)
+	assert.Equal(t, map[string]string{"path": "/data"}, entry.Metadata)
+}
+
+func TestGenericParserEqualsInsideFreeText(t *testing.T) {
+	p := &genericParser{}
+	entry, ok := p.Parse(`2024-01-15 10:00:01 WARN expected a == b in check`, 1, "app.log")
+	assert.True(t, ok)
+	assert.Equal(t, "WARN expected a == b in check", entry.Message)
+	assert.Empty(t, entry.Metadata)
+}

@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -207,4 +208,31 @@ func TestE2EInvalidFlagValues(t *testing.T) {
 			assert.Contains(t, r.stderr, tt.wantStderr)
 		})
 	}
+}
+
+func TestE2ETimestampedTextWithPairs(t *testing.T) {
+	logPath := writeFile(t, t.TempDir(), "app.log",
+		`2024-01-15 10:00:00 INFO request served path=/a status=200 dur=5ms
+2024-01-15 10:00:01 ERROR payment failed user=42 amount=10 currency=USD
+2024-01-15 10:00:02 INFO request served path=/b status=200 dur=7ms
+`)
+
+	report := runJSON(t, logPath)
+
+	critical := sectionOf(report.CompactedSummary, "## Critical Errors")
+	assert.Contains(t, critical, "payment failed")
+	assert.Contains(t, critical, "2024-01-15T10:00:01Z")
+}
+
+// sectionOf returns the body of the summary section that starts at header.
+func sectionOf(summary, header string) string {
+	start := strings.Index(summary, header)
+	if start < 0 {
+		return ""
+	}
+	body := summary[start+len(header):]
+	if end := strings.Index(body, "\n## "); end >= 0 {
+		body = body[:end]
+	}
+	return body
 }

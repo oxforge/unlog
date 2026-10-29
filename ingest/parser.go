@@ -127,9 +127,7 @@ func lineCheckerForFormat(format Format) LineChecker {
 			return reCLF.MatchString(line)
 		}
 	case FormatLogfmt:
-		return func(line string) bool {
-			return len(reLogfmtPair.FindAllString(line, 3)) >= 3
-		}
+		return isLogfmtLine
 	case FormatCSV:
 		return func(line string) bool {
 			return len(line) > 0
