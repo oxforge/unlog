@@ -272,6 +272,7 @@ just build           # bin/unlog
 just install         # go install . into $GOBIN
 just test            # all tests, with the race detector
 just lint            # golangci-lint
+just golden          # rewrite testdata/golden/ after an intended output change
 just smoke           # build, then run against testdata/incidents/
 just bench           # all benchmarks
 just bench-compare   # benchmarks x6 into bench-new.txt, for benchstat

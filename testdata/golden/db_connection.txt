@@ -1,0 +1,33 @@
+## Incident Overview
+Window: 2024-01-15T10:29:55Z — 2024-01-15T10:32:25Z (2m30s)
+Sources: 2 (testdata/incidents/db_connection/app.log, testdata/incidents/db_connection/db.log)
+Events: 3 fatal, 20 error (9 distinct), 7 warn (4 distinct)
+Error chains detected: circuit-breaker-1
+
+## Critical Errors
+2024-01-15T10:31:00Z–10:31:02Z [ERROR] testdata/incidents/db_connection/db.log: ERROR:  max_connections limit reached: 50/50 {×3}
+2024-01-15T10:31:03Z–10:31:08Z [ERROR] testdata/incidents/db_connection/db.log: ERROR:  connection rejected: max_connections limit reached {×3}
+2024-01-15T10:31:10Z [FATAL] testdata/incidents/db_connection/db.log: FATAL:  out of memory: shared buffers exhausted {err=out}
+2024-01-15T10:31:12Z [ERROR] testdata/incidents/db_connection/db.log: ERROR:  autovacuum worker terminated due to low memory
+2024-01-15T10:31:15Z–10:31:17Z [ERROR] testdata/incidents/db_connection/app.log: request failed: could not acquire database connection {×3 http=500}
+2024-01-15T10:31:15Z [ERROR] testdata/incidents/db_connection/db.log: ERROR:  WAL writer process failed: out of memory
+2024-01-15T10:31:20Z [FATAL] testdata/incidents/db_connection/db.log: FATAL:  the database system is in recovery mode {err=the}
+2024-01-15T10:31:25Z–10:31:35Z [ERROR] testdata/incidents/db_connection/app.log: all requests rejected: circuit breaker open {×3}
+2024-01-15T10:32:20Z [ERROR] testdata/incidents/db_connection/app.log: max reconnect attempts exceeded, giving up
+2024-01-15T10:32:25Z [FATAL] testdata/incidents/db_connection/app.log: connection pool exhausted, shutting down
+
+## Error Chains
+2024-01-15T10:31:10Z–10:31:13Z [ERROR] testdata/incidents/db_connection/app.log: database connection timeout: context deadline exceeded {chain=circuit-breaker-1 ×4}
+
+## Rate Anomalies
+(none)
+
+## Context
+2024-01-15T10:29:55Z–10:32:00Z [UNKNOWN] testdata/incidents/db_connection/db.log: LOG:  database system is ready to accept connections {×2}
+2024-01-15T10:30:00Z [UNKNOWN] testdata/incidents/db_connection/db.log: LOG:  checkpoint starting: time
+2024-01-15T10:30:30Z–10:30:45Z [WARN] testdata/incidents/db_connection/db.log: WARNING:  connection pool nearing capacity: 40/50 connections {×2}
+2024-01-15T10:31:00Z–10:31:05Z [WARN] testdata/incidents/db_connection/app.log: database connection slow {×2}
+2024-01-15T10:31:25Z [UNKNOWN] testdata/incidents/db_connection/db.log: LOG:  recovery in progress
+2024-01-15T10:32:00Z–10:32:10Z [WARN] testdata/incidents/db_connection/app.log: attempting database reconnection {×2}
+2024-01-15T10:32:05Z [WARN] testdata/incidents/db_connection/db.log: WARNING:  connection pool recovered: 5/50 connections in use
+2024-01-15T10:32:10Z [UNKNOWN] testdata/incidents/db_connection/db.log: LOG:  checkpoint complete: wrote 256 buffers
