@@ -237,13 +237,21 @@ func buildOverview(all []scoredEntry, burstCount int) string {
 				latest = end
 			}
 		}
-		switch e.Level {
-		case types.LevelFatal:
-			fatal.add(e)
-		case types.LevelError:
-			errs.add(e)
-		case types.LevelWarn:
-			warn.add(e)
+		// Each occurrence counts at its own level; an entry without the
+		// per-level breakdown counts at its level.
+		byLevel := e.OccurrencesByLevel
+		if len(byLevel) == 0 {
+			byLevel = map[types.Level]int{e.Level: max(e.OccurrenceCount, 1)}
+		}
+		for lvl, n := range byLevel {
+			switch lvl {
+			case types.LevelFatal:
+				fatal.add(n)
+			case types.LevelError:
+				errs.add(n)
+			case types.LevelWarn:
+				warn.add(n)
+			}
 		}
 		if e.Source != "" {
 			sources[e.Source] = struct{}{}
@@ -286,8 +294,9 @@ type levelTally struct {
 	distinct    int
 }
 
-func (lt *levelTally) add(e types.EnrichedEntry) {
-	lt.occurrences += max(e.OccurrenceCount, 1)
+// add records one distinct error with n occurrences at this level.
+func (lt *levelTally) add(n int) {
+	lt.occurrences += n
 	lt.distinct++
 }
 

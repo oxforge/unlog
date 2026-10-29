@@ -115,3 +115,16 @@ func TestDedupSpikeMarkAppearsInEntries(t *testing.T) {
 	require.Len(t, got, 1)
 	assert.True(t, got[0].IsSpike)
 }
+
+func TestDedupCountsOccurrencesPerLevel(t *testing.T) {
+	d := NewDedupFilter(4)
+	at := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+	d.Add(types.LogEntry{Timestamp: at, Level: types.LevelWarn, Source: "app.log", Message: "disk 91% full"})
+	d.Add(types.LogEntry{Timestamp: at.Add(5 * time.Minute), Level: types.LevelError, Source: "app.log", Message: "disk 97% full"})
+	d.Add(types.LogEntry{Timestamp: at.Add(6 * time.Minute), Level: types.LevelError, Source: "app.log", Message: "disk 98% full"})
+
+	entries := d.Entries()
+
+	require.Len(t, entries, 1)
+	assert.Equal(t, map[types.Level]int{types.LevelWarn: 1, types.LevelError: 2}, entries[0].OccurrencesByLevel)
+}
