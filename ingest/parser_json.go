@@ -16,8 +16,6 @@ type jsonParser struct {
 	tsCache formatCache
 }
 
-func (p *jsonParser) Name() string { return "json" }
-
 // Parse decodes a JSON object and extracts well-known fields into a LogEntry.
 // Unknown fields are preserved in Metadata.
 func (p *jsonParser) Parse(line string, lineNum int64, source string) (types.LogEntry, bool) {

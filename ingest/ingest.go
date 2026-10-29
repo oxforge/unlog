@@ -35,8 +35,6 @@ var compressedExtensions = map[string]bool{
 
 // IngestOptions controls Ingester behaviour.
 type IngestOptions struct {
-	// BufferSize is the output channel buffer size. Default: 100_000.
-	BufferSize int
 	// SampleLines is how many lines to read for format detection. Default: 100.
 	SampleLines int
 	// Location is the zone of timestamps that carry none. Default: UTC.
@@ -44,9 +42,6 @@ type IngestOptions struct {
 }
 
 func (o IngestOptions) withDefaults() IngestOptions {
-	if o.BufferSize <= 0 {
-		o.BufferSize = 100_000
-	}
 	if o.SampleLines <= 0 {
 		o.SampleLines = 100
 	}

@@ -152,7 +152,6 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 		Analysis:   ar,
 		Version:    Version,
 		NoColor:    effectiveNoColor,
-		Verbose:    verbose,
 		AIStreamed: aiStreamed,
 	}
 

@@ -82,9 +82,7 @@ type FilterPipeline struct {
 	output  chan<- types.FilteredEntry
 	opts    FilterOptions
 	filters []EntryFilter
-	// dedup is the dedup filter, tracked separately for flush at end.
-	dedup  *DedupFilter
-	bursts []types.Burst
+	bursts  []types.Burst
 }
 
 // Bursts returns the bursts found by Run. It is set before any entry is emitted,
@@ -134,7 +132,6 @@ func (p *FilterPipeline) Run(ctx context.Context) (types.FilterStats, DetailedSt
 	chain = append(chain, p.filters...)
 
 	dedup := NewDedupFilter(p.opts.DedupShards)
-	p.dedup = dedup
 
 	// Phase 1: Fan-out workers.
 	allWorkerStats := make([]workerStats, p.opts.Workers)

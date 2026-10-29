@@ -22,8 +22,6 @@ type dockerComposeParser struct {
 	tsCache formatCache
 }
 
-func (p *dockerComposeParser) Name() string { return "docker-compose" }
-
 func (p *dockerComposeParser) Parse(line string, lineNum int64, source string) (types.LogEntry, bool) {
 	idx := strings.Index(line, " | ")
 	if idx < 0 {
