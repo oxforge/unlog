@@ -69,6 +69,7 @@ type geminiChunk struct {
 				Text string `json:"text"`
 			} `json:"parts"`
 		} `json:"content"`
+		FinishReason string `json:"finishReason"`
 	} `json:"candidates"`
 }
 
@@ -120,7 +121,10 @@ func (p *GeminiProvider) Analyze(ctx context.Context, system, prompt string) (<-
 			return
 		}
 
-		events := parseSSE(ctx, resp.Body)
+		// The last chunk carries a finish reason; without one the stream
+		// was cut short.
+		events, stopped := parseSSE(ctx, resp.Body)
+		finished := false
 		for ev := range events {
 			var chunk geminiChunk
 			if err := json.Unmarshal([]byte(ev.Data), &chunk); err != nil {
@@ -138,6 +142,12 @@ func (p *GeminiProvider) Analyze(ctx context.Context, system, prompt string) (<-
 					return
 				}
 			}
+			if len(chunk.Candidates) > 0 && chunk.Candidates[0].FinishReason != "" {
+				finished = true
+			}
+		}
+		if err := stopped(); err != nil || !finished {
+			errCh <- fmt.Errorf("analyze: gemini: %w", streamEnd(stopped))
 		}
 	}()
 

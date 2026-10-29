@@ -31,8 +31,13 @@ func (r *TerminalRenderer) Render(w io.Writer, opts Options) error {
 	c := colorizer{enabled: !opts.NoColor}
 
 	r.renderSummary(ew, opts, c)
-	if opts.Analysis != nil && !opts.AIStreamed {
+	switch {
+	case opts.Analysis == nil:
+	case !opts.AIStreamed:
 		r.renderAI(ew, opts, c)
+	case opts.Analysis.Error != "":
+		// The analysis was streamed above; say that it was cut short.
+		_, _ = fmt.Fprintf(ew, "\nAI analysis failed: %s\n", opts.Analysis.Error)
 	}
 
 	return ew.err

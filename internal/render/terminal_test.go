@@ -160,3 +160,18 @@ func TestTerminalRenderNamesAFailedAnalysis(t *testing.T) {
 		})
 	}
 }
+
+// With the analysis streamed to stdout ahead of the summary, a failure is
+// still named at the end, so a redirected report says the analysis is cut.
+func TestTerminalRenderNamesAFailedStreamedAnalysis(t *testing.T) {
+	var buf bytes.Buffer
+	err := (&render.TerminalRenderer{}).Render(&buf, render.Options{
+		Result:     sampleResult(),
+		Analysis:   &analyze.AnalysisResult{Analysis: "partial", Error: "analyze: anthropic: stream ended early", ModelUsed: "m"},
+		NoColor:    true,
+		AIStreamed: true,
+	})
+	require.NoError(t, err)
+	assert.Contains(t, buf.String(), "AI analysis failed: analyze: anthropic: stream ended early")
+	assert.NotContains(t, buf.String(), "--- Analysis ---", "the streamed text isn't repeated")
+}

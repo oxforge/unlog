@@ -3,6 +3,7 @@ package analyze
 import (
 	"bufio"
 	"context"
+	"errors"
 	"io"
 	"strings"
 )
@@ -14,8 +15,11 @@ type sseEvent struct {
 }
 
 // parseSSE reads SSE events from r and sends them on the returned channel.
-func parseSSE(ctx context.Context, r io.Reader) <-chan sseEvent {
+// Once the channel is closed, the returned func says why reading stopped:
+// nil at the end of the stream, else the read error or ctx's error.
+func parseSSE(ctx context.Context, r io.Reader) (<-chan sseEvent, func() error) {
 	ch := make(chan sseEvent, 8)
+	var stopErr error
 	go func() {
 		defer close(ch)
 
@@ -26,6 +30,7 @@ func parseSSE(ctx context.Context, r io.Reader) <-chan sseEvent {
 		for scanner.Scan() {
 			select {
 			case <-ctx.Done():
+				stopErr = ctx.Err()
 				return
 			default:
 			}
@@ -38,6 +43,7 @@ func parseSSE(ctx context.Context, r io.Reader) <-chan sseEvent {
 					select {
 					case ch <- event:
 					case <-ctx.Done():
+						stopErr = ctx.Err()
 						return
 					}
 				}
@@ -61,13 +67,30 @@ func parseSSE(ctx context.Context, r io.Reader) <-chan sseEvent {
 			}
 		}
 
-		if len(dataLines) > 0 {
+		if stopErr = scanner.Err(); stopErr == nil {
+			stopErr = ctx.Err()
+		}
+		if len(dataLines) > 0 && stopErr == nil {
 			event.Data = strings.Join(dataLines, "\n")
 			select {
 			case ch <- event:
 			case <-ctx.Done():
+				stopErr = ctx.Err()
 			}
 		}
 	}()
-	return ch
+	return ch, func() error { return stopErr }
+}
+
+// errStreamEndedEarly is the error of a stream that ended before the
+// provider's end-of-stream event: a dropped connection or a proxy timeout.
+var errStreamEndedEarly = errors.New("stream ended early")
+
+// streamEnd is the error for a stream whose events ran out before its end
+// event: why reading stopped, or errStreamEndedEarly.
+func streamEnd(stopped func() error) error {
+	if err := stopped(); err != nil {
+		return err
+	}
+	return errStreamEndedEarly
 }

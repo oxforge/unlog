@@ -134,7 +134,7 @@ unlog --ai-provider openai --format markdown --output report.md logs/
 | `0` | The report was written |
 | `1` | An error (bad flag, missing or unreadable input, unwritable `--output`); no report |
 | `3` | The report was written, but the AI analysis failed; the error is in `analysis_error` and on stderr |
-| `130` | Interrupted |
+| `130` | Interrupted (when that happens during the AI call, the report is still written, with `analysis_error` set) |
 
 ## Configuration
 

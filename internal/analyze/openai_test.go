@@ -30,17 +30,7 @@ func TestOpenAIStreaming(t *testing.T) {
 
 		tokens := []string{"Hello", " world", "!"}
 		for _, tok := range tokens {
-			chunk := openaiChunk{
-				Choices: []struct {
-					Delta struct {
-						Content string `json:"content"`
-					} `json:"delta"`
-				}{
-					{Delta: struct {
-						Content string `json:"content"`
-					}{Content: tok}},
-				},
-			}
+			chunk := map[string]any{"choices": []map[string]any{{"delta": map[string]string{"content": tok}}}}
 			data, _ := json.Marshal(chunk)
 			_, _ = fmt.Fprintf(w, "data: %s\n\n", data)
 			flusher.Flush()
@@ -98,17 +88,7 @@ func TestOpenAIContextCancel(t *testing.T) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		flusher := w.(http.Flusher)
 
-		chunk := openaiChunk{
-			Choices: []struct {
-				Delta struct {
-					Content string `json:"content"`
-				} `json:"delta"`
-			}{
-				{Delta: struct {
-					Content string `json:"content"`
-				}{Content: "first"}},
-			},
-		}
+		chunk := map[string]any{"choices": []map[string]any{{"delta": map[string]string{"content": "first"}}}}
 		data, _ := json.Marshal(chunk)
 		_, _ = fmt.Fprintf(w, "data: %s\n\n", data)
 		flusher.Flush()

@@ -52,7 +52,7 @@ var rootCmd = &cobra.Command{
 
 		loaded, err := config.Load(path)
 		if err != nil {
-			return fmt.Errorf("cmd: load config: %w", err)
+			return fmt.Errorf("cmd: %w", err)
 		}
 		cfg = loaded
 

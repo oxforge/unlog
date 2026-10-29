@@ -26,17 +26,7 @@ func mockOpenAIServer(response string) *httptest.Server {
 			if i > 0 {
 				word = " " + word
 			}
-			chunk := openaiChunk{
-				Choices: []struct {
-					Delta struct {
-						Content string `json:"content"`
-					} `json:"delta"`
-				}{
-					{Delta: struct {
-						Content string `json:"content"`
-					}{Content: word}},
-				},
-			}
+			chunk := map[string]any{"choices": []map[string]any{{"delta": map[string]string{"content": word}}}}
 			data, _ := json.Marshal(chunk)
 			_, _ = fmt.Fprintf(w, "data: %s\n\n", data)
 			flusher.Flush()
@@ -146,6 +136,8 @@ func TestIntegrationGemini(t *testing.T) {
 			_, _ = fmt.Fprintf(w, "data: %s\n\n", data)
 			flusher.Flush()
 		}
+		_, _ = fmt.Fprint(w, "data: {\"candidates\":[{\"finishReason\":\"STOP\"}]}\n\n")
+		flusher.Flush()
 	}))
 	defer srv.Close()
 

@@ -47,6 +47,8 @@ func TestGeminiStreaming(t *testing.T) {
 			_, _ = fmt.Fprintf(w, "data: %s\n\n", data)
 			flusher.Flush()
 		}
+		_, _ = fmt.Fprint(w, "data: {\"candidates\":[{\"finishReason\":\"STOP\"}]}\n\n")
+		flusher.Flush()
 	}))
 	defer srv.Close()
 

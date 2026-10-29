@@ -105,7 +105,7 @@ func (p *AnthropicProvider) Analyze(ctx context.Context, system, prompt string) 
 			return
 		}
 
-		events := parseSSE(ctx, resp.Body)
+		events, stopped := parseSSE(ctx, resp.Body)
 		for ev := range events {
 			switch ev.Event {
 			case "content_block_delta":
@@ -129,6 +129,7 @@ func (p *AnthropicProvider) Analyze(ctx context.Context, system, prompt string) 
 				return
 			}
 		}
+		errCh <- fmt.Errorf("analyze: anthropic: %w", streamEnd(stopped))
 	}()
 
 	return tokenCh, errCh
