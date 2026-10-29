@@ -5,8 +5,8 @@ Generate large log files for manual performance and correctness testing of `unlo
 ## Usage
 
 ```bash
-# Generate 100MB JSON log file (default)
-make bigdata
+# Generate 100MB JSON logs: test.log and test.tar.gz
+just bigdata
 
 # Generate custom size/format
 go run testdata/big/generate.go --size 1GB --format json --error-rate 0.1 --output testdata/big/large.log
@@ -18,7 +18,7 @@ go run testdata/big/generate.go --size 500MB --format logfmt --output testdata/b
 go run testdata/big/generate.go --size 500MB --format csv --output testdata/big/csv.log
 
 # Generate to stdout and pipe to unlog
-go run testdata/big/generate.go --size 50MB --format json | ./bin/unlog analyze -
+go run testdata/big/generate.go --size 50MB --format json | ./bin/unlog -
 ```
 
 ## Flags
@@ -34,19 +34,19 @@ go run testdata/big/generate.go --size 50MB --format json | ./bin/unlog analyze 
 
 ```bash
 # Build unlog first
-make build
+just build
 
 # Basic analysis
-./bin/unlog analyze testdata/big/test.log
+./bin/unlog testdata/big/test.log
 
 # With verbose stats
-./bin/unlog analyze testdata/big/test.log --verbose
+./bin/unlog testdata/big/test.log --verbose
 
 # Error-only filtering
-./bin/unlog analyze testdata/big/test.log --level error
+./bin/unlog testdata/big/test.log --level error
 
 # Time performance
-time ./bin/unlog analyze testdata/big/test.log --level error > /dev/null
+time ./bin/unlog testdata/big/test.log --level error > /dev/null
 ```
 
 ## Generated Data Characteristics

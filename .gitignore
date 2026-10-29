@@ -23,6 +23,9 @@ coverage.*
 *.coverprofile
 profile.cov
 
+# benchstat input written by `just bench-compare`
+bench-*.txt
+
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
