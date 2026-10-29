@@ -3,6 +3,7 @@ package enrich
 import (
 	"testing"
 
+	"github.com/oxforge/unlog/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -73,4 +74,26 @@ func TestDeployDetector_MetadataPriority(t *testing.T) {
 	entry := makeEnrichedEntry("no deploy keywords here", map[string]string{"event": "deploy"})
 	dd.Detect(&entry)
 	assert.True(t, entry.IsDeployment)
+}
+
+func TestLooksLikeDeployment(t *testing.T) {
+	tests := []struct {
+		message string
+		meta    map[string]string
+		want    bool
+	}{
+		{"deployment started: app-deployment to version 3.3.0", nil, true},
+		{"Deployment initiated for checkout-api", nil, true},
+		{"rolling out version 3.3.0 to 3 pods", nil, true},
+		{"rollout of api-server complete", nil, true},
+		{"rolling update initiated: 3 pods, max-surge=1", nil, true},
+		{"build finished", map[string]string{"event": "deploy"}, true},
+		{"deployment failure threshold exceeded: initiating rollback", nil, false},
+		{"payment declined", nil, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.message, func(t *testing.T) {
+			assert.Equal(t, tt.want, LooksLikeDeployment(types.LogEntry{Message: tt.message, Metadata: tt.meta}))
+		})
+	}
 }

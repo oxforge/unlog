@@ -4,6 +4,9 @@ Sources: 2 (testdata/incidents/db_connection/app.log, testdata/incidents/db_conn
 Events: 3 fatal, 20 error (9 distinct), 7 warn (4 distinct)
 Error chains detected: circuit-breaker
 
+## Deployments
+(none)
+
 ## Critical Errors
 2024-01-15T10:31:00Z–10:31:02Z [ERROR] testdata/incidents/db_connection/db.log: ERROR:  max_connections limit reached: 50/50 {×3}
 2024-01-15T10:31:03Z–10:31:08Z [ERROR] testdata/incidents/db_connection/db.log: ERROR:  connection rejected: max_connections limit reached {×3}

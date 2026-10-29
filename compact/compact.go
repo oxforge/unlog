@@ -3,15 +3,17 @@
 // importance, and produces a structured text summary that fits within an LLM
 // context window.
 //
-// The output is organized into five sections, each with a base share of the
+// The output is organized into six sections, each with a base share of the
 // token budget; what a section does not need goes to the sections that would
-// otherwise be cut, in this order:
+// otherwise be cut, in the order of this list (they print overview first,
+// then deployments, then the rest):
 //
 //	Incident Overview  5% (fixed)
 //	Critical Errors   45%
 //	Error Chains      20%
+//	Deployments        5%
 //	Rate Anomalies    10%
-//	Context           20%
+//	Context           15%
 //
 // A section keeps its highest-scored entries and lists them in time order.
 //

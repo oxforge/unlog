@@ -120,6 +120,11 @@ func TestE2EIncidentDeployFailure(t *testing.T) {
 	assert.Contains(t, report.CompactedSummary, "deploy_failure/app.log")
 	assert.Contains(t, report.CompactedSummary, "deploy_failure/deploy.log")
 	assert.Contains(t, report.CompactedSummary, "deployment failure threshold exceeded: initiating rollback")
+	// The deploy lines are INFO, yet they reach the summary ahead of the
+	// errors, and the deployment-failure chain forms across both files.
+	assert.Contains(t, sectionOf(report.CompactedSummary, "## Deployments"), "deployment started: app-deployment to version 3.3.0")
+	assert.Contains(t, report.CompactedSummary, "Last deployment: 2024-01-15T14:02:00Z, 15s before the first error")
+	assert.Contains(t, sectionOf(report.CompactedSummary, "## Error Chains"), "deployment-failure: 3 of 3 steps")
 }
 
 // levelFixture has one entry per level, all within one minute.

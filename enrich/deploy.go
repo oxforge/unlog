@@ -19,6 +19,8 @@ var deployPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)(restarted|restart\s+complete)`),
 	regexp.MustCompile(`(?i)pulling\s+image`),
 	regexp.MustCompile(`(?i)(scaling|scaled)\s+(up|down|to)`),
+	regexp.MustCompile(`(?i)deploy(ment)?\s+(started|starting|initiated|in\s+progress)`),
+	regexp.MustCompile(`(?i)\b(rollout|rolling\s+out)\b`),
 }
 
 // deployMetadataKeys are metadata keys that may indicate deployment events.
@@ -35,27 +37,31 @@ func NewDeployDetector() *DeployDetector {
 	return &DeployDetector{}
 }
 
-// Detect sets IsDeployment=true if the entry matches a deployment pattern.
-// Metadata keys are checked first; if a match is found the regex patterns are skipped.
+// Detect sets IsDeployment when the entry looks like a deployment.
 func (d *DeployDetector) Detect(entry *types.EnrichedEntry) {
-	if entry.Metadata != nil {
-		for _, key := range deployMetadataKeys {
-			if v, ok := entry.Metadata[key]; ok {
-				vLower := strings.ToLower(v)
-				for _, dv := range deployMetadataValues {
-					if strings.Contains(vLower, dv) {
-						entry.IsDeployment = true
-						return
-					}
+	if LooksLikeDeployment(entry.LogEntry) {
+		entry.IsDeployment = true
+	}
+}
+
+// LooksLikeDeployment reports whether entry is a deployment, restart or
+// scaling event: an event/action/type field says so, or the message matches a
+// deployment pattern.
+func LooksLikeDeployment(entry types.LogEntry) bool {
+	for _, key := range deployMetadataKeys {
+		if v, ok := entry.Metadata[key]; ok {
+			vLower := strings.ToLower(v)
+			for _, dv := range deployMetadataValues {
+				if strings.Contains(vLower, dv) {
+					return true
 				}
 			}
 		}
 	}
-
 	for _, re := range deployPatterns {
 		if re.MatchString(entry.Message) {
-			entry.IsDeployment = true
-			return
+			return true
 		}
 	}
+	return false
 }

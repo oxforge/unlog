@@ -25,7 +25,8 @@ unlog --ai-provider openai logs/
 - **Noise removal** -- Built-in noise patterns (health checks, Prometheus scrapes, k8s internals) plus custom pattern files.
 - **One line per error** -- Normalizes UUIDs, IPs, timestamps, and paths to group similar messages; each distinct error per source becomes one line with when it started and stopped and how many times it occurred. The same input always gives the same summary.
 - **Burst detection** -- Finds stretches where a source logged far above its normal rate, counted on real event volume, and lists the errors behind each burst.
-- **Error chain detection** -- 10 built-in patterns (DB exhaustion, OOM cascade, circuit breaker, disk full, cert expiry, DNS failure, etc.).
+- **Error chain detection** -- 10 built-in patterns (DB exhaustion, OOM cascade, circuit breaker, deployment failure, disk full, cert expiry, DNS failure, etc.); a chain is reported when at least two of its steps occur, with its errors in order.
+- **Deployment markers** -- Deploy, restart and scaling lines are kept at any `--level` and listed before the errors, with how long before the first error the last deploy happened.
 - **Token-budgeted compaction** -- Priority-scored entries fit within LLM context windows.
 - **LLM analysis** -- Timeline, root cause, and recommendations in a single pass via OpenAI, Anthropic, Google Gemini, or Ollama.
 - **Streaming output** -- LLM responses stream to the terminal token-by-token.
