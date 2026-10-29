@@ -172,3 +172,21 @@ func TestClassifyLineKeyValuePairs(t *testing.T) {
 		})
 	}
 }
+
+func TestClassifyLineSyslogFiles(t *testing.T) {
+	tests := []struct {
+		name string
+		line string
+		want Format
+	}{
+		{"file format without priority", `Jan 15 10:29:55 db-01 postgres[1234]: LOG:  database system is ready`, FormatSyslog3164},
+		{"single-digit day", `Feb  3 07:01:12 web-1 kernel: [  12.004] eth0: link up`, FormatSyslog3164},
+		{"rsyslog high-precision format", `2024-04-30T12:34:56.789012+00:00 web-1 nginx[99]: worker started`, FormatSyslog3164},
+		{"generic line whose second word is a level", `2024-01-15T10:00:00.123+00:00 ERROR db: connection lost`, FormatGeneric},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, classifyLine(tt.line))
+		})
+	}
+}
