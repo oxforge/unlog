@@ -38,13 +38,18 @@ type EnrichedEntry struct {
 	ChainID string `json:"chain_id,omitempty"`
 	// ChainStep is the stage (1-based) of the chain this entry matched, and
 	// ChainSteps the chain pattern's number of stages; both 0 outside a chain.
-	ChainStep      int      `json:"chain_step,omitempty"`
-	ChainSteps     int      `json:"chain_steps,omitempty"`
-	IsDeployment   bool     `json:"is_deployment"`
-	CorrelatedWith []string `json:"correlated_with,omitempty"`
-	ErrorType      string   `json:"error_type,omitempty"`
-	HTTPStatus     int      `json:"http_status,omitempty"`
-	TraceID        string   `json:"trace_id,omitempty"`
+	ChainStep    int  `json:"chain_step,omitempty"`
+	ChainSteps   int  `json:"chain_steps,omitempty"`
+	IsDeployment bool `json:"is_deployment"`
+	// CorrelatedWith names the first few (by name) of the other origins whose
+	// errors started within the correlation window of this one, and
+	// CorrelatedCount how many there are in all. Both are set on dated
+	// ERROR and FATAL entries only.
+	CorrelatedWith  []string `json:"correlated_with,omitempty"`
+	CorrelatedCount int      `json:"correlated_count,omitempty"`
+	ErrorType       string   `json:"error_type,omitempty"`
+	HTTPStatus      int      `json:"http_status,omitempty"`
+	TraceID         string   `json:"trace_id,omitempty"`
 }
 
 // Origin labels where the entry came from: the source, plus the service in

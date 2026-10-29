@@ -80,8 +80,8 @@ collect:
 		}
 	}
 
+	e.corr.Correlate(entries)
 	for i := range entries {
-		e.corr.Correlate(&entries[i])
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
