@@ -18,12 +18,12 @@ type AnalysisReport struct {
 
 // FilterStats tracks what the filter stage did.
 type FilterStats struct {
-	TotalIngested      int64            `json:"ingested"`
-	TotalDropped       int64            `json:"dropped"`
-	TotalSurvived      int64            `json:"survived"`
-	UniqueSignatures   int              `json:"unique_signatures"`
-	TimeWindowStart    time.Time        `json:"time_window_start"`
-	TimeWindowEnd      time.Time        `json:"time_window_end"`
+	TotalIngested    int64     `json:"ingested"`
+	TotalDropped     int64     `json:"dropped"`
+	TotalSurvived    int64     `json:"survived"`
+	UniqueSignatures int       `json:"unique_signatures"`
+	TimeWindowStart  time.Time `json:"time_window_start"`
+	TimeWindowEnd    time.Time `json:"time_window_end"`
 	// Deprecated: always false; unlog no longer narrows the time range on its
 	// own. Kept for report consumers.
 	AutoDetectedWindow bool             `json:"auto_detected_window"`
