@@ -9,10 +9,7 @@
 
 unlog processes logs through a 6-stage streaming pipeline via Go channels with back-pressure:
 
-```
-Files/stdin → [Ingest] → [Filter] → [Enrich] → [Compact] → [Analyze*] → [Render]
-                        (N workers)                       (* optional)
-```
+![Pipeline](docs/pipeline.png)
 
 Stages 1-4 are pure Go with zero network calls, making the core useful without any AI provider. Stage 5 adds optional LLM analysis via OpenAI, Anthropic, Google Gemini, or Ollama.
 
@@ -38,35 +35,23 @@ unlog --ai-provider openai logs/
 
 ## Installation
 
-### Homebrew
-
-```bash
-brew tap oxforge/tap
-
-brew install unlog
-```
-
-### Shell script
+On macOS or Linux:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/oxforge/unlog/main/install.sh | sh
 ```
 
-### From source
+The script downloads the latest release for your system, checks it against the
+release's `checksums.txt` and puts `unlog` in `~/.local/bin`; `UNLOG_INSTALL_DIR`
+changes the folder. To install a specific version, give the script that version
+(`curl -fsSL https://raw.githubusercontent.com/oxforge/unlog/main/install.sh | UNLOG_VERSION=v0.2.2 sh`).
+Release archives for every platform, Windows included, are on the
+[releases page](https://github.com/oxforge/unlog/releases).
 
-Requires Go 1.22+.
+Or, with Go 1.27+ (on any platform):
 
 ```bash
 go install github.com/oxforge/unlog@latest
-```
-
-### Build from repo
-
-```bash
-git clone https://github.com/oxforge/unlog.git
-cd unlog
-go build -o bin/unlog .   # binary at ./bin/unlog
-go install .              # install to $GOPATH/bin
 ```
 
 ## Quick start
@@ -212,10 +197,7 @@ unlog auto-detects the format of each input file by sampling lines and using maj
 
 unlog uses a 6-stage streaming pipeline connected by buffered Go channels:
 
-```
-Files/stdin --> [Ingest] --> [Filter] --> [Enrich] --> [Compact] --> [Analyze*] --> [Render]
-                              N workers                              * optional
-```
+![Pipeline](docs/pipeline.png)
 
 | Stage | Package | Description |
 |-------|---------|-------------|
@@ -274,22 +256,22 @@ When AI analysis is included, the output adds an `analysis` field and `ai_durati
 
 ## Development
 
-```bash
-go build -o bin/unlog .                              # Build binary
-go test ./... -race                                  # Run all tests with race detector
-golangci-lint run                                    # Lint
-go test ./internal/... -bench=. -benchmem            # Run benchmarks
-go run testdata/big/generate.go -h                   # Generate synthetic test data
-go install .                                         # Install to $GOPATH/bin
-```
-
-### Running tests
+Needs [just](https://just.systems) (bare `just` lists every recipe) and
+optionally [golangci-lint](https://golangci-lint.run).
 
 ```bash
-go test ./... -race                    # Full suite
-go test ./ingest/ -run TestIngester    # Specific package/test
-go test ./filter/ -bench=. -benchmem   # Benchmarks for one package
+just build           # bin/unlog
+just install         # go install . into $GOBIN
+just test            # all tests, with the race detector
+just lint            # golangci-lint
+just smoke           # build, then run against testdata/incidents/
+just bench           # all benchmarks
+just bench-compare   # benchmarks x6 into bench-new.txt, for benchstat
+just bigdata         # 100MB synthetic logs in testdata/big/
+just clean           # remove bin/ and generated test data
 ```
+
+To run one package or test: `go test ./ingest/ -run TestIngester`.
 
 ### Generating test data
 
