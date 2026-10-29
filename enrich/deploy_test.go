@@ -48,6 +48,16 @@ func TestDeployDetector_Patterns(t *testing.T) {
 		{"a feature flag rollout", "rolling out feature flag new-checkout to 5% of users", false},
 		{"a transaction rolled back", "transaction rolled back: deadlock detected", false},
 		{"a pod still restarting", "health check degraded: pod restarting", false},
+
+		// Real markers the context rules must not lose.
+		{"a program restarted", "nginx restarted", true},
+		{"systemd restarted", "Restarted nginx.service", true},
+		{"a numbered worker restarted", "worker-3 restarted", true},
+		{"restarted with a reason", "payments-api restarted after config change", true},
+		{"a version after the app name", "myapp version=2.4.1 starting", true},
+		{"an Argo rollout", "Rollout updated to revision 5", true},
+		{"rolling out a named release", "Rolling out web 2.4.1", true},
+		{"a connection restarted", "watch connection restarted", false},
 	}
 
 	dd := NewDeployDetector()
@@ -73,6 +83,9 @@ func TestDeployDetector_Metadata(t *testing.T) {
 		{"event=request", map[string]string{"event": "request"}, false},
 		{"event=deploy.started", map[string]string{"event": "deploy.started"}, true},
 		{"a word containing scale", map[string]string{"event": "rescale_check"}, false},
+		{"CamelCase", map[string]string{"event": "DeploymentStarted"}, true},
+		{"redeploy", map[string]string{"action": "redeploy"}, true},
+		{"autoscale", map[string]string{"type": "autoscale"}, true},
 		{"no metadata", nil, false},
 	}
 

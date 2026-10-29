@@ -1,7 +1,9 @@
 package filter
 
 import (
+	"regexp"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -42,8 +44,9 @@ type DedupFilter struct {
 	shards []*dedupShard
 	nextID atomic.Uint32
 	byID   sync.Map // uint32 -> *dedupRecord
-	// exact, when set, picks entries merged only with identical messages.
-	exact func(types.LogEntry) bool
+	// markers, when set, picks marker lines: they merge only with lines
+	// naming the same versions.
+	markers func(types.LogEntry) bool
 }
 
 // NewDedupFilter creates a DedupFilter with the given number of shards.
@@ -93,13 +96,20 @@ func betterExemplar(e, cur types.LogEntry) bool {
 	}
 }
 
+// reVersion finds the versions a marker line names ("3.1.0", "v2.4.1-rc1").
+var reVersion = regexp.MustCompile(`\bv?\d+\.\d+(?:\.\d+)*(?:-[\w.]+)?\b`)
+
 // Add merges the entry into the record keyed by (Source, Service, signature)
-// and returns the record's id; an entry exact accepts is keyed by its whole
-// message instead. It is safe for concurrent use.
+// and returns the record's id. For a marker line below ERROR, the versions
+// it names are part of the key too, so deploys of 3.1.0 and 4.0.0 stay
+// apart while a crash loop's pids and attempt numbers merge. It is safe for
+// concurrent use.
 func (d *DedupFilter) Add(entry types.LogEntry) uint32 {
-	sig := entry.Message
-	if d.exact == nil || !d.exact(entry) {
-		sig = ExtractSignature(entry.Message)
+	sig := ExtractSignature(entry.Message)
+	if d.markers != nil && entry.Level < types.LevelError && d.markers(entry) {
+		if v := reVersion.FindAllString(entry.Message, -1); len(v) > 0 {
+			sig += "\x00" + strings.Join(v, " ")
+		}
 	}
 	k := dedupKey{source: entry.Source, service: entry.Service, sig: sig}
 	shard := d.shardFor(k)
