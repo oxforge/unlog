@@ -41,7 +41,7 @@ func applyLogfmtFields(entry *types.LogEntry, pairs map[string]string, tsCache *
 		case "level", "lvl", "severity":
 			entry.Level = types.ParseLevel(v)
 		case "ts", "time", "timestamp", "t":
-			if ts, ok := tsCache.Parse(v); ok {
+			if ts, zoned, ok := tsCache.ParseZoned(v); ok && (zoned || entry.Timestamp.IsZero()) {
 				entry.Timestamp = ts
 			}
 		default:

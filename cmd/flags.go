@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -34,16 +35,19 @@ func resolveFormat(cmd *cobra.Command) (string, error) {
 // resolveLocation returns the zone for timestamps that carry none (--tz,
 // UNLOG_TZ, config tz); UTC by default.
 func resolveLocation(cmd *cobra.Command) (*time.Location, error) {
-	name := cfg.TZ
+	name, from := cfg.TZ, "tz value in the config file"
+	if os.Getenv("UNLOG_TZ") != "" {
+		from = "UNLOG_TZ value"
+	}
 	if cmd.Flags().Changed("tz") {
-		name = tzFlag
+		name, from = tzFlag, "--tz value"
 	}
 	if name == "" {
 		return time.UTC, nil
 	}
 	loc, err := time.LoadLocation(name)
 	if err != nil {
-		return nil, fmt.Errorf("cmd: invalid --tz value: %w", err)
+		return nil, fmt.Errorf("cmd: invalid %s: %w", from, err)
 	}
 	return loc, nil
 }

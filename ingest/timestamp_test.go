@@ -23,7 +23,7 @@ func TestParseTimestamp(t *testing.T) {
 		{"Space separated comma millis", "2026-03-19 12:29:30,963", 2026, true},
 		{"Space separated", "2024-01-15 10:30:45", 2024, true},
 		{"Apache CLF", "15/Jan/2024:10:30:45 -0700", 2024, true},
-		{"Syslog", "Jan 15 10:30:45", 0, true},
+		{"Syslog, dated from the reference", "Jan 15 10:30:45", 2026, true},
 		{"Unix epoch seconds", "1705312245", 2024, true},
 		{"Unix epoch millis", "1705312245000", 2024, true},
 		{"Unix epoch micros", "1705312245000000", 2024, true},
@@ -36,7 +36,8 @@ func TestParseTimestamp(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ts, _, ok := parseTimestamp(tt.input, time.UTC)
+			c := formatCache{ref: time.Date(2026, 10, 29, 12, 0, 0, 0, time.UTC)}
+			ts, _, ok := c.parse(tt.input)
 			assert.Equal(t, tt.wantOK, ok)
 			if tt.wantOK && tt.wantYear > 0 {
 				assert.Equal(t, tt.wantYear, ts.Year())
@@ -78,4 +79,40 @@ func TestFormatCacheZonelessTimestampsUseItsZone(t *testing.T) {
 	got, ok = defaultZone.Parse("2024-01-15 10:00:00")
 	require.True(t, ok)
 	assert.True(t, time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC).Equal(got), "got %s", got)
+}
+
+// Year-less times (RFC 3164 syslog) take their year from the reference, and
+// their offset from the zone on that date: summer time included, and a line
+// just after midnight on New Year stays in its own year.
+func TestFormatCacheYearlessTimestampsInAZone(t *testing.T) {
+	zone := func(name string) *time.Location {
+		loc, err := time.LoadLocation(name)
+		require.NoError(t, err)
+		return loc
+	}
+	ref := time.Date(2026, 10, 29, 12, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name string
+		loc  *time.Location
+		ref  time.Time
+		in   string
+		want time.Time
+	}{
+		{"summer time in Berlin", zone("Europe/Berlin"), ref, "Jul 15 10:00:00", time.Date(2026, 7, 15, 8, 0, 0, 0, time.UTC)},
+		{"winter time in Berlin", zone("Europe/Berlin"), ref, "Feb  3 10:00:00", time.Date(2026, 2, 3, 9, 0, 0, 0, time.UTC)},
+		{"New Year in Tokyo", zone("Asia/Tokyo"), ref, "Jan  1 00:30:00", time.Date(2025, 12, 31, 15, 30, 0, 0, time.UTC)},
+		{"New Year's Eve in New York read in January", zone("America/New_York"), time.Date(2027, 1, 2, 0, 0, 0, 0, time.UTC),
+			"Dec 31 23:30:00", time.Date(2027, 1, 1, 4, 30, 0, 0, time.UTC)},
+		{"no zone means UTC", nil, ref, "Jul 15 10:00:00", time.Date(2026, 7, 15, 10, 0, 0, 0, time.UTC)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := formatCache{loc: tt.loc, ref: tt.ref}
+			for _, pass := range []string{"first", "cached"} {
+				got, ok := c.Parse(tt.in)
+				require.True(t, ok, pass)
+				assert.True(t, tt.want.Equal(got), "%s: want %s, got %s", pass, tt.want, got)
+			}
+		})
+	}
 }
