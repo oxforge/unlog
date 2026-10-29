@@ -74,6 +74,7 @@ collect:
 	for _, c := range e.chains.FindChains(entries) {
 		for _, m := range c.Members {
 			member := &entries[m.Index]
+			member.Chains = append(member.Chains, types.ChainLink{ID: c.ID, Step: m.Step, Steps: c.Steps})
 			if member.ChainID == "" {
 				member.ChainID, member.ChainStep, member.ChainSteps = c.ID, m.Step, c.Steps
 			}

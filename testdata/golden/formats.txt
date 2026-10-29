@@ -3,6 +3,7 @@ Window: 2024-01-15T10:00:00Z — 2026-03-19T14:05:12Z (19060h5m13s)
 Sources: 14 (testdata/formats/apache_clf.log, testdata/formats/cloudwatch.log, testdata/formats/csv_kibana.csv, testdata/formats/docker_compose.log, testdata/formats/docker_mixed_streams.log, +9 more)
 Events: 10 fatal, 29 error (28 distinct), 24 warn (21 distinct)
 Last deployment: 2024-01-15T10:00:01Z, 1s before the first error
+Error chains detected: deployment-failure, oom-cascade
 
 ## Deployments
 2024-01-15T10:00:00Z [INFO] testdata/formats/kubernetes_multiline.log: Starting application v2.5.0 {deploy}
@@ -34,17 +35,13 @@ web-1     |     at com.example.Main.handleRequest(Main.java:42) {err=Connection}
 2024-01-15T10:00:11Z [ERROR] testdata/formats/json_epoch.json: Write to closed channel {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
 2024-01-15T10:00:11Z [ERROR] testdata/formats/json_multiline_stack.log: Failed to send notification {err=ConnectionRefusedException with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
 2024-01-15T10:00:11Z [ERROR] testdata/formats/logfmt_varied.log: Retry scheduled {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
-2024-01-15T10:00:15Z [FATAL] testdata/formats/docker_mixed_streams.log: [2024-01-15 10:00:15] FATAL: Healthcheck failed 3 times, shutting down {err=Healthcheck with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
-2024-01-15T10:00:15Z [FATAL] testdata/formats/json_epoch.json: OOM killer invoked {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
 2024-01-15T10:00:15Z [FATAL] testdata/formats/json_multiline_stack.log: Data corruption detected in primary index {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
 2024-01-15T10:00:15Z [FATAL] testdata/formats/kubernetes_multiline.log: FATAL: Controller crash loop detected, exiting {err=Controller with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
 2024-01-15T10:00:15Z [FATAL] testdata/formats/logfmt_varied.log: Queue backend unreachable {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
-2024-01-15T10:00:15Z [FATAL] testdata/formats/syslog_rfc5424.log[myapp]: Service unavailable, shutting down {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
 2024-01-15T10:00:15Z [ERROR] testdata/formats/cloudwatch.log: ERROR: max retries exceeded {with=testdata/formats/csv_kibana.csv,testdata/formats/docker_mixed_streams.log,+7}
 2024-01-15T10:00:15Z [ERROR] testdata/formats/csv_kibana.csv: [Thread-8] ERROR com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Exception during pool initialization. {with=testdata/formats/cloudwatch.log,testdata/formats/docker_mixed_streams.log,+7}
 2024-01-15T10:00:15Z [FATAL] testdata/formats/generic_with_brackets.log: [FATAL] [main] Shutting down due to unrecoverable error {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+6}
 2024-01-15T10:00:20Z [ERROR] testdata/formats/csv_kibana.csv: [2024-01-1510:00:20+0100] [error] Payment request with checksum (abc123def456) could not be imported into reporting database {with=testdata/formats/cloudwatch.log,testdata/formats/docker_mixed_streams.log,+6}
-2024-01-15T10:00:30Z [FATAL] testdata/formats/csv_kibana.csv: [Thread-1] FATAL com.example.Application - Out of memory, shutting down
 2024-01-15T17:00:05Z–17:00:07Z [ERROR] testdata/formats/apache_clf.log: GET /api/orders HTTP/1.1 500 {×3 http=500}
 2024-01-15T17:00:08Z [ERROR] testdata/formats/apache_clf.log: POST /api/checkout HTTP/1.1 503 {http=503}
 2026-03-19T14:05:09Z [ERROR] testdata/formats/k8s_deployment.log[payment-svc]: ERROR PAYMENT_SVC APP_LOG Refund rejected by gateway for order ord-87201: insufficient merchant balance
@@ -54,7 +51,16 @@ web-1     |     at com.example.Main.handleRequest(Main.java:42) {err=Connection}
 - [ERROR] testdata/formats/unstructured.log: Error: second attempt also failed {err=second}
 
 ## Error Chains
-(none)
+deployment-failure: 2 of 3 steps, 2024-01-15T10:00:00Z–10:00:15Z
+  1. 2024-01-15T10:00:00Z [INFO] testdata/formats/kubernetes_multiline.log: Starting application v2.5.0 {deploy}
+  1. 2024-01-15T10:00:00Z [INFO] testdata/formats/docker_compose.log[web]: INFO Starting application on port 8080 {deploy}
+  1. 2024-01-15T10:00:01Z [INFO] testdata/formats/csv_kibana.csv: [Thread-1] INFO com.example.Application - Listening on port 8080 {deploy}
+  1. 2024-01-15T10:00:01Z [INFO] testdata/formats/json_multiline_stack.log: Database migration complete {deploy}
+  2. 2024-01-15T10:00:15Z [FATAL] testdata/formats/docker_mixed_streams.log: [2024-01-15 10:00:15] FATAL: Healthcheck failed 3 times, shutting down {err=Healthcheck with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
+oom-cascade: 2 of 3 steps, 2024-01-15T10:00:15Z–10:00:30Z
+  2. 2024-01-15T10:00:15Z [FATAL] testdata/formats/json_epoch.json: OOM killer invoked {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
+  3. 2024-01-15T10:00:15Z [FATAL] testdata/formats/syslog_rfc5424.log[myapp]: Service unavailable, shutting down {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
+  2. 2024-01-15T10:00:30Z [FATAL] testdata/formats/csv_kibana.csv: [Thread-1] FATAL com.example.Application - Out of memory, shutting down
 
 ## Rate Anomalies
 (none)

@@ -46,16 +46,20 @@ func formatSummary(all []scoredEntry, bursts []types.Burst, tokenBudget int) str
 
 	claimed := make(map[int]bool)
 
-	// A chain's members, whatever their level, are shown together in it;
-	// chains are ranked by their best-scored member (all is score-ordered).
+	// A chain's members, whatever their level, are shown together in it, an
+	// entry in two chains in both; chains are ranked by their best-scored
+	// member (all is score-ordered).
 	var chainIDs []string
-	chains := make(map[string][]scoredEntry)
+	chains := make(map[string][]chainSlot)
 	for i, se := range all {
-		if id := se.entry.ChainID; id != "" {
-			if _, ok := chains[id]; !ok {
-				chainIDs = append(chainIDs, id)
+		links := se.entry.ChainLinks()
+		for _, link := range links {
+			if _, ok := chains[link.ID]; !ok {
+				chainIDs = append(chainIDs, link.ID)
 			}
-			chains[id] = append(chains[id], se)
+			chains[link.ID] = append(chains[link.ID], chainSlot{se.entry, link.Step, link.Steps})
+		}
+		if len(links) > 0 {
 			claimed[i] = true
 		}
 	}
@@ -132,8 +136,14 @@ func newEntrySection(title string, items []scoredEntry, budget int) *entrySectio
 	return sec
 }
 
+// chainSlot is an entry shown in a chain, with the step it matched there.
+type chainSlot struct {
+	entry       types.EnrichedEntry
+	step, steps int
+}
+
 // newChainSection lists each chain as one item, in the order of ids.
-func newChainSection(title string, ids []string, chains map[string][]scoredEntry, budget int) *entrySection {
+func newChainSection(title string, ids []string, chains map[string][]chainSlot, budget int) *entrySection {
 	sec := &entrySection{title: title, budget: budget}
 	for _, id := range ids {
 		text, start := formatChain(id, chains[id])
@@ -287,10 +297,10 @@ func buildOverview(all []scoredEntry, burstCount int) string {
 		if e.Source != "" {
 			sources[e.Source] = struct{}{}
 		}
-		if e.ChainID != "" {
-			if _, seen := chainSeen[e.ChainID]; !seen {
-				chainSeen[e.ChainID] = struct{}{}
-				chainIDs = append(chainIDs, e.ChainID)
+		for _, link := range e.ChainLinks() {
+			if _, seen := chainSeen[link.ID]; !seen {
+				chainSeen[link.ID] = struct{}{}
+				chainIDs = append(chainIDs, link.ID)
 			}
 		}
 	}
@@ -466,35 +476,36 @@ func formatSpan(start, end time.Time) string {
 	return span + "–" + end.Format(full)
 }
 
-// formatChain renders a chain: a header with its progress and span, then its
-// members in time order, each numbered with the step it matched.
-func formatChain(id string, members []scoredEntry) (string, time.Time) {
-	sorted := make([]types.EnrichedEntry, len(members))
-	for i, se := range members {
-		sorted[i] = se.entry
-	}
+// formatChain renders a chain: a header with how many of its steps occurred
+// and its span, then its members in time order, each numbered with the step
+// it matched.
+func formatChain(id string, members []chainSlot) (string, time.Time) {
+	sorted := append([]chainSlot(nil), members...)
 	sort.SliceStable(sorted, func(i, j int) bool {
-		if !sorted[i].Timestamp.Equal(sorted[j].Timestamp) {
-			return sorted[i].Timestamp.Before(sorted[j].Timestamp)
+		if !sorted[i].entry.Timestamp.Equal(sorted[j].entry.Timestamp) {
+			return sorted[i].entry.Timestamp.Before(sorted[j].entry.Timestamp)
 		}
-		return sorted[i].ChainStep < sorted[j].ChainStep
+		return sorted[i].step < sorted[j].step
 	})
-	start, end, matched := sorted[0].Timestamp, sorted[0].Timestamp, 0
-	for _, e := range sorted {
-		if e.LastSeen.After(end) {
-			end = e.LastSeen
-		}
-		if e.Timestamp.After(end) {
-			end = e.Timestamp
-		}
-		matched = max(matched, e.ChainStep)
+	start, end := sorted[0].entry.Timestamp, sorted[0].entry.Timestamp
+	steps := make(map[int]bool)
+	for _, m := range sorted {
+		end = maxTime(end, maxTime(m.entry.Timestamp, m.entry.LastSeen))
+		steps[m.step] = true
 	}
 	var sb strings.Builder
-	fmt.Fprintf(&sb, "%s: %d of %d steps, %s", id, matched, sorted[0].ChainSteps, formatSpan(start, end))
-	for _, e := range sorted {
-		fmt.Fprintf(&sb, "\n  %d. %s", e.ChainStep, formatEntry(e))
+	fmt.Fprintf(&sb, "%s: %d of %d steps, %s", id, len(steps), sorted[0].steps, formatSpan(start, end))
+	for _, m := range sorted {
+		fmt.Fprintf(&sb, "\n  %d. %s", m.step, formatEntry(m.entry))
 	}
 	return sb.String(), start
+}
+
+func maxTime(a, b time.Time) time.Time {
+	if a.After(b) {
+		return a
+	}
+	return b
 }
 
 // formatBurst renders a burst: a header with its span, source, size and

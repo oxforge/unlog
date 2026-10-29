@@ -97,3 +97,17 @@ func TestLooksLikeDeployment(t *testing.T) {
 		})
 	}
 }
+
+// Every way the deployment-failure chain's first step was worded is a
+// deployment, so the line survives the level filter and opens the chain.
+func TestLooksLikeDeploymentCoversTheChainStarts(t *testing.T) {
+	for _, msg := range []string{
+		"deployment starting for api-server v2.4.1",
+		"deployment started: app to version 3.3.0",
+		"rolling update started",
+		"new version 2.4.1 rolled to production",
+		"pulling image registry.example.com/api:2.4.1",
+	} {
+		assert.True(t, LooksLikeDeployment(types.LogEntry{Message: msg}), msg)
+	}
+}

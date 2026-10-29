@@ -21,6 +21,7 @@ var deployPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)(scaling|scaled)\s+(up|down|to)`),
 	regexp.MustCompile(`(?i)deploy(ment)?\s+(started|starting|initiated|in\s+progress)`),
 	regexp.MustCompile(`(?i)\b(rollout|rolling\s+out)\b`),
+	regexp.MustCompile(`(?i)\bnew\s+version\s+v?\d`),
 }
 
 // deployMetadataKeys are metadata keys that may indicate deployment events.
