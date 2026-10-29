@@ -17,7 +17,8 @@ func TestGeminiStreaming(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Contains(t, r.URL.Path, "/v1beta/models/gemini-2.5-flash:streamGenerateContent")
 		assert.Equal(t, "sse", r.URL.Query().Get("alt"))
-		assert.Equal(t, "test-key", r.URL.Query().Get("key"))
+		assert.Equal(t, "test-key", r.Header.Get("x-goog-api-key"))
+		assert.Empty(t, r.URL.Query().Get("key"), "the key stays out of the URL, which errors quote")
 		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
 
 		var req geminiRequest
@@ -137,4 +138,19 @@ func TestGeminiContextCancel(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for error channel")
 	}
+}
+
+// A key pasted or mounted with a trailing newline makes the request invalid;
+// the error that reports it must not carry the key.
+func TestGeminiErrorsNeverQuoteTheKey(t *testing.T) {
+	p, err := NewGemini("AIzaSECRETKEY123\n", "gemini-2.5-flash", "http://127.0.0.1:1", time.Second)
+	require.NoError(t, err)
+
+	tokenCh, errCh := p.Analyze(context.Background(), "system", "prompt")
+	for range tokenCh {
+	}
+	err = <-errCh
+
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), "AIzaSECRETKEY123")
 }

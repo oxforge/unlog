@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -97,17 +96,20 @@ func (p *GeminiProvider) Analyze(ctx context.Context, system, prompt string) (<-
 			return
 		}
 
-		url := fmt.Sprintf("%s/v1beta/models/%s:streamGenerateContent?alt=sse&key=%s", p.baseURL, p.model, p.apiKey)
+		// The key goes in a header, not the URL: errors quote the URL, and
+		// they end up in the report's analysis_error.
+		url := fmt.Sprintf("%s/v1beta/models/%s:streamGenerateContent?alt=sse", p.baseURL, p.model)
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 		if err != nil {
 			errCh <- fmt.Errorf("analyze: gemini: create request: %w", err)
 			return
 		}
 		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("x-goog-api-key", p.apiKey)
 
 		resp, err := p.client.Do(req)
 		if err != nil {
-			errCh <- fmt.Errorf("analyze: gemini: request failed: %s", redactGeminiErr(err, p.apiKey))
+			errCh <- fmt.Errorf("analyze: gemini: request failed: %w", err)
 			return
 		}
 		defer resp.Body.Close() //nolint:errcheck
@@ -140,9 +142,4 @@ func (p *GeminiProvider) Analyze(ctx context.Context, system, prompt string) (<-
 	}()
 
 	return tokenCh, errCh
-}
-
-// redactGeminiErr strips the API key from error messages to prevent leaking it in logs.
-func redactGeminiErr(err error, apiKey string) string {
-	return strings.ReplaceAll(err.Error(), apiKey, "REDACTED")
 }

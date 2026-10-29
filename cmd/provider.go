@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/oxforge/unlog/internal/analyze"
@@ -13,19 +14,19 @@ import (
 func newProvider(name, model string, timeout time.Duration) (analyze.Provider, error) {
 	switch name {
 	case "openai":
-		key := os.Getenv("OPENAI_API_KEY")
+		key := strings.TrimSpace(os.Getenv("OPENAI_API_KEY"))
 		if key == "" {
 			return nil, fmt.Errorf("cmd: OPENAI_API_KEY not set")
 		}
 		return analyze.NewOpenAI(key, model, "", timeout)
 	case "anthropic":
-		key := os.Getenv("ANTHROPIC_API_KEY")
+		key := strings.TrimSpace(os.Getenv("ANTHROPIC_API_KEY"))
 		if key == "" {
 			return nil, fmt.Errorf("cmd: ANTHROPIC_API_KEY not set")
 		}
 		return analyze.NewAnthropic(key, model, "", timeout)
 	case "gemini":
-		key := os.Getenv("GEMINI_API_KEY")
+		key := strings.TrimSpace(os.Getenv("GEMINI_API_KEY"))
 		if key == "" {
 			return nil, fmt.Errorf("cmd: GEMINI_API_KEY not set")
 		}
