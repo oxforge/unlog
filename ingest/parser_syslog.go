@@ -26,17 +26,12 @@ var (
 type syslogParser struct {
 	rfc5424 bool
 	tsCache formatCache
-	// ref is when the source was last written. RFC 3164 timestamps carry no
-	// year; they get ref's year, or the year before when that would put them
-	// more than a day after ref (December lines read in January).
-	ref time.Time
 }
 
+// newSyslogParser returns a syslog parser; ref (when the source was last
+// written) dates RFC 3164 timestamps, which carry no year.
 func newSyslogParser(rfc5424 bool, ref time.Time) *syslogParser {
-	if ref.IsZero() {
-		ref = time.Now()
-	}
-	return &syslogParser{rfc5424: rfc5424, ref: ref.UTC()}
+	return &syslogParser{rfc5424: rfc5424, tsCache: formatCache{ref: ref}}
 }
 
 // Parse extracts a LogEntry from a single syslog line.
@@ -70,7 +65,7 @@ func (p *syslogParser) parse3164(line string, lineNum int64, source string) (typ
 		entry.Level = syslogSeverityToLevel(priority % 8)
 	}
 	if ts, ok := p.tsCache.Parse(m[2] + " " + m[3] + " " + m[4]); ok {
-		entry.Timestamp = p.withYear(ts)
+		entry.Timestamp = ts
 	}
 	if m[7] != "" {
 		entry.Metadata["pid"] = m[7]
@@ -104,18 +99,6 @@ func (p *syslogParser) parseISO(line string, lineNum int64, source string) (type
 	}
 
 	return entry, true
-}
-
-// withYear dates a year-less timestamp (year 0) from the parser's reference.
-func (p *syslogParser) withYear(ts time.Time) time.Time {
-	if ts.Year() != 0 {
-		return ts
-	}
-	ts = ts.AddDate(p.ref.Year(), 0, 0)
-	if ts.After(p.ref.Add(24 * time.Hour)) {
-		ts = ts.AddDate(-1, 0, 0)
-	}
-	return ts
 }
 
 func (p *syslogParser) parse5424(line string, lineNum int64, source string) (types.LogEntry, bool) {

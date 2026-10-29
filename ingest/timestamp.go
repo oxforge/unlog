@@ -20,19 +20,18 @@ var timestampFormats = []string{
 	"Jan 2, 2006 @ 15:04:05.000", // Kibana CSV export, e.g. "Feb 25, 2026 @ 03:32:24.771"
 }
 
-// parseTimestamp attempts to parse s as a timestamp, trying each known format
-// in order; a timestamp without a zone is read in loc. Returns the parsed
-// time, the matched format string, and whether parsing succeeded. The
-// returned time is always in UTC.
-func parseTimestamp(s string, loc *time.Location) (time.Time, string, bool) {
+// parse attempts to parse s as a timestamp, trying each known format in
+// order. Returns the parsed time, the matched format string, and whether
+// parsing succeeded. The returned time is always in UTC.
+func (c *formatCache) parse(s string) (time.Time, string, bool) {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return time.Time{}, "", false
 	}
 
-	for _, fmt := range timestampFormats {
-		if t, err := time.ParseInLocation(fmt, s, loc); err == nil {
-			return t.UTC(), fmt, true
+	for _, layout := range timestampFormats {
+		if t, err := c.parseLayout(layout, s); err == nil {
+			return t, layout, true
 		}
 	}
 
@@ -41,6 +40,44 @@ func parseTimestamp(s string, loc *time.Location) (time.Time, string, bool) {
 	}
 
 	return time.Time{}, "", false
+}
+
+// parseLayout parses s with layout. A value without a zone is read in the
+// cache's zone. A value without a year is read as a wall-clock time and dated
+// from ref first: Go would place it in year 0, where zones have only their
+// 19th-century local mean time and no daylight saving.
+func (c *formatCache) parseLayout(layout, s string) (time.Time, error) {
+	if strings.Contains(layout, "2006") {
+		t, err := time.ParseInLocation(layout, s, c.zone())
+		return t.UTC(), err
+	}
+	wall, err := time.Parse(layout, s)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return c.withYear(wall), nil
+}
+
+// withYear places a year-less wall-clock time in ref's year in the cache's
+// zone, or the year before when that would be more than a day after ref.
+func (c *formatCache) withYear(wall time.Time) time.Time {
+	ref := c.ref
+	if ref.IsZero() {
+		ref = time.Now()
+	}
+	in := func(year int) time.Time {
+		return time.Date(year, wall.Month(), wall.Day(), wall.Hour(), wall.Minute(), wall.Second(), wall.Nanosecond(), c.zone()).UTC()
+	}
+	year := ref.In(c.zone()).Year()
+	if t := in(year); !t.After(ref.Add(24 * time.Hour)) {
+		return t
+	}
+	return in(year - 1)
+}
+
+// hasZone reports whether a value parsed with layout names its own zone.
+func hasZone(layout string) bool {
+	return layout == "epoch" || strings.Contains(layout, "Z07") || strings.Contains(layout, "-0700")
 }
 
 // tryUnixEpoch attempts to interpret s as a Unix epoch value in seconds,
@@ -85,6 +122,11 @@ type formatCache struct {
 	lastFormat string
 	// loc is the zone of timestamps that carry none; nil means UTC.
 	loc *time.Location
+	// ref is when the source was last written. Timestamps that carry no year
+	// (RFC 3164 syslog) get ref's year, or the year before when that would
+	// put them more than a day after ref (December lines read in January).
+	// Zero means now.
+	ref time.Time
 }
 
 // ParseFromPrefix scans the beginning of s for a timestamp, trying
@@ -123,18 +165,22 @@ func (c *formatCache) Parse(s string) (time.Time, bool) {
 			if t, ok := tryUnixEpoch(s); ok {
 				return t.UTC(), true
 			}
-		} else {
-			if t, err := time.ParseInLocation(c.lastFormat, s, c.zone()); err == nil {
-				return t.UTC(), true
-			}
+		} else if t, err := c.parseLayout(c.lastFormat, s); err == nil {
+			return t, true
 		}
 	}
 
-	t, fmt, ok := parseTimestamp(s, c.zone())
+	t, layout, ok := c.parse(s)
 	if ok {
-		c.lastFormat = fmt
+		c.lastFormat = layout
 	}
 	return t, ok
+}
+
+// ParseZoned is Parse that also reports whether the value named its own zone.
+func (c *formatCache) ParseZoned(s string) (time.Time, bool, bool) {
+	t, ok := c.Parse(s)
+	return t, ok && hasZone(c.lastFormat), ok
 }
 
 // zone is the location for timestamps without a zone: loc, or UTC.

@@ -613,13 +613,44 @@ func TestE2ETZFlagSetsTheZoneOfZonelessTimestamps(t *testing.T) {
 	assert.NotContains(t, report.CompactedSummary, "early failure")
 }
 
-func TestE2EInvalidTZFails(t *testing.T) {
+func TestE2ETZFromTheEnvironmentAndConfig(t *testing.T) {
 	logPath := writeFile(t, t.TempDir(), "app.log", zonelessFixture)
+	withConfig := t.TempDir()
+	writeFile(t, filepath.Join(withConfig, ".unlog"), "config.toml", "tz = \"Asia/Tokyo\"\n")
 
-	r := runUnlog(t, t.TempDir(), nil, "--tz", "Mars/Olympus", logPath)
+	for name, run := range map[string]cliRun{
+		"UNLOG_TZ": runUnlog(t, t.TempDir(), []string{"UNLOG_TZ=Asia/Tokyo"}, "--format", "json", logPath),
+		"config":   runUnlog(t, withConfig, nil, "--format", "json", logPath),
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, 0, run.exit, "stderr: %s", run.stderr)
+			var report types.AnalysisReport
+			require.NoError(t, json.Unmarshal([]byte(run.stdout), &report))
+			assert.Contains(t, report.CompactedSummary, "2024-01-15T02:00:00Z [ERROR]")
+		})
+	}
+}
 
-	assert.Equal(t, 1, r.exit)
-	assert.Contains(t, r.stderr, "invalid --tz value")
+func TestE2EInvalidTZNamesWhereItCameFrom(t *testing.T) {
+	logPath := writeFile(t, t.TempDir(), "app.log", zonelessFixture)
+	withConfig := t.TempDir()
+	writeFile(t, filepath.Join(withConfig, ".unlog"), "config.toml", "tz = \"Mars/Olympus\"\n")
+
+	tests := []struct {
+		name string
+		run  cliRun
+		want string
+	}{
+		{"flag", runUnlog(t, t.TempDir(), nil, "--tz", "Mars/Olympus", logPath), "invalid --tz value"},
+		{"environment", runUnlog(t, t.TempDir(), []string{"UNLOG_TZ=Mars/Olympus"}, logPath), "invalid UNLOG_TZ value"},
+		{"config", runUnlog(t, withConfig, nil, logPath), "invalid tz value in the config file"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, 1, tt.run.exit)
+			assert.Contains(t, tt.run.stderr, tt.want)
+		})
+	}
 }
 
 // A misconfigured provider fails before any log is read: the input path

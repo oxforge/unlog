@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/oxforge/unlog/types"
 )
@@ -99,6 +100,31 @@ func TestContainerStreamIsOnlyAWeakHint(t *testing.T) {
 			entry, ok := (&dockerParser{}).Parse(tt.line, 1, "c.log")
 			assert.True(t, ok)
 			assert.Equal(t, tt.want, entry.Level)
+		})
+	}
+}
+
+// A runtime's timestamp is exact UTC; a payload time without a zone must not
+// replace it, or --tz would shift container lines that were already right.
+func TestPayloadTimeReplacesTheRuntimeTimeOnlyWithAZone(t *testing.T) {
+	berlin, err := time.LoadLocation("Europe/Berlin")
+	require.NoError(t, err)
+	runtime := time.Date(2024, 1, 15, 10, 0, 0, 123000000, time.UTC)
+	tests := []struct {
+		name    string
+		payload string
+		want    time.Time
+	}{
+		{"zone-less payload time", `{\"time\":\"2024-01-15 10:00:00\",\"level\":\"error\",\"msg\":\"x\"}`, runtime},
+		{"payload time with a zone", `{\"time\":\"2024-01-15T09:59:59Z\",\"level\":\"error\",\"msg\":\"x\"}`, time.Date(2024, 1, 15, 9, 59, 59, 0, time.UTC)},
+		{"zone-less logfmt time", `time=\"2024-01-15 10:00:00\" level=error msg=x`, runtime},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := parserForFormat(FormatDockerJSON, time.Now(), berlin)
+			entry, ok := p.Parse(`{"log":"`+tt.payload+`\n","stream":"stderr","time":"2024-01-15T10:00:00.123Z"}`, 1, "c.log")
+			require.True(t, ok)
+			assert.True(t, tt.want.Equal(entry.Timestamp), "want %s, got %s", tt.want, entry.Timestamp)
 		})
 	}
 }

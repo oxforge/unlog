@@ -6,6 +6,7 @@ import (
 
 	"github.com/oxforge/unlog/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSyslogParser3164(t *testing.T) {
@@ -142,4 +143,15 @@ func TestSyslogParserYearFromReference(t *testing.T) {
 			assert.True(t, tt.want.Equal(entry.Timestamp), "want %s, got %s", tt.want, entry.Timestamp)
 		})
 	}
+}
+
+func TestSyslogParserYearlessLinesInAZone(t *testing.T) {
+	berlin, err := time.LoadLocation("Europe/Berlin")
+	require.NoError(t, err)
+	p := parserForFormat(FormatSyslog3164, time.Date(2026, 10, 29, 12, 0, 0, 0, time.UTC), berlin)
+
+	entry, ok := p.Parse(`Jul 15 10:00:00 web01 nginx[1]: error: upstream timed out`, 1, "syslog")
+
+	require.True(t, ok)
+	assert.True(t, time.Date(2026, 7, 15, 8, 0, 0, 0, time.UTC).Equal(entry.Timestamp), "got %s", entry.Timestamp)
 }

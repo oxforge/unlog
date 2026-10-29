@@ -9,9 +9,9 @@ import (
 // applyInnerLine reads msg, the line a container runtime or log service
 // wrapped (Docker's "log", CRI's message, CloudWatch's "@message"), as a log
 // line of its own. A JSON object or logfmt pairs fill Message, Level,
-// Timestamp and Metadata; the wrapper's timestamp stays when the payload has
-// none, and the wrapper's metadata keys are never overwritten. Plain text
-// stays the message, with its level read from its first words.
+// Timestamp and Metadata; the wrapper's timestamp stays unless the payload's
+// names its own zone, and the wrapper's metadata keys are never overwritten.
+// Plain text stays the message, with its level read from its first words.
 func applyInnerLine(entry *types.LogEntry, msg string, tsCache *formatCache) {
 	entry.Message = msg
 	if strings.HasPrefix(msg, "{") {

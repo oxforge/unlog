@@ -57,7 +57,7 @@ func applyJSONFields(entry *types.LogEntry, obj map[string]interface{}, tsCache 
 
 	for _, key := range []string{"timestamp", "ts", "time", "@timestamp", "t"} {
 		if v, ok := obj[key]; ok {
-			if ts, ok := tsCache.Parse(fmt.Sprint(v)); ok {
+			if ts, zoned, ok := tsCache.ParseZoned(fmt.Sprint(v)); ok && (zoned || entry.Timestamp.IsZero()) {
 				entry.Timestamp = ts
 			}
 			delete(obj, key)

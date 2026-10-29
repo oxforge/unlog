@@ -68,7 +68,7 @@ type Parser interface {
 // is when the source was last written (its mtime), which dates timestamps that
 // carry no year; loc is the zone of timestamps that carry none (nil = UTC).
 func parserForFormat(format Format, ref time.Time, loc *time.Location) Parser {
-	ts := formatCache{loc: loc}
+	ts := formatCache{loc: loc, ref: ref}
 	switch format {
 	case FormatDockerJSON:
 		return &dockerParser{tsCache: ts}
