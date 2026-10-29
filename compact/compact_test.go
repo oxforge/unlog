@@ -652,3 +652,71 @@ func TestRun_SectionListsEntriesInTimeOrder(t *testing.T) {
 	assert.True(t, first >= 0 && first < second && second < third && third < undated,
 		"want time order with undated last, got:\n%s", critical)
 }
+
+// ─── Error spans and occurrence counts ──────────────────────────────────────
+
+func spanEntry(level types.Level, msg, source string, first, last time.Time, count int) types.EnrichedEntry {
+	e := makeEntry(level, msg, source, first)
+	e.FirstSeen = first
+	e.LastSeen = last
+	e.OccurrenceCount = count
+	return e
+}
+
+func TestFormatEntrySpan(t *testing.T) {
+	day := func(d, h, m, s int) time.Time { return time.Date(2024, 1, d, h, m, s, 0, time.UTC) }
+	tests := []struct {
+		name  string
+		entry types.EnrichedEntry
+		want  string
+	}{
+		{"same day", spanEntry(types.LevelError, "cache miss", "api.log", day(15, 10, 0, 0), day(15, 10, 9, 50), 60),
+			"2024-01-15T10:00:00Z–10:09:50Z [ERROR] api.log: cache miss {×60}"},
+		{"across midnight", spanEntry(types.LevelError, "cache miss", "api.log", day(15, 23, 59, 0), day(16, 0, 1, 0), 2),
+			"2024-01-15T23:59:00Z–2024-01-16T00:01:00Z [ERROR] api.log: cache miss {×2}"},
+		{"single moment", spanEntry(types.LevelError, "cache miss", "api.log", day(15, 10, 0, 0), day(15, 10, 0, 0), 1),
+			"2024-01-15T10:00:00Z [ERROR] api.log: cache miss"},
+		{"no last seen", spanEntry(types.LevelError, "cache miss", "api.log", day(15, 10, 0, 0), time.Time{}, 1),
+			"2024-01-15T10:00:00Z [ERROR] api.log: cache miss"},
+		{"undated", spanEntry(types.LevelError, "cache miss", "api.log", time.Time{}, time.Time{}, 3),
+			"- [ERROR] api.log: cache miss {×3}"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, formatEntry(tt.entry))
+		})
+	}
+}
+
+func TestRun_OverviewSpansAndOccurrences(t *testing.T) {
+	first := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+	last := time.Date(2024, 1, 15, 10, 49, 59, 0, time.UTC)
+	ch := make(chan types.EnrichedEntry, 1)
+	sendAndClose(ch, []types.EnrichedEntry{spanEntry(types.LevelError, "payment declined for order 0", "app.log", first, last, 3000)})
+
+	summary, err := Run(context.Background(), ch, Options{})
+	require.NoError(t, err)
+
+	overview := extractSection(summary, "## Incident Overview", "## Critical Errors")
+	assert.Contains(t, overview, "Window: 2024-01-15T10:00:00Z — 2024-01-15T10:49:59Z (49m59s)")
+	assert.Contains(t, overview, "Events: 0 fatal, 3000 error (1 distinct), 0 warn")
+}
+
+func TestRun_OverviewDistinctOnlyWhenRepeated(t *testing.T) {
+	at := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+	entries := []types.EnrichedEntry{
+		spanEntry(types.LevelError, "payment declined", "app.log", at, at.Add(time.Hour), 2900),
+		spanEntry(types.LevelError, "refund failed", "app.log", at, at.Add(time.Minute), 100),
+		spanEntry(types.LevelFatal, "ledger corrupted", "app.log", at, at, 1),
+	}
+	for i := 0; i < 7; i++ {
+		entries = append(entries, spanEntry(types.LevelWarn, fmt.Sprintf("queue %d slow", i), "app.log", at, at, 1))
+	}
+	ch := make(chan types.EnrichedEntry, len(entries))
+	sendAndClose(ch, entries)
+
+	summary, err := Run(context.Background(), ch, Options{})
+	require.NoError(t, err)
+
+	assert.Contains(t, summary, "Events: 1 fatal, 3000 error (2 distinct), 7 warn\n")
+}

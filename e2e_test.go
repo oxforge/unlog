@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -359,4 +360,73 @@ func TestE2ETwoIncidentsHoursApartAreBothReported(t *testing.T) {
 	for i := 0; i < 9; i++ {
 		assert.Equal(t, first, runJSON(t, logPath).CompactedSummary, "run %d differs", i+2)
 	}
+}
+
+// repeatedErrors returns n JSON error lines of one signature, one per second
+// from start: "payment declined for order 0", "... order 1", ...
+func repeatedErrors(n int, start time.Time) string {
+	var b strings.Builder
+	for i := 0; i < n; i++ {
+		fmt.Fprintf(&b, `{"level":"error","msg":"payment declined for order %d","time":"%s"}`+"\n",
+			i, start.Add(time.Duration(i)*time.Second).Format(time.RFC3339))
+	}
+	return b.String()
+}
+
+func TestE2ERepeatedErrorIsOneLine(t *testing.T) {
+	logPath := writeFile(t, t.TempDir(), "app.log",
+		repeatedErrors(3000, time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)))
+
+	report := runJSON(t, logPath)
+
+	critical := sectionOf(report.CompactedSummary, "## Critical Errors")
+	var lines []string
+	for _, line := range strings.Split(critical, "\n") {
+		if strings.Contains(line, "payment declined") {
+			lines = append(lines, line)
+		}
+	}
+	require.Len(t, lines, 1, "critical section:\n%s", critical)
+	assert.True(t, strings.HasPrefix(lines[0], "2024-01-15T10:00:00Z–10:49:59Z [ERROR]"), "got %q", lines[0])
+	assert.Contains(t, lines[0], "payment declined for order 0")
+	assert.Contains(t, lines[0], "{×3000")
+}
+
+func TestE2ESameInputSameSummary(t *testing.T) {
+	dir := t.TempDir()
+	start := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+	first := writeFile(t, dir, "a.log", repeatedErrors(3000, start))
+	second := writeFile(t, dir, "b.log", repeatedErrors(3000, start.Add(30*time.Minute)))
+
+	want := runJSON(t, first, second).CompactedSummary
+	for i := 0; i < 19; i++ {
+		assert.Equal(t, want, runJSON(t, first, second).CompactedSummary, "run %d differs", i+2)
+	}
+}
+
+func TestE2EHighestSeverityWins(t *testing.T) {
+	logPath := writeFile(t, t.TempDir(), "app.log",
+		`{"level":"warn","msg":"disk 91% full on /data","time":"2024-01-15T10:00:00Z"}
+{"level":"error","msg":"disk 97% full on /data","time":"2024-01-15T10:05:00Z"}
+`)
+
+	summary := runJSON(t, logPath).CompactedSummary
+
+	assert.Equal(t, 1, strings.Count(summary, "full on /data"), "summary:\n%s", summary)
+	critical := sectionOf(summary, "## Critical Errors")
+	assert.Contains(t, critical, "2024-01-15T10:00:00Z–10:05:00Z [ERROR]")
+	assert.Contains(t, critical, "disk 91% full on /data")
+}
+
+func TestE2EOneLinePerSource(t *testing.T) {
+	dir := t.TempDir()
+	line := `{"level":"error","msg":"payment declined for order 5","time":"2024-01-15T10:00:00Z"}` + "\n"
+	api1 := writeFile(t, dir, "api-1.log", line)
+	api2 := writeFile(t, dir, "api-2.log", line)
+
+	summary := runJSON(t, api1, api2).CompactedSummary
+
+	assert.Equal(t, 2, strings.Count(summary, "payment declined for order 5"), "summary:\n%s", summary)
+	assert.Contains(t, summary, "api-1.log: payment declined")
+	assert.Contains(t, summary, "api-2.log: payment declined")
 }

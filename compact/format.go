@@ -200,7 +200,7 @@ func buildOverview(all []scoredEntry) string {
 	}
 
 	var earliest, latest time.Time
-	var errorCount, fatalCount, warnCount int
+	var fatal, errs, warn levelTally
 	sources := make(map[string]struct{})
 	var chainIDs []string
 	chainSeen := make(map[string]struct{})
@@ -212,17 +212,21 @@ func buildOverview(all []scoredEntry) string {
 			if earliest.IsZero() || t.Before(earliest) {
 				earliest = t
 			}
-			if latest.IsZero() || t.After(latest) {
-				latest = t
+			end := t
+			if e.LastSeen.After(end) {
+				end = e.LastSeen
+			}
+			if end.After(latest) {
+				latest = end
 			}
 		}
 		switch e.Level {
 		case types.LevelFatal:
-			fatalCount++
+			fatal.add(e)
 		case types.LevelError:
-			errorCount++
+			errs.add(e)
 		case types.LevelWarn:
-			warnCount++
+			warn.add(e)
 		}
 		if e.Source != "" {
 			sources[e.Source] = struct{}{}
@@ -248,7 +252,8 @@ func buildOverview(all []scoredEntry) string {
 			latest.Sub(earliest).Round(time.Second)))
 	}
 	parts = append(parts, fmt.Sprintf("Sources: %d (%s)", len(sources), joinedSources(sources)))
-	parts = append(parts, fmt.Sprintf("Events: %d fatal, %d error, %d warn", fatalCount, errorCount, warnCount))
+	parts = append(parts, fmt.Sprintf("Events: %s, %s, %s",
+		fatal.describe("fatal"), errs.describe("error"), warn.describe("warn")))
 
 	if len(chainIDs) > 0 {
 		parts = append(parts, fmt.Sprintf("Error chains detected: %s", strings.Join(chainIDs, ", ")))
@@ -258,6 +263,27 @@ func buildOverview(all []scoredEntry) string {
 	}
 
 	return strings.Join(parts, "\n")
+}
+
+// levelTally counts one level's occurrences and the distinct errors behind
+// them.
+type levelTally struct {
+	occurrences int
+	distinct    int
+}
+
+func (lt *levelTally) add(e types.EnrichedEntry) {
+	lt.occurrences += max(e.OccurrenceCount, 1)
+	lt.distinct++
+}
+
+// describe renders "3000 error", followed by "(N distinct)" when some errors
+// repeated.
+func (lt levelTally) describe(level string) string {
+	if lt.occurrences == lt.distinct {
+		return fmt.Sprintf("%d %s", lt.occurrences, level)
+	}
+	return fmt.Sprintf("%d %s (%d distinct)", lt.occurrences, level, lt.distinct)
 }
 
 // joinedSources returns a comma-separated sorted list of source names.
@@ -292,7 +318,7 @@ func formatEntry(e types.EnrichedEntry) string {
 	if e.Timestamp.IsZero() {
 		sb.WriteString("-")
 	} else {
-		sb.WriteString(e.Timestamp.UTC().Format("2006-01-02T15:04:05Z"))
+		sb.WriteString(formatSpan(e.Timestamp, e.LastSeen))
 	}
 	sb.WriteString(" [")
 	sb.WriteString(e.Level.String())
@@ -333,6 +359,21 @@ func formatEntry(e types.EnrichedEntry) string {
 	}
 
 	return sb.String()
+}
+
+// formatSpan renders start, and "–end" when end is later: the end's time
+// alone on the same day, its full date otherwise.
+func formatSpan(start, end time.Time) string {
+	const full = "2006-01-02T15:04:05Z"
+	start, end = start.UTC(), end.UTC()
+	span := start.Format(full)
+	if !end.After(start) {
+		return span
+	}
+	if end.Format(time.DateOnly) == start.Format(time.DateOnly) {
+		return span + "–" + end.Format("15:04:05Z")
+	}
+	return span + "–" + end.Format(full)
 }
 
 // capMessage cuts msg to at most maxMessageBytes on a UTF-8 boundary and says
