@@ -9,6 +9,8 @@ Error chains detected: deployment-failure, cascade-failure
 2024-01-15T14:01:55Z [INFO] testdata/incidents/deploy_failure/deploy.log: INFO  deployment started: app-deployment to version 3.3.0 {deploy}
 2024-01-15T14:02:00Z [INFO] testdata/incidents/deploy_failure/app.log: rolling update started {deploy}
 2024-01-15T14:02:00Z [INFO] testdata/incidents/deploy_failure/deploy.log: INFO  rolling update initiated: 3 pods, max-surge=1, max-unavailable=0 {deploy}
+2024-01-15T14:02:40Z [WARN] testdata/incidents/deploy_failure/deploy.log: WARN  rollback initiated: reverting to version 3.2.1 {deploy}
+2024-01-15T14:03:00Z [WARN] testdata/incidents/deploy_failure/app.log: rolling back deployment {deploy}
 
 ## Critical Errors
 2024-01-15T14:02:25Z–14:02:30Z [ERROR] testdata/incidents/deploy_failure/app.log[app-pod]: deployment probe failed: readiness check timeout {×2 with=testdata/incidents/deploy_failure/deploy.log}
@@ -33,5 +35,3 @@ cascade-failure: 2 of 3 steps, 2024-01-15T14:02:15Z–14:02:21Z
 ## Context
 2024-01-15T14:02:10Z [WARN] testdata/incidents/deploy_failure/app.log[app-pod]: health check degraded: pod restarting
 2024-01-15T14:02:10Z [WARN] testdata/incidents/deploy_failure/deploy.log: WARN  pod app-pod-2 readiness probe failing
-2024-01-15T14:02:40Z [WARN] testdata/incidents/deploy_failure/deploy.log: WARN  rollback initiated: reverting to version 3.2.1
-2024-01-15T14:03:00Z [WARN] testdata/incidents/deploy_failure/app.log: rolling back deployment

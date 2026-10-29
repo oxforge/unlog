@@ -1021,3 +1021,25 @@ func sectionOf(summary, header string) string {
 	}
 	return body
 }
+
+// An ERROR-level line that looks like a deployment is one of the errors, not
+// the deployment that came before them.
+func TestRun_LastDeploymentIsNotAnError(t *testing.T) {
+	at := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+	deploy := makeEntry(types.LevelInfo, "deployment started: api to v2.4.1", "deploy.log", at)
+	deploy.IsDeployment = true
+	tlsError := makeEntry(types.LevelError, "TLS handshake failed: unsupported version", "api.log", at.Add(2*time.Minute))
+	tlsError.IsDeployment = true
+
+	summary := runEntries(t, []types.EnrichedEntry{deploy, tlsError}, Options{})
+
+	assert.Contains(t, summary, "Last deployment: 2024-01-15T10:00:00Z, 2m0s before the first error")
+}
+
+func TestRun_EmptySummaryHasEverySection(t *testing.T) {
+	summary := runEntries(t, nil, Options{})
+
+	for _, header := range []string{"## Incident Overview", "## Deployments", "## Critical Errors", "## Error Chains", "## Rate Anomalies", "## Context"} {
+		assert.Contains(t, summary, header)
+	}
+}

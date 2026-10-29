@@ -345,3 +345,14 @@ func TestFindChains_ChainStartsAtItsLowestStep(t *testing.T) {
 	assert.Equal(t, "oom-cascade", chains[0].Pattern)
 	assert.Equal(t, []step{{2, 2}, {3, 3}}, membersOf(chains[0]))
 }
+
+// A rollback is a deployment marker, but it ends a deployment-failure chain;
+// it doesn't start one.
+func TestFindChains_ARollbackIsNotTheFirstStep(t *testing.T) {
+	entries := []types.EnrichedEntry{
+		makeChainEntry("rolling back deployment to v2.3.9", types.LevelInfo, "deploy", chainBase, 1),
+		makeChainEntry("readiness probe failed: HTTP 503", types.LevelWarn, "k8s", chainBase.Add(time.Minute), 2),
+	}
+
+	assert.Empty(t, NewChainMatcher().FindChains(entries))
+}

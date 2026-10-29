@@ -395,3 +395,40 @@ func TestKeepAtAnyLevelPassesTheLevelFilter(t *testing.T) {
 	assert.Equal(t, []string{"deployment started: app to 3.3.0", "health check failed"}, messages)
 	assert.Equal(t, int64(1), detailed.DroppedByLevel)
 }
+
+// Lines kept at any level (deployments) are merged only when identical:
+// what tells two of them apart, a version, is what matters.
+func TestKeepAtAnyLevelLinesMergeOnlyWhenIdentical(t *testing.T) {
+	at := time.Date(2024, 1, 15, 8, 0, 0, 0, time.UTC)
+	lines := []types.LogEntry{
+		{Timestamp: at, Level: types.LevelInfo, Message: "deployment started: checkout to version 3.1.0"},
+		{Timestamp: at.Add(time.Hour), Level: types.LevelInfo, Message: "deployment started: checkout to version 3.1.1"},
+		{Timestamp: at.Add(3 * time.Hour), Level: types.LevelInfo, Message: "deployment started: checkout to version 4.0.0"},
+		{Timestamp: at.Add(3*time.Hour + time.Minute), Level: types.LevelInfo, Message: "deployment started: checkout to version 4.0.0"},
+		{Timestamp: at.Add(3*time.Hour + 2*time.Minute), Level: types.LevelError, Message: "payment 1001 declined"},
+		{Timestamp: at.Add(3*time.Hour + 3*time.Minute), Level: types.LevelError, Message: "payment 1002 declined"},
+	}
+	input := make(chan types.LogEntry, len(lines))
+	output := make(chan types.FilteredEntry, len(lines))
+	for i, l := range lines {
+		l.Source, l.LineNumber = "app.log", int64(i+1)
+		input <- l
+	}
+	close(input)
+
+	opts := DefaultFilterOptions()
+	opts.KeepAtAnyLevel = func(e types.LogEntry) bool { return strings.HasPrefix(e.Message, "deployment started") }
+	_, _, err := NewFilterPipeline(input, output, opts, nil).Run(context.Background())
+	require.NoError(t, err)
+
+	counts := map[string]int{}
+	for e := range output {
+		counts[e.Message] = e.OccurrenceCount
+	}
+	assert.Equal(t, map[string]int{
+		"deployment started: checkout to version 3.1.0": 1,
+		"deployment started: checkout to version 3.1.1": 1,
+		"deployment started: checkout to version 4.0.0": 2,
+		"payment 1001 declined":                         2, // errors still merge by signature
+	}, counts)
+}

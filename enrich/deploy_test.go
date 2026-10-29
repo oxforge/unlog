@@ -32,6 +32,22 @@ func TestDeployDetector_Patterns(t *testing.T) {
 		{"no match", "GET /api/users 200 OK", false},
 		{"no match error", "Connection refused to database", false},
 		{"partial no match", "starting breakfast", false},
+		{"app version", "application version: 2.4.1", true},
+		{"scaled a deployment", "Scaled deployment api to 5 replicas", true},
+		{"pod restarted", "pod api-7d9f restarted", true},
+		{"rollback of a release", "rollback initiated: reverting to version 3.2.1", true},
+		{"rolling back a deployment", "rolling back deployment", true},
+		{"kubectl rollout", `deployment "api" successfully rolled out`, true},
+		{"rolling out a version", "rolling out version 2.4.1 to production", true},
+
+		// Look-alikes that aren't deployments.
+		{"a protocol version", "http client protocol version=1.1", false},
+		{"a TLS version error", "TLS handshake failed: unsupported TLS version: 1.0", false},
+		{"a timer restarted", "retry timer restarted", false},
+		{"an image scaled", "thumbnail scaled to 200px", false},
+		{"a feature flag rollout", "rolling out feature flag new-checkout to 5% of users", false},
+		{"a transaction rolled back", "transaction rolled back: deadlock detected", false},
+		{"a pod still restarting", "health check degraded: pod restarting", false},
 	}
 
 	dd := NewDeployDetector()
@@ -55,6 +71,8 @@ func TestDeployDetector_Metadata(t *testing.T) {
 		{"type=rollout", map[string]string{"type": "rollout"}, true},
 		{"event=scale", map[string]string{"event": "scale-up"}, true},
 		{"event=request", map[string]string{"event": "request"}, false},
+		{"event=deploy.started", map[string]string{"event": "deploy.started"}, true},
+		{"a word containing scale", map[string]string{"event": "rescale_check"}, false},
 		{"no metadata", nil, false},
 	}
 
@@ -109,5 +127,12 @@ func TestLooksLikeDeploymentCoversTheChainStarts(t *testing.T) {
 		"pulling image registry.example.com/api:2.4.1",
 	} {
 		assert.True(t, LooksLikeDeployment(types.LogEntry{Message: msg}), msg)
+	}
+}
+
+func BenchmarkLooksLikeDeployment(b *testing.B) {
+	entry := types.LogEntry{Message: "GET /api/v1/orders/12345 200 OK in 12ms for 10.0.3.17"}
+	for range b.N {
+		LooksLikeDeployment(entry)
 	}
 }

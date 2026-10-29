@@ -397,10 +397,11 @@ func lastDeploymentLine(all []scoredEntry) string {
 	if firstError.IsZero() {
 		return ""
 	}
+	// An ERROR-level deployment line is itself one of the errors.
 	var last time.Time
 	for _, se := range all {
 		e := se.entry
-		if !e.IsDeployment {
+		if !e.IsDeployment || e.Level >= types.LevelError {
 			continue
 		}
 		for _, t := range []time.Time{e.Timestamp, e.LastSeen} {
