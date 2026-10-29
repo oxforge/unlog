@@ -13,7 +13,11 @@ type AnalysisReport struct {
 	AIDurationMs       int64       `json:"ai_duration_ms"`
 	Stats              FilterStats `json:"stats"`
 	Analysis           string      `json:"analysis"`
-	CompactedSummary   string      `json:"compacted_summary"`
+	// AnalysisError says why the AI analysis failed (Analysis then holds
+	// whatever arrived before the failure); empty when it succeeded or did not
+	// run.
+	AnalysisError    string `json:"analysis_error"`
+	CompactedSummary string `json:"compacted_summary"`
 }
 
 // FilterStats tracks what the filter stage did.

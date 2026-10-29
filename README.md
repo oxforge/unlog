@@ -267,11 +267,12 @@ When using `--format json`, the output includes:
     "duration_ms": 310
   },
   "analysis": "",
+  "analysis_error": "",
   "compacted_summary": "## Incident Overview\n..."
 }
 ```
 
-Every key is always present. `survived` counts the distinct errors (one per source) that reach the summary, and `dropped` includes the merged repeats, so `ingested = dropped + survived`. `source_breakdown` counts ERROR and FATAL occurrences per source. `auto_detected_window` is always `false` (unlog never narrows the time range on its own; use `--since`/`--until`). With `--ai-provider`, `model_used`, `analysis` and `ai_duration_ms` are filled in.
+Every key is always present. `survived` counts the distinct errors (one per source) that reach the summary, and `dropped` includes the merged repeats, so `ingested = dropped + survived`. `source_breakdown` counts ERROR and FATAL occurrences per source. `auto_detected_window` is always `false` (unlog never narrows the time range on its own; use `--since`/`--until`). With `--ai-provider`, `model_used`, `analysis` and `ai_duration_ms` are filled in. If the AI call fails, the report is still written, with the reason in `analysis_error` (and any partial `analysis`), and unlog exits with code 1. The provider name and API key are checked before any log is read.
 
 ## Development
 

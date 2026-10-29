@@ -74,6 +74,14 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 		return err
 	}
 
+	// Check the AI provider (name, API key) before reading any input.
+	var provider analyze.Provider
+	if name := resolveProviderName(cmd); name != "" {
+		if provider, err = newProvider(name, resolveModelName(cmd), aiTimeout); err != nil {
+			return err
+		}
+	}
+
 	result, err := pipeline.New(pipeline.Options{
 		IngestOpts: ingest.IngestOptions{Location: loc},
 		FilterOpts: filterOpts,
@@ -83,13 +91,8 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	var ar *analyze.AnalysisResult
-
-	if effectiveProvider := resolveProviderName(cmd); effectiveProvider != "" {
-		provider, err := newProvider(effectiveProvider, resolveModelName(cmd), aiTimeout)
-		if err != nil {
-			return err
-		}
-
+	var aiErr error
+	if provider != nil {
 		var streamCB analyze.StreamCallback
 		if effectiveFormat == "text" {
 			streamW := os.Stdout
@@ -101,9 +104,14 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 			}
 		}
 
-		ar, err = analyze.Run(ctx, provider, result.Summary, cfg.SystemPrompt, streamCB)
-		if err != nil {
-			return fmt.Errorf("cmd: analyze: %w", err)
+		// A failed analysis still gets the report written below, with the
+		// error in it; the run then exits with the error.
+		ar, aiErr = analyze.Run(ctx, provider, result.Summary, cfg.SystemPrompt, streamCB)
+		if aiErr != nil {
+			if ar == nil {
+				ar = &analyze.AnalysisResult{ModelUsed: provider.Model()}
+			}
+			ar.Error = aiErr.Error()
 		}
 
 		if effectiveFormat == "text" {
@@ -156,5 +164,8 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 		printStats(os.Stderr, result, ar, verbose)
 	}
 
+	if aiErr != nil {
+		return fmt.Errorf("cmd: analyze: %w", aiErr)
+	}
 	return nil
 }

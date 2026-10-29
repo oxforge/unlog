@@ -21,4 +21,7 @@ type AnalysisResult struct {
 	Analysis  string
 	ModelUsed string
 	Duration  time.Duration
+	// Error says why the analysis failed; Analysis then holds the text that
+	// arrived before the failure.
+	Error string
 }

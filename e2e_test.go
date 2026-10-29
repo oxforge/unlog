@@ -621,3 +621,51 @@ func TestE2EInvalidTZFails(t *testing.T) {
 	assert.Equal(t, 1, r.exit)
 	assert.Contains(t, r.stderr, "invalid --tz value")
 }
+
+// A misconfigured provider fails before any log is read: the input path
+// below does not exist, and the error is about the provider, not the file.
+func TestE2EProviderIsCheckedBeforeReadingInput(t *testing.T) {
+	tests := []struct {
+		name       string
+		env        []string
+		provider   string
+		wantStderr string
+	}{
+		{"unknown provider", nil, "antropic", `unknown AI provider: "antropic"`},
+		{"missing API key", nil, "anthropic", "ANTHROPIC_API_KEY not set"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := runUnlog(t, t.TempDir(), tt.env, "--ai-provider", tt.provider, "nope.log")
+			assert.Equal(t, 1, r.exit)
+			assert.Contains(t, r.stderr, tt.wantStderr)
+			assert.NotContains(t, r.stderr, "nope.log")
+		})
+	}
+}
+
+// An AI failure still delivers the report: the proxy points at a closed
+// local port, so the call fails at once without touching the network.
+func TestE2EFailedAnalysisStillWritesTheReport(t *testing.T) {
+	logPath := writeFile(t, t.TempDir(), "app.log", levelFixture)
+	env := []string{"HTTPS_PROXY=http://127.0.0.1:1", "ANTHROPIC_API_KEY=test-key"}
+
+	r := runUnlog(t, t.TempDir(), env, "--format", "json", "--ai-provider", "anthropic", logPath)
+
+	assert.Equal(t, 1, r.exit)
+	var report map[string]any
+	require.NoError(t, json.Unmarshal([]byte(r.stdout), &report), "stdout: %s", r.stdout)
+	assert.Contains(t, report["compacted_summary"], "disk controller lost")
+	assert.Contains(t, report["analysis_error"], "anthropic")
+	assert.Contains(t, r.stderr, "anthropic")
+}
+
+func TestE2EReportHasAnEmptyAnalysisErrorWithoutAI(t *testing.T) {
+	logPath := writeFile(t, t.TempDir(), "app.log", levelFixture)
+	r := runUnlog(t, t.TempDir(), nil, "--format", "json", logPath)
+	require.Equal(t, 0, r.exit)
+
+	var report map[string]any
+	require.NoError(t, json.Unmarshal([]byte(r.stdout), &report))
+	assert.Equal(t, "", report["analysis_error"])
+}
