@@ -86,10 +86,13 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 
 	// Open --output before reading input or paying for an AI call. It is
 	// truncated only when the report is written; a file this run created is
-	// removed if the run fails before that.
+	// removed if the run fails before that. It is never read as input.
 	var outFile *os.File
 	written := false
 	if outputFlag != "" {
+		if err := checkNotAnInput(outputFlag, args); err != nil {
+			return err
+		}
 		_, statErr := os.Stat(outputFlag)
 		created := errors.Is(statErr, fs.ErrNotExist)
 		outFile, err = os.OpenFile(outputFlag, os.O_WRONLY|os.O_CREATE, 0o644)
@@ -107,7 +110,7 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	result, err := pipeline.New(pipeline.Options{
-		IngestOpts: ingest.IngestOptions{Location: loc},
+		IngestOpts: ingest.IngestOptions{Location: loc, Exclude: excludedInputs()},
 		FilterOpts: filterOpts,
 	}).Run(ctx, args)
 	if err != nil {
@@ -188,4 +191,28 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 		return &exitError{code: exitAIFailed, err: fmt.Errorf("cmd: %w", aiErr)}
 	}
 	return nil
+}
+
+// checkNotAnInput fails when output is one of the files named in args, which
+// writing the report would overwrite.
+func checkNotAnInput(output string, args []string) error {
+	out, err := os.Stat(output)
+	if err != nil {
+		return nil // not there yet, so no input is it
+	}
+	for _, arg := range args {
+		if in, err := os.Stat(arg); err == nil && os.SameFile(in, out) {
+			return fmt.Errorf("cmd: --output %s is one of the input files", output)
+		}
+	}
+	return nil
+}
+
+// excludedInputs lists the files the ingest stage must not read: the report
+// being written, which may sit in a directory being searched.
+func excludedInputs() []string {
+	if outputFlag == "" {
+		return nil
+	}
+	return []string{outputFlag}
 }

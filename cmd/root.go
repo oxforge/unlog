@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -60,6 +61,10 @@ var rootCmd = &cobra.Command{
 			cfg.Verbose = verbose
 		} else if cfg.Verbose {
 			verbose = cfg.Verbose
+		}
+		if verbose {
+			// Debug messages say which files were skipped and why.
+			slog.SetLogLoggerLevel(slog.LevelDebug)
 		}
 		if cmd.Flags().Changed("no-color") {
 			cfg.NoColor = noColor

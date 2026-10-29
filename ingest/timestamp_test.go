@@ -116,3 +116,26 @@ func TestFormatCacheYearlessTimestampsInAZone(t *testing.T) {
 		})
 	}
 }
+
+// A time that lands outside years 1-9999 can't be rendered as JSON; it is
+// not a timestamp.
+func TestFormatCacheRejectsYearsOutOfRange(t *testing.T) {
+	zone := func(name string) *time.Location {
+		loc, err := time.LoadLocation(name)
+		require.NoError(t, err)
+		return loc
+	}
+	for name, tt := range map[string]struct {
+		loc *time.Location
+		in  string
+	}{
+		"before year 1": {zone("Asia/Tokyo"), "0000-01-01 00:30:00"},
+		"after 9999":    {zone("America/New_York"), "9999-12-31 23:00:00"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			c := formatCache{loc: tt.loc}
+			_, ok := c.Parse(tt.in)
+			assert.False(t, ok)
+		})
+	}
+}

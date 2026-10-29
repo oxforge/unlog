@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -168,4 +169,99 @@ func TestIngesterFailsOnANamedFileItCannotRead(t *testing.T) {
 		require.Len(t, entries, 1)
 		assert.Equal(t, good, entries[0].Source)
 	})
+}
+
+// logrotate's copytruncate leaves a writer that kept its offset writing
+// after a run of NUL bytes; the text after them is the log.
+func TestIngesterReadsALogTruncatedInPlace(t *testing.T) {
+	dir := t.TempDir()
+	path := touch(t, dir, "app.log", strings.Repeat("\x00", 20*1024)+"2024-01-15 10:00:00 ERROR disk full\n")
+
+	for name, arg := range map[string]string{"walked": dir, "named": path} {
+		t.Run(name, func(t *testing.T) {
+			entries, err := runIngest(t, arg)
+			require.NoError(t, err)
+			require.Len(t, entries, 1)
+			assert.Contains(t, entries[0].Message, "disk full")
+		})
+	}
+}
+
+// A named directory or archive from which nothing could be read fails like
+// a named file would: the run must not pass with "0 errors".
+func TestIngesterFailsWhenANamedDirectoryHasNothingReadable(t *testing.T) {
+	binaryDir := t.TempDir()
+	touch(t, binaryDir, "app.log", wtmpBytes)
+	archive := touch(t, t.TempDir(), "bundle.tgz", tarGzipped(t, map[string]string{"var/log/wtmp": wtmpBytes}))
+
+	for name, arg := range map[string]string{"directory": binaryDir, "archive": archive} {
+		t.Run(name, func(t *testing.T) {
+			_, err := runIngest(t, arg)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), arg)
+		})
+	}
+
+	t.Run("one readable file is enough", func(t *testing.T) {
+		touch(t, binaryDir, "ok.log", "2024-01-15 10:00:00 ERROR disk full\n")
+		_, err := runIngest(t, binaryDir)
+		assert.NoError(t, err)
+	})
+}
+
+func TestExpandSourcesReadsTheSameFileOnce(t *testing.T) {
+	dir := t.TempDir()
+	touch(t, dir, "releases/1/log/app.log", "x\n")
+	require.NoError(t, os.Symlink(filepath.Join(dir, "releases", "1"), filepath.Join(dir, "current")))
+	t.Chdir(dir)
+
+	files, err := ExpandSources([]string{"current/log", "releases/1/log", filepath.Join(dir, "releases/1/log/app.log")})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{filepath.Join("current", "log", "app.log")}, files)
+}
+
+// A symlink to a directory outside the tree is followed once; one back into
+// the tree, or to an ancestor, is not, so nothing is read twice or loops.
+func TestExpandSourcesFollowsALinkOutOfTheTree(t *testing.T) {
+	data, logs := t.TempDir(), t.TempDir()
+	touch(t, data, "app/current.log", "x\n")
+	touch(t, logs, "sys.log", "x\n")
+	require.NoError(t, os.Symlink(filepath.Join(data, "app"), filepath.Join(logs, "app")))
+	require.NoError(t, os.Symlink(logs, filepath.Join(data, "app", "back")))
+	require.NoError(t, os.Symlink(logs, filepath.Join(logs, "self")))
+
+	files, err := ExpandSources([]string{logs})
+
+	require.NoError(t, err)
+	sort.Strings(files)
+	assert.Equal(t, []string{filepath.Join(logs, "app", "current.log"), filepath.Join(logs, "sys.log")}, files)
+}
+
+// A glob unlog expands itself is a search, like a directory: what it finds
+// that can't be read is skipped, not fatal.
+func TestIngesterSkipsUnreadableGlobMatches(t *testing.T) {
+	dir := t.TempDir()
+	touch(t, dir, "app.log", "2024-01-15 10:00:00 ERROR disk full\n")
+	touch(t, dir, "wtmp.log", wtmpBytes)
+
+	entries, err := runIngest(t, filepath.Join(dir, "*.log"))
+
+	require.NoError(t, err)
+	assert.Len(t, entries, 1)
+}
+
+func TestIngesterExcludesPaths(t *testing.T) {
+	dir := t.TempDir()
+	touch(t, dir, "app.log", "2024-01-15 10:00:00 ERROR disk full\n")
+	report := touch(t, dir, "report.txt", "2024-01-15 10:00:00 FATAL from an earlier report\n")
+	output := make(chan types.LogEntry, 10)
+
+	require.NoError(t, NewIngester(output, IngestOptions{Exclude: []string{report}}).Run(context.Background(), []string{dir}))
+
+	var sources []string
+	for e := range output {
+		sources = append(sources, filepath.Base(e.Source))
+	}
+	assert.Equal(t, []string{"app.log"}, sources)
 }

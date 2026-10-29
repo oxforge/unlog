@@ -797,3 +797,38 @@ func TestE2EServicesInOneFileAreToldApart(t *testing.T) {
 	assert.Contains(t, critical, "agg.log[search]: upstream refused {with="+logPath+"[payments]}")
 	assert.Equal(t, map[string]int64{logPath: 2}, report.Stats.SourceBreakdown, "source_breakdown stays per file")
 }
+
+// The report file is never read as input: not when it sits in a searched
+// directory, and naming it as an input is an error that leaves it alone.
+func TestE2EOutputFileIsNotAnInput(t *testing.T) {
+	dir := t.TempDir()
+	logPath := writeFile(t, dir, "app.log", levelFixture)
+	out := filepath.Join(dir, "report.txt")
+
+	for range 2 {
+		r := runUnlog(t, t.TempDir(), nil, "--output", out, dir)
+		require.Equal(t, 0, r.exit, "stderr: %s", r.stderr)
+	}
+	written, err := os.ReadFile(out)
+	require.NoError(t, err)
+	assert.Contains(t, string(written), "Events: 1 fatal, 1 error, 1 warn", "the earlier report isn't counted")
+
+	r := runUnlog(t, t.TempDir(), nil, "--output", logPath, logPath)
+	assert.Equal(t, 1, r.exit)
+	assert.Contains(t, r.stderr, "--output")
+	kept, err := os.ReadFile(logPath)
+	require.NoError(t, err)
+	assert.Equal(t, levelFixture, string(kept))
+}
+
+// -v shows why files were skipped.
+func TestE2EVerboseNamesSkippedFiles(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "app.log", levelFixture)
+	writeFile(t, dir, "wtmp", "\x00\x00\x07\x00root\x00")
+
+	r := runUnlog(t, t.TempDir(), nil, "-v", dir)
+
+	assert.Equal(t, 0, r.exit)
+	assert.Contains(t, r.stderr, "wtmp")
+}
