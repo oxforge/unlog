@@ -2,7 +2,6 @@ package analyze
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 )
@@ -63,7 +62,7 @@ func Run(ctx context.Context, provider Provider, summary, systemPrompt string, c
 
 	if err := <-errCh; err != nil {
 		result.Analysis = buf.String()
-		return result, fmt.Errorf("analyze: %w", err)
+		return result, err
 	}
 
 	result.Analysis = buf.String()

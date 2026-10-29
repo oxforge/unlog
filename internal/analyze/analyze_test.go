@@ -111,7 +111,9 @@ func TestRunProviderError(t *testing.T) {
 
 	result, err := Run(context.Background(), mp, "summary", "", nil)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "analyze:")
+	// Providers name themselves ("analyze: anthropic: ..."), so Run passes
+	// the error on as it is rather than prefixing it again.
+	assert.Equal(t, "mock: simulated error", err.Error())
 	assert.NotNil(t, result)
 }
 
