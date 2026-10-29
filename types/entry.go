@@ -31,7 +31,11 @@ type FilteredEntry struct {
 // EnrichedEntry is produced by Stage 3 (Enrich). Adds structural context.
 type EnrichedEntry struct {
 	FilteredEntry
-	ChainID        string   `json:"chain_id,omitempty"`
+	ChainID string `json:"chain_id,omitempty"`
+	// ChainStep is the stage (1-based) of the chain this entry matched, and
+	// ChainSteps the chain pattern's number of stages; both 0 outside a chain.
+	ChainStep      int      `json:"chain_step,omitempty"`
+	ChainSteps     int      `json:"chain_steps,omitempty"`
 	IsDeployment   bool     `json:"is_deployment"`
 	CorrelatedWith []string `json:"correlated_with,omitempty"`
 	ErrorType      string   `json:"error_type,omitempty"`

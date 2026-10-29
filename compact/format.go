@@ -44,14 +44,19 @@ func formatSummary(all []scoredEntry, bursts []types.Burst, tokenBudget int) str
 
 	claimed := make(map[int]bool)
 
-	var chainsRaw []scoredEntry
+	// A chain's members, whatever their level, are shown together in it;
+	// chains are ranked by their best-scored member (all is score-ordered).
+	var chainIDs []string
+	chains := make(map[string][]scoredEntry)
 	for i, se := range all {
-		if se.entry.ChainID != "" && (se.entry.Level == types.LevelFatal || se.entry.Level == types.LevelError) {
-			chainsRaw = append(chainsRaw, se)
+		if id := se.entry.ChainID; id != "" {
+			if _, ok := chains[id]; !ok {
+				chainIDs = append(chainIDs, id)
+			}
+			chains[id] = append(chains[id], se)
 			claimed[i] = true
 		}
 	}
-	chains := deduplicateByChain(chainsRaw)
 
 	var criticals []scoredEntry
 	for i, se := range all {
@@ -75,7 +80,7 @@ func formatSummary(all []scoredEntry, bursts []types.Burst, tokenBudget int) str
 	// Listed in the order leftover budget is handed out.
 	sections := []*entrySection{
 		newEntrySection(sectionCritical, criticals, sectionBudget(tokenBudget, budgetCritical)),
-		newEntrySection(sectionChains, chains, sectionBudget(tokenBudget, budgetChains)),
+		newChainSection(sectionChains, chainIDs, chains, sectionBudget(tokenBudget, budgetChains)),
 		newBurstSection(sectionAnomalies, bursts, sectionBudget(tokenBudget, budgetAnomalies)),
 		newEntrySection(sectionContext, contextEntries, sectionBudget(tokenBudget, budgetContext)),
 	}
@@ -107,6 +112,16 @@ func newEntrySection(title string, items []scoredEntry, budget int) *entrySectio
 	sec := &entrySection{title: title, budget: budget}
 	for _, se := range items {
 		sec.add(formatEntry(se.entry), se.entry.Timestamp)
+	}
+	return sec
+}
+
+// newChainSection lists each chain as one item, in the order of ids.
+func newChainSection(title string, ids []string, chains map[string][]scoredEntry, budget int) *entrySection {
+	sec := &entrySection{title: title, budget: budget}
+	for _, id := range ids {
+		text, start := formatChain(id, chains[id])
+		sec.add(text, start)
 	}
 	return sec
 }
@@ -353,9 +368,6 @@ func formatEntry(e types.EnrichedEntry) string {
 	sb.WriteString(capMessage(e.Message))
 
 	var tags []string
-	if e.ChainID != "" {
-		tags = append(tags, "chain="+e.ChainID)
-	}
 	if e.IsDeployment {
 		tags = append(tags, "deploy")
 	}
@@ -399,6 +411,37 @@ func formatSpan(start, end time.Time) string {
 	return span + "–" + end.Format(full)
 }
 
+// formatChain renders a chain: a header with its progress and span, then its
+// members in time order, each numbered with the step it matched.
+func formatChain(id string, members []scoredEntry) (string, time.Time) {
+	sorted := make([]types.EnrichedEntry, len(members))
+	for i, se := range members {
+		sorted[i] = se.entry
+	}
+	sort.SliceStable(sorted, func(i, j int) bool {
+		if !sorted[i].Timestamp.Equal(sorted[j].Timestamp) {
+			return sorted[i].Timestamp.Before(sorted[j].Timestamp)
+		}
+		return sorted[i].ChainStep < sorted[j].ChainStep
+	})
+	start, end, matched := sorted[0].Timestamp, sorted[0].Timestamp, 0
+	for _, e := range sorted {
+		if e.LastSeen.After(end) {
+			end = e.LastSeen
+		}
+		if e.Timestamp.After(end) {
+			end = e.Timestamp
+		}
+		matched = max(matched, e.ChainStep)
+	}
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "%s: %d of %d steps, %s", id, matched, sorted[0].ChainSteps, formatSpan(start, end))
+	for _, e := range sorted {
+		fmt.Fprintf(&sb, "\n  %d. %s", e.ChainStep, formatEntry(e))
+	}
+	return sb.String(), start
+}
+
 // formatBurst renders a burst: a header with its span, source, size and
 // normal rate, then one indented line per top error.
 func formatBurst(b types.Burst) string {
@@ -431,33 +474,6 @@ func capMessage(msg string) string {
 		cut--
 	}
 	return fmt.Sprintf("%s …[%d more bytes]", msg[:cut], len(msg)-cut)
-}
-
-// deduplicateByChain returns at most one entry per chain ID (the highest-scored).
-func deduplicateByChain(entries []scoredEntry) []scoredEntry {
-	best := make(map[string]scoredEntry)
-	for _, se := range entries {
-		if se.entry.ChainID == "" {
-			continue
-		}
-		if existing, seen := best[se.entry.ChainID]; !seen || se.score > existing.score {
-			best[se.entry.ChainID] = se
-		}
-	}
-
-	seen := make(map[string]bool)
-	var result []scoredEntry
-	for _, se := range entries {
-		if se.entry.ChainID == "" {
-			result = append(result, se)
-			continue
-		}
-		if !seen[se.entry.ChainID] {
-			seen[se.entry.ChainID] = true
-			result = append(result, best[se.entry.ChainID])
-		}
-	}
-	return result
 }
 
 // truncateToTokens truncates s so its estimated token count does not exceed budget.
