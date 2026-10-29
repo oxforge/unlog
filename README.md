@@ -23,8 +23,8 @@ unlog --ai-provider openai logs/
 - **12 log format parsers** -- JSON, logfmt, CSV, syslog (RFC 3164/5424 and rsyslog's file formats), Apache CLF, Docker JSON, Docker Compose, Kubernetes, CloudWatch, generic timestamped, and raw fallback. Format auto-detected via majority vote.
 - **Compressed file support** -- Reads `.gz`, `.tar.gz`, and `.tgz` files transparently.
 - **Noise removal** -- Built-in noise patterns (health checks, Prometheus scrapes, k8s internals) plus custom pattern files.
-- **Fuzzy deduplication** -- Normalizes UUIDs, IPs, timestamps, and paths to group similar messages. Sharded LRU cache for concurrent access.
-- **Rate spike detection** -- Per-source sliding window detects anomalous event rates.
+- **One line per error** -- Normalizes UUIDs, IPs, timestamps, and paths to group similar messages; each distinct error per source becomes one line with when it started and stopped and how many times it occurred. The same input always gives the same summary.
+- **Burst detection** -- Finds stretches where a source logged far above its normal rate, counted on real event volume, and lists the errors behind each burst.
 - **Error chain detection** -- 10 built-in patterns (DB exhaustion, OOM cascade, circuit breaker, disk full, cert expiry, DNS failure, etc.).
 - **Token-budgeted compaction** -- Priority-scored entries fit within LLM context windows.
 - **LLM analysis** -- Timeline, root cause, and recommendations in a single pass via OpenAI, Anthropic, Google Gemini, or Ollama.
@@ -203,7 +203,7 @@ unlog uses a 6-stage streaming pipeline connected by buffered Go channels:
 | Stage | Package | Description |
 |-------|---------|-------------|
 | 1. Ingest | `ingest/` | Read files, detect format, parse into structured entries |
-| 2. Filter | `filter/` | Level filter, time window, noise removal, dedup, spike detection |
+| 2. Filter | `filter/` | Level filter, time window, noise removal, one record per error, burst detection |
 | 3. Enrich | `enrich/` | Error chain detection, deployment events, field extraction |
 | 4. Compact | `compact/` | Priority scoring, token-budgeted compaction |
 | 5. Analyze | `internal/analyze/` | Optional single-pass LLM analysis |
@@ -239,21 +239,28 @@ When using `--format json`, the output includes:
 {
   "generated_at": "2024-01-15T12:00:00Z",
   "unlog_version": "1.0.0",
+  "model_used": "",
   "analysis_duration_ms": 1234,
+  "ai_duration_ms": 0,
   "stats": {
     "ingested": 50000,
-    "dropped": 49500,
-    "survived": 500,
-    "unique_signatures": 42,
+    "dropped": 49958,
+    "survived": 42,
+    "unique_signatures": 40,
     "time_window_start": "2024-01-15T10:00:00Z",
     "time_window_end": "2024-01-15T10:05:00Z",
-    "source_breakdown": { "api.log": 30, "db.log": 12 }
+    "auto_detected_window": false,
+    "source_breakdown": { "api.log": 3000, "db.log": 12 },
+    "file_count": 0,
+    "bytes_processed": 0,
+    "duration_ms": 310
   },
+  "analysis": "",
   "compacted_summary": "## Incident Overview\n..."
 }
 ```
 
-When AI analysis is included, the output adds an `analysis` field and `ai_duration_ms` timing.
+Every key is always present. `survived` counts the distinct errors (one per source) that reach the summary, and `dropped` includes the merged repeats, so `ingested = dropped + survived`. `source_breakdown` counts ERROR and FATAL occurrences per source. `auto_detected_window` is always `false` (unlog never narrows the time range on its own; use `--since`/`--until`). With `--ai-provider`, `model_used`, `analysis` and `ai_duration_ms` are filled in.
 
 ## Development
 
