@@ -13,7 +13,7 @@ import (
 
 // processFile routes to the appropriate handler based on file extension.
 // modTime is the file's mtime.
-func (ing *Ingester) processFile(ctx context.Context, path string, f io.ReadSeeker, modTime time.Time) error {
+func (ing *Ingester) processFile(ctx context.Context, path string, f io.Reader, modTime time.Time) error {
 	if isTarGz(path) {
 		return ing.processTarGz(ctx, path, f)
 	}
@@ -77,6 +77,10 @@ func (ing *Ingester) processTarGz(ctx context.Context, path string, r io.Reader)
 		if err := ing.processSource(ctx, source, tr, hdr.ModTime); err != nil {
 			if ctx.Err() != nil {
 				return ctx.Err()
+			}
+			if isNotText(err) {
+				slog.Debug("ingest: skipping tar entry", "archive", path, "entry", hdr.Name, "reason", err)
+				continue
 			}
 			slog.Warn("ingest: error processing tar entry", "archive", path, "entry", hdr.Name, "error", err)
 		}
