@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -442,4 +443,52 @@ func TestE2EVerboseStatsLabels(t *testing.T) {
 	assert.Contains(t, r.stderr, "Bursts:")
 	assert.NotContains(t, r.stderr, "Spike events")
 	assert.NotContains(t, r.stderr, "auto-window")
+}
+
+// burstLines returns spec example 4's input: a background error every 10 s
+// for 10 minutes from 10:00:00 and, when withBackground is false, only the 400
+// payment errors at 25 ms steps from 10:05:00.
+func burstLines(withBackground bool) string {
+	var b strings.Builder
+	base := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+	type line struct {
+		at  time.Time
+		msg string
+	}
+	var lines []line
+	if withBackground {
+		for i := 0; i < 60; i++ {
+			lines = append(lines, line{base.Add(time.Duration(i) * 10 * time.Second), fmt.Sprintf("cache miss for key user:%d", i)})
+		}
+	}
+	for i := 0; i < 400; i++ {
+		lines = append(lines, line{base.Add(5*time.Minute + time.Duration(i)*25*time.Millisecond),
+			fmt.Sprintf("payment gateway refused connection from 10.0.3.%d", i%250)})
+	}
+	sort.Slice(lines, func(i, j int) bool { return lines[i].at.Before(lines[j].at) })
+	for _, l := range lines {
+		fmt.Fprintf(&b, `{"level":"error","msg":%q,"time":%q}`+"\n", l.msg, l.at.Format(time.RFC3339Nano))
+	}
+	return b.String()
+}
+
+func TestE2EBurstIsReported(t *testing.T) {
+	logPath := writeFile(t, t.TempDir(), "same.log", burstLines(true))
+
+	anomalies := sectionOf(runJSON(t, logPath).CompactedSummary, "## Rate Anomalies")
+
+	assert.Contains(t, anomalies, "2024-01-15T10:05:00Z–10:05:09Z")
+	assert.Contains(t, anomalies, "401 events in 10s (normally quiet)")
+	assert.Contains(t, anomalies, "payment gateway refused connection")
+}
+
+func TestE2EExcerptHasNoBurst(t *testing.T) {
+	logPath := writeFile(t, t.TempDir(), "same.log", burstLines(false))
+
+	summary := runJSON(t, logPath).CompactedSummary
+
+	assert.Equal(t, "\n(none)\n", sectionOf(summary, "## Rate Anomalies"))
+	critical := sectionOf(summary, "## Critical Errors")
+	assert.Contains(t, critical, "2024-01-15T10:05:00Z–10:05:09Z [ERROR]")
+	assert.Contains(t, critical, "{×400}")
 }

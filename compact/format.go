@@ -2,6 +2,7 @@ package compact
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -38,7 +39,7 @@ const estimatedHeaderTokens = 5
 
 // formatSummary produces the structured text summary from scored and grouped entries.
 // Sections are mutually exclusive; priority: Error Chains > Rate Anomalies > Critical Errors > Context.
-func formatSummary(all []scoredEntry, tokenBudget int) string {
+func formatSummary(all []scoredEntry, bursts []types.Burst, tokenBudget int) string {
 	var sb strings.Builder
 
 	claimed := make(map[int]bool)
@@ -51,14 +52,6 @@ func formatSummary(all []scoredEntry, tokenBudget int) string {
 		}
 	}
 	chains := deduplicateByChain(chainsRaw)
-
-	var anomalies []scoredEntry
-	for i, se := range all {
-		if !claimed[i] && se.entry.IsSpike {
-			anomalies = append(anomalies, se)
-			claimed[i] = true
-		}
-	}
 
 	var criticals []scoredEntry
 	for i, se := range all {
@@ -76,14 +69,14 @@ func formatSummary(all []scoredEntry, tokenBudget int) string {
 	}
 
 	overviewBudget := sectionBudget(tokenBudget, budgetOverview)
-	overviewText := buildOverview(all)
+	overviewText := buildOverview(all, len(bursts))
 	writeSection(&sb, sectionOverview, truncateToTokens(overviewText, overviewBudget))
 
 	// Listed in the order leftover budget is handed out.
 	sections := []*entrySection{
 		newEntrySection(sectionCritical, criticals, sectionBudget(tokenBudget, budgetCritical)),
 		newEntrySection(sectionChains, chains, sectionBudget(tokenBudget, budgetChains)),
-		newEntrySection(sectionAnomalies, anomalies, sectionBudget(tokenBudget, budgetAnomalies)),
+		newBurstSection(sectionAnomalies, bursts, sectionBudget(tokenBudget, budgetAnomalies)),
 		newEntrySection(sectionContext, contextEntries, sectionBudget(tokenBudget, budgetContext)),
 	}
 	shareUnusedBudget(sections)
@@ -94,21 +87,46 @@ func formatSummary(all []scoredEntry, tokenBudget int) string {
 	return strings.TrimRight(sb.String(), "\n")
 }
 
-// entrySection is one section of entries with its rendered lines and budget.
+// entrySection is one section of rendered items (entries or bursts), most
+// important first, with their budget.
 type entrySection struct {
 	title  string
-	items  []scoredEntry // highest score first
-	lines  []string      // lines[i] renders items[i]
-	tokens []int         // tokens[i] is the cost of lines[i] with its newline
+	lines  []string    // one rendered item each; a burst spans several lines
+	tokens []int       // tokens[i] is the cost of lines[i] with its newline
+	at     []time.Time // at[i] is when item i happened, for listing in time order
 	budget int
 }
 
+func (sec *entrySection) add(text string, at time.Time) {
+	sec.lines = append(sec.lines, text)
+	sec.tokens = append(sec.tokens, EstimateTokens(text+"\n"))
+	sec.at = append(sec.at, at)
+}
+
 func newEntrySection(title string, items []scoredEntry, budget int) *entrySection {
-	sec := &entrySection{title: title, items: items, budget: budget}
+	sec := &entrySection{title: title, budget: budget}
 	for _, se := range items {
-		line := formatEntry(se.entry)
-		sec.lines = append(sec.lines, line)
-		sec.tokens = append(sec.tokens, EstimateTokens(line+"\n"))
+		sec.add(formatEntry(se.entry), se.entry.Timestamp)
+	}
+	return sec
+}
+
+// newBurstSection ranks bursts by event count (then start, then source) so
+// the largest survive a short budget.
+func newBurstSection(title string, bursts []types.Burst, budget int) *entrySection {
+	ranked := append([]types.Burst(nil), bursts...)
+	sort.SliceStable(ranked, func(i, j int) bool {
+		if ranked[i].Events != ranked[j].Events {
+			return ranked[i].Events > ranked[j].Events
+		}
+		if !ranked[i].Start.Equal(ranked[j].Start) {
+			return ranked[i].Start.Before(ranked[j].Start)
+		}
+		return ranked[i].Source < ranked[j].Source
+	})
+	sec := &entrySection{title: title, budget: budget}
+	for _, b := range ranked {
+		sec.add(formatBurst(b), b.Start)
 	}
 	return sec
 }
@@ -151,14 +169,14 @@ func (sec *entrySection) write(sb *strings.Builder) {
 	sb.WriteString(sec.title)
 	sb.WriteString("\n")
 
-	if len(sec.items) == 0 {
+	if len(sec.lines) == 0 {
 		sb.WriteString("(none)\n\n")
 		return
 	}
 
 	var chosen []int
 	used := 0
-	for i := range sec.items {
+	for i := range sec.lines {
 		if used+sec.tokens[i] > sec.budget && len(chosen) > 0 {
 			break
 		}
@@ -167,7 +185,7 @@ func (sec *entrySection) write(sb *strings.Builder) {
 	}
 
 	sort.SliceStable(chosen, func(a, b int) bool {
-		ta, tb := sec.items[chosen[a]].entry.Timestamp, sec.items[chosen[b]].entry.Timestamp
+		ta, tb := sec.at[chosen[a]], sec.at[chosen[b]]
 		if ta.IsZero() != tb.IsZero() {
 			return tb.IsZero()
 		}
@@ -177,7 +195,7 @@ func (sec *entrySection) write(sb *strings.Builder) {
 		sb.WriteString(sec.lines[i])
 		sb.WriteString("\n")
 	}
-	if omitted := len(sec.items) - len(chosen); omitted > 0 {
+	if omitted := len(sec.lines) - len(chosen); omitted > 0 {
 		fmt.Fprintf(sb, "... (%d more entries omitted)\n", omitted)
 	}
 	sb.WriteString("\n")
@@ -194,7 +212,7 @@ func sectionBudget(totalBudget int, fraction float64) int {
 }
 
 // buildOverview produces a short incident summary paragraph from all entries.
-func buildOverview(all []scoredEntry) string {
+func buildOverview(all []scoredEntry, burstCount int) string {
 	if len(all) == 0 {
 		return "No significant log entries found."
 	}
@@ -204,7 +222,6 @@ func buildOverview(all []scoredEntry) string {
 	sources := make(map[string]struct{})
 	var chainIDs []string
 	chainSeen := make(map[string]struct{})
-	spikeCount := 0
 
 	for _, se := range all {
 		e := se.entry
@@ -237,9 +254,6 @@ func buildOverview(all []scoredEntry) string {
 				chainIDs = append(chainIDs, e.ChainID)
 			}
 		}
-		if e.IsSpike {
-			spikeCount++
-		}
 	}
 
 	var parts []string
@@ -258,8 +272,8 @@ func buildOverview(all []scoredEntry) string {
 	if len(chainIDs) > 0 {
 		parts = append(parts, fmt.Sprintf("Error chains detected: %s", strings.Join(chainIDs, ", ")))
 	}
-	if spikeCount > 0 {
-		parts = append(parts, fmt.Sprintf("Rate spikes: %d", spikeCount))
+	if burstCount > 0 {
+		parts = append(parts, fmt.Sprintf("Bursts: %d", burstCount))
 	}
 
 	return strings.Join(parts, "\n")
@@ -374,6 +388,27 @@ func formatSpan(start, end time.Time) string {
 		return span + "–" + end.Format("15:04:05Z")
 	}
 	return span + "–" + end.Format(full)
+}
+
+// formatBurst renders a burst: a header with its span, source, size and
+// normal rate, then one indented line per top error.
+func formatBurst(b types.Burst) string {
+	dur := b.End.Sub(b.Start) + time.Second
+	normal := "(normally quiet)"
+	if b.Baseline > 0 {
+		rate := float64(b.Events) / dur.Seconds()
+		normal = fmt.Sprintf("(normal ~%.1f/s, %d× above)", b.Baseline, int(math.Round(rate/b.Baseline)))
+	}
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "%s %s: %d events in %s %s", formatSpan(b.Start, b.End), b.Source, b.Events, dur, normal)
+	for _, te := range b.TopErrors {
+		sb.WriteString("\n  ")
+		sb.WriteString(capMessage(te.Message))
+		if te.Count > 1 {
+			fmt.Fprintf(&sb, " {×%d}", te.Count)
+		}
+	}
+	return sb.String()
 }
 
 // capMessage cuts msg to at most maxMessageBytes on a UTF-8 boundary and says
