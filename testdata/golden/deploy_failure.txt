@@ -1,7 +1,7 @@
 ## Incident Overview
 Window: 2024-01-15T14:01:55Z — 2024-01-15T14:03:00Z (1m5s)
 Sources: 2 (testdata/incidents/deploy_failure/app.log, testdata/incidents/deploy_failure/deploy.log)
-Events: 0 fatal, 13 error (8 distinct), 4 warn
+Events: 0 fatal, 13 error (11 distinct), 4 warn
 Last deployment: 2024-01-15T14:02:00Z, 15s before the first error
 Error chains detected: deployment-failure
 
@@ -11,26 +11,29 @@ Error chains detected: deployment-failure
 2024-01-15T14:02:00Z [INFO] testdata/incidents/deploy_failure/deploy.log: INFO  rolling update initiated: 3 pods, max-surge=1, max-unavailable=0 {deploy}
 
 ## Critical Errors
-2024-01-15T14:02:15Z–14:02:20Z [ERROR] testdata/incidents/deploy_failure/deploy.log: ERROR pod app-pod-2 failed readiness probe: HTTP 503 {×2}
-2024-01-15T14:02:20Z–14:02:21Z [ERROR] testdata/incidents/deploy_failure/app.log: request timeout: upstream unavailable {×2 http=503}
-2024-01-15T14:02:25Z–14:02:30Z [ERROR] testdata/incidents/deploy_failure/app.log: deployment probe failed: readiness check timeout {×2}
-2024-01-15T14:02:30Z [ERROR] testdata/incidents/deploy_failure/deploy.log: ERROR deployment stalled: 1/3 pods healthy, required 2/3
-2024-01-15T14:02:35Z–14:02:40Z [ERROR] testdata/incidents/deploy_failure/app.log: too many probe failures, pod CrashLoopBackOff {×2}
+2024-01-15T14:02:15Z–14:02:20Z [ERROR] testdata/incidents/deploy_failure/deploy.log: ERROR pod app-pod-2 failed readiness probe: HTTP 503 {×2 with=testdata/incidents/deploy_failure/app.log[app-pod-2]}
+2024-01-15T14:02:20Z–14:02:21Z [ERROR] testdata/incidents/deploy_failure/app.log: request timeout: upstream unavailable {×2 http=503 with=testdata/incidents/deploy_failure/app.log[app-pod-2],testdata/incidents/deploy_failure/app.log[app-pod-3],testdata/incidents/deploy_failure/deploy.log}
+2024-01-15T14:02:25Z [ERROR] testdata/incidents/deploy_failure/app.log[app-pod-2]: deployment probe failed: readiness check timeout {with=testdata/incidents/deploy_failure/app.log}
+2024-01-15T14:02:30Z [ERROR] testdata/incidents/deploy_failure/app.log[app-pod-3]: deployment probe failed: readiness check timeout {with=testdata/incidents/deploy_failure/app.log[app-pod-2],testdata/incidents/deploy_failure/deploy.log}
+2024-01-15T14:02:30Z [ERROR] testdata/incidents/deploy_failure/deploy.log: ERROR deployment stalled: 1/3 pods healthy, required 2/3 {with=testdata/incidents/deploy_failure/app.log[app-pod-2],testdata/incidents/deploy_failure/app.log[app-pod-3]}
+2024-01-15T14:02:35Z [ERROR] testdata/incidents/deploy_failure/app.log[app-pod-2]: too many probe failures, pod CrashLoopBackOff {with=testdata/incidents/deploy_failure/app.log[app-pod-3],testdata/incidents/deploy_failure/deploy.log}
+2024-01-15T14:02:40Z [ERROR] testdata/incidents/deploy_failure/app.log[app-pod-3]: too many probe failures, pod CrashLoopBackOff {with=testdata/incidents/deploy_failure/app.log[app-pod-2],testdata/incidents/deploy_failure/deploy.log}
 
 ## Error Chains
 deployment-failure: 3 of 3 steps, 2024-01-15T14:01:55Z–14:02:35Z
   1. 2024-01-15T14:01:55Z [INFO] testdata/incidents/deploy_failure/deploy.log: INFO  deployment started: app-deployment to version 3.3.0 {deploy}
   1. 2024-01-15T14:02:00Z [INFO] testdata/incidents/deploy_failure/app.log: rolling update started {deploy}
   1. 2024-01-15T14:02:00Z [INFO] testdata/incidents/deploy_failure/deploy.log: INFO  rolling update initiated: 3 pods, max-surge=1, max-unavailable=0 {deploy}
-  2. 2024-01-15T14:02:15Z–14:02:16Z [ERROR] testdata/incidents/deploy_failure/app.log: health check failed: connection refused {×2}
-  2. 2024-01-15T14:02:25Z [ERROR] testdata/incidents/deploy_failure/deploy.log: ERROR deployment health check failed: insufficient healthy pods
-  3. 2024-01-15T14:02:35Z [ERROR] testdata/incidents/deploy_failure/deploy.log: ERROR deployment failure threshold exceeded: initiating rollback
+  2. 2024-01-15T14:02:15Z [ERROR] testdata/incidents/deploy_failure/app.log[app-pod-2]: health check failed: connection refused
+  2. 2024-01-15T14:02:16Z [ERROR] testdata/incidents/deploy_failure/app.log[app-pod-3]: health check failed: connection refused {with=testdata/incidents/deploy_failure/app.log[app-pod-2],testdata/incidents/deploy_failure/deploy.log}
+  2. 2024-01-15T14:02:25Z [ERROR] testdata/incidents/deploy_failure/deploy.log: ERROR deployment health check failed: insufficient healthy pods {with=testdata/incidents/deploy_failure/app.log,testdata/incidents/deploy_failure/app.log[app-pod-2]}
+  3. 2024-01-15T14:02:35Z [ERROR] testdata/incidents/deploy_failure/deploy.log: ERROR deployment failure threshold exceeded: initiating rollback {with=testdata/incidents/deploy_failure/app.log[app-pod-2],testdata/incidents/deploy_failure/app.log[app-pod-3]}
 
 ## Rate Anomalies
 (none)
 
 ## Context
-2024-01-15T14:02:10Z [WARN] testdata/incidents/deploy_failure/app.log: health check degraded: pod restarting
+2024-01-15T14:02:10Z [WARN] testdata/incidents/deploy_failure/app.log[app-pod-2]: health check degraded: pod restarting
 2024-01-15T14:02:10Z [WARN] testdata/incidents/deploy_failure/deploy.log: WARN  pod app-pod-2 readiness probe failing
 2024-01-15T14:02:40Z [WARN] testdata/incidents/deploy_failure/deploy.log: WARN  rollback initiated: reverting to version 3.2.1
 2024-01-15T14:03:00Z [WARN] testdata/incidents/deploy_failure/app.log: rolling back deployment

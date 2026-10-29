@@ -229,3 +229,29 @@ func TestBurstFromSlowStormInQuietSource(t *testing.T) {
 	assert.Equal(t, int64(2430), bursts[0].Events) // 2,400 timeouts + 30 background errors inside
 	assert.Equal(t, int64(2400), bursts[0].TopErrors[0].Count)
 }
+
+func TestBurstsArePerService(t *testing.T) {
+	d := NewDedupFilter(4)
+	var notes []occurrence
+	add := func(at time.Time, service, msg string) {
+		id := d.Add(types.LogEntry{Timestamp: at, Level: types.LevelError, Source: "agg.log", Service: service, Message: msg})
+		notes = append(notes, occurrence{record: id, second: at.Unix()})
+	}
+	// search logs 5 errors a second for 10 minutes; payments is quiet but for
+	// 200 errors in 10 seconds. Mixed together, payments' burst would be under
+	// 10x search's rate; per service it stands out.
+	for i := 0; i < 3000; i++ {
+		add(burstBase.Add(time.Duration(i)*200*time.Millisecond), "search", fmt.Sprintf("index shard %d slow", i))
+	}
+	add(burstBase, "payments", "heartbeat")
+	add(burstBase.Add(10*time.Minute), "payments", "heartbeat")
+	for i := 0; i < 200; i++ {
+		add(burstBase.Add(5*time.Minute+time.Duration(i)*50*time.Millisecond), "payments", fmt.Sprintf("card %d declined", i))
+	}
+
+	bursts := detectBursts(notes, d, 10, 20)
+
+	require.Len(t, bursts, 1)
+	assert.Equal(t, "agg.log", bursts[0].Source)
+	assert.Equal(t, "payments", bursts[0].Service)
+}

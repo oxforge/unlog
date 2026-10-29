@@ -128,3 +128,18 @@ func TestDedupCountsOccurrencesPerLevel(t *testing.T) {
 	require.Len(t, entries, 1)
 	assert.Equal(t, map[types.Level]int{types.LevelWarn: 1, types.LevelError: 2}, entries[0].OccurrencesByLevel)
 }
+
+func TestDedupSplitsServicesWithinAFile(t *testing.T) {
+	d := NewDedupFilter(4)
+	at := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+	d.Add(types.LogEntry{Timestamp: at, Level: types.LevelError, Source: "agg.log", Service: "payments", Message: "upstream refused"})
+	d.Add(types.LogEntry{Timestamp: at, Level: types.LevelError, Source: "agg.log", Service: "search", Message: "upstream refused"})
+	d.Add(types.LogEntry{Timestamp: at.Add(time.Second), Level: types.LevelError, Source: "agg.log", Service: "payments", Message: "upstream refused"})
+
+	entries := d.Entries()
+
+	require.Len(t, entries, 2)
+	assert.Equal(t, "payments", entries[0].Service)
+	assert.Equal(t, 2, entries[0].OccurrenceCount)
+	assert.Equal(t, "search", entries[1].Service)
+}

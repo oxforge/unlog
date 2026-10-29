@@ -31,8 +31,12 @@ type Enricher struct {
 	corr   *Correlator
 }
 
-// NewEnricher creates an Enricher wired to the given channels.
+// NewEnricher creates an Enricher wired to the given channels. Zero option
+// fields take their defaults.
 func NewEnricher(input <-chan types.FilteredEntry, output chan<- types.EnrichedEntry, opts EnrichOptions) *Enricher {
+	if opts.CorrelationWindow <= 0 {
+		opts.CorrelationWindow = DefaultOptions().CorrelationWindow
+	}
 	return &Enricher{
 		input:  input,
 		output: output,

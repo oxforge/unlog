@@ -99,8 +99,8 @@ func TestE2EIncidentDBConnection(t *testing.T) {
 	assert.Contains(t, report.CompactedSummary, "circuit breaker open")
 	// db.log holds the root cause; it must reach the summary as errors.
 	critical := sectionOf(report.CompactedSummary, "## Critical Errors")
-	assert.Contains(t, critical, "2024-01-15T10:31:10Z [FATAL] testdata/incidents/db_connection/db.log: FATAL:  out of memory: shared buffers exhausted")
-	assert.Contains(t, report.CompactedSummary, "[ERROR] testdata/incidents/db_connection/db.log: ERROR:  max_connections limit reached")
+	assert.Contains(t, critical, "2024-01-15T10:31:10Z [FATAL] testdata/incidents/db_connection/db.log[postgres]: FATAL:  out of memory: shared buffers exhausted")
+	assert.Contains(t, report.CompactedSummary, "[ERROR] testdata/incidents/db_connection/db.log[postgres]: ERROR:  max_connections limit reached")
 }
 
 func TestE2EDebugLevelReachesSummary(t *testing.T) {
@@ -668,4 +668,18 @@ func TestE2EReportHasAnEmptyAnalysisErrorWithoutAI(t *testing.T) {
 	var report map[string]any
 	require.NoError(t, json.Unmarshal([]byte(r.stdout), &report))
 	assert.Equal(t, "", report["analysis_error"])
+}
+
+func TestE2EServicesInOneFileAreToldApart(t *testing.T) {
+	logPath := writeFile(t, t.TempDir(), "agg.log",
+		`{"level":"error","service":"payments","msg":"upstream refused","time":"2024-01-15T10:00:00Z"}
+{"level":"error","service":"search","msg":"upstream refused","time":"2024-01-15T10:00:02Z"}
+`)
+
+	report := runJSON(t, logPath)
+
+	critical := sectionOf(report.CompactedSummary, "## Critical Errors")
+	assert.Contains(t, critical, "agg.log[payments]: upstream refused")
+	assert.Contains(t, critical, "agg.log[search]: upstream refused {with="+logPath+"[payments]}")
+	assert.Equal(t, map[string]int64{logPath: 2}, report.Stats.SourceBreakdown, "source_breakdown stays per file")
 }

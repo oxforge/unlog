@@ -17,6 +17,7 @@ const (
 	weightSpike      = 40 // rate spike detected by filter stage
 	weightChain      = 50 // entry participates in a known error chain
 	weightDeployment = 30 // entry is a deployment/restart event
+	weightConcurrent = 10 // other sources failed within seconds of this error
 
 	// Occurrence weight: log(occurrenceCount) * this factor.
 	// Capped at occurrenceCap to prevent one noisy pattern dominating.
@@ -37,6 +38,9 @@ func Score(e types.EnrichedEntry) int {
 	}
 	if e.IsDeployment {
 		score += weightDeployment
+	}
+	if len(e.CorrelatedWith) > 0 {
+		score += weightConcurrent
 	}
 
 	// Occurrence bonus: repeated events are more significant up to a cap.

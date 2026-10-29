@@ -885,3 +885,38 @@ func TestRun_ErrorLevelDeployLineStaysInCriticalErrors(t *testing.T) {
 	assert.Contains(t, extractSection(summary, "## Critical Errors", "## Error Chains"), "service restarted after crash {deploy}")
 	assert.Contains(t, extractSection(summary, "## Deployments", "## Critical Errors"), "service restarted after crash")
 }
+
+// ─── Services and concurrent failures ───────────────────────────────────────
+
+func TestFormatEntryShowsTheService(t *testing.T) {
+	at := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+	e := spanEntry(types.LevelError, "card declined", "agg.log", at, at, 1)
+	e.Service = "payments"
+
+	assert.Equal(t, "2024-01-15T10:00:00Z [ERROR] agg.log[payments]: card declined", formatEntry(e))
+}
+
+func TestFormatEntryNamesConcurrentFailures(t *testing.T) {
+	at := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+	e := spanEntry(types.LevelError, "request failed", "api.log", at, at, 1)
+	e.CorrelatedWith = []string{"agg.log[payments]", "cache.log", "db.log", "queue.log"}
+
+	assert.Equal(t, "2024-01-15T10:00:00Z [ERROR] api.log: request failed {with=agg.log[payments],cache.log,db.log,+1}", formatEntry(e))
+}
+
+func TestScore_ConcurrentFailureAddsPoints(t *testing.T) {
+	alone := makeEntry(types.LevelError, "x", "api.log", time.Time{})
+	together := alone
+	together.CorrelatedWith = []string{"db.log"}
+
+	assert.Greater(t, Score(together), Score(alone))
+}
+
+func TestRun_BurstHeaderShowsTheService(t *testing.T) {
+	b := exampleBurst()
+	b.Source, b.Service = "agg.log", "payments"
+	summary := runWithBursts(t,
+		[]types.EnrichedEntry{makeEntry(types.LevelError, "x", "agg.log", b.Start)}, []types.Burst{b})
+
+	assert.Contains(t, summary, "2024-01-15T10:05:00Z–10:05:09Z agg.log[payments]: 401 events in 10s")
+}

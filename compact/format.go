@@ -413,8 +413,8 @@ func formatEntry(e types.EnrichedEntry) string {
 	sb.WriteString(" [")
 	sb.WriteString(e.Level.String())
 	sb.WriteString("] ")
-	if e.Source != "" {
-		sb.WriteString(e.Source)
+	if origin := e.Origin(); origin != "" {
+		sb.WriteString(origin)
 		sb.WriteString(": ")
 	}
 	sb.WriteString(capMessage(e.Message))
@@ -437,6 +437,9 @@ func formatEntry(e types.EnrichedEntry) string {
 	}
 	if e.TraceID != "" {
 		tags = append(tags, "trace="+e.TraceID)
+	}
+	if len(e.CorrelatedWith) > 0 {
+		tags = append(tags, "with="+joinCapped(e.CorrelatedWith, 3))
 	}
 
 	if len(tags) > 0 {
@@ -504,7 +507,8 @@ func formatBurst(b types.Burst) string {
 		normal = fmt.Sprintf("(normal ~%.1f/s, %d× above)", b.Baseline, int(math.Round(rate/b.Baseline)))
 	}
 	var sb strings.Builder
-	fmt.Fprintf(&sb, "%s %s: %d events in %s %s", formatSpan(b.Start, b.End), b.Source, b.Events, dur, normal)
+	origin := types.LogEntry{Source: b.Source, Service: b.Service}.Origin()
+	fmt.Fprintf(&sb, "%s %s: %d events in %s %s", formatSpan(b.Start, b.End), origin, b.Events, dur, normal)
 	for _, te := range b.TopErrors {
 		sb.WriteString("\n  ")
 		sb.WriteString(capMessage(te.Message))
@@ -513,6 +517,15 @@ func formatBurst(b types.Burst) string {
 		}
 	}
 	return sb.String()
+}
+
+// joinCapped joins up to limit items with commas and counts the rest
+// ("a,b,c,+2").
+func joinCapped(items []string, limit int) string {
+	if len(items) <= limit {
+		return strings.Join(items, ",")
+	}
+	return strings.Join(items[:limit], ",") + fmt.Sprintf(",+%d", len(items)-limit)
 }
 
 // capMessage cuts msg to at most maxMessageBytes on a UTF-8 boundary and says

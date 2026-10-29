@@ -88,3 +88,24 @@ func TestCSVHeaderIsNotAnEntry(t *testing.T) {
 	assert.Equal(t, "disk full", entries[0].Message)
 	assert.Equal(t, int64(0), stats.Unparsed)
 }
+
+func TestServiceComesFromTheLine(t *testing.T) {
+	tests := []struct {
+		name   string
+		source string
+		text   string
+		want   string
+	}{
+		{"JSON service field", "agg.log", `{"level":"error","service":"payments","msg":"declined","time":"2024-01-15T10:00:00Z"}` + "\n", "payments"},
+		{"compose container", "compose.log", "web-1  | 2024-01-15 10:00:00 ERROR request failed\n", "web-1"},
+		{"syslog program", "syslog", "Jan 15 10:00:00 db-01 postgres[1234]: ERROR:  disk full\n", "postgres"},
+		{"nothing names one", "app.log", "2024-01-15 10:00:00 ERROR request failed\n", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			entries, _ := ingestText(t, tt.source, tt.text)
+			require.Len(t, entries, 1)
+			assert.Equal(t, tt.want, entries[0].Service)
+		})
+	}
+}

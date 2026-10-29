@@ -76,9 +76,10 @@ func TestEnricher_Integration(t *testing.T) {
 	// Entry 2: error type extracted.
 	assert.Equal(t, "ConnectionRefused", results[2].ErrorType)
 
-	// Entries 1 and 2 should be correlated with previous sources (within 5s).
-	assert.NotNil(t, results[1].CorrelatedWith)
-	assert.NotNil(t, results[2].CorrelatedWith)
+	// Only errors correlate: the INFO deploy line is not tagged; the db error
+	// started 2s after the api error.
+	assert.Nil(t, results[1].CorrelatedWith)
+	assert.Equal(t, []string{"api-svc"}, results[2].CorrelatedWith)
 }
 
 func TestEnricher_ContextCancellation(t *testing.T) {
@@ -107,4 +108,19 @@ func TestEnricher_EmptyInput(t *testing.T) {
 	// Output should be closed with no entries.
 	_, ok := <-output
 	assert.False(t, ok)
+}
+
+// The pipeline passes zero options; the 5s correlation window must still apply.
+func TestEnricher_ZeroOptionsUseTheDefaultWindow(t *testing.T) {
+	input := make(chan types.FilteredEntry, 2)
+	output := make(chan types.EnrichedEntry, 2)
+	base := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
+	input <- types.FilteredEntry{LogEntry: types.LogEntry{Timestamp: base, Level: types.LevelError, Source: "api", Message: "request failed"}}
+	input <- types.FilteredEntry{LogEntry: types.LogEntry{Timestamp: base.Add(2 * time.Second), Level: types.LevelError, Source: "db", Message: "disk full"}}
+	close(input)
+
+	require.NoError(t, NewEnricher(input, output, EnrichOptions{}).Run(context.Background()))
+
+	<-output
+	assert.Equal(t, []string{"api"}, (<-output).CorrelatedWith)
 }
