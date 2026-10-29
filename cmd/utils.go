@@ -30,8 +30,8 @@ func printStats(w io.Writer, result *pipeline.Result, ar *analyze.AnalysisResult
 		_, _ = fmt.Fprintf(w, "Dropped by level:       %d\n", ds.DroppedByLevel)
 		_, _ = fmt.Fprintf(w, "Dropped by time window: %d\n", ds.DroppedByTimeWindow)
 		_, _ = fmt.Fprintf(w, "Dropped by noise:       %d\n", ds.DroppedByNoise)
-		_, _ = fmt.Fprintf(w, "Dropped by dedup:       %d\n", ds.DroppedByDedup)
-		_, _ = fmt.Fprintf(w, "Spike events:           %d\n", ds.SpikeCount)
+		_, _ = fmt.Fprintf(w, "Merged duplicates:      %d\n", ds.DroppedByDedup)
+		_, _ = fmt.Fprintf(w, "Bursts:                 %d\n", ds.BurstCount)
 
 		if len(result.IngestStats) > 0 {
 			_, _ = fmt.Fprintln(w, "\n--- Sources ---")

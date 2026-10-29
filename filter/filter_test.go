@@ -312,3 +312,33 @@ func TestFilterOutputIsDeterministic(t *testing.T) {
 		require.Equal(t, first, run(seed), "run %d differs", seed)
 	}
 }
+
+func TestFilterPipelineReportsBursts(t *testing.T) {
+	input := make(chan types.LogEntry, 1000)
+	output := make(chan types.FilteredEntry, 1000)
+	base := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+	for i := 0; i < 60; i++ {
+		input <- types.LogEntry{Timestamp: base.Add(time.Duration(i) * 10 * time.Second), Level: types.LevelError,
+			Source: "same.log", Message: fmt.Sprintf("cache miss for key user:%d", i)}
+	}
+	for i := 0; i < 400; i++ {
+		input <- types.LogEntry{Timestamp: base.Add(5*time.Minute + time.Duration(i)*25*time.Millisecond),
+			Level: types.LevelError, Source: "same.log",
+			Message: fmt.Sprintf("payment gateway refused connection from 10.0.3.%d", i)}
+	}
+	close(input)
+
+	p := NewFilterPipeline(input, output, DefaultFilterOptions(), nil)
+	_, detailed, err := p.Run(context.Background())
+
+	require.NoError(t, err)
+	assert.Len(t, p.Bursts(), 1)
+	assert.Equal(t, int64(1), detailed.BurstCount)
+	var spikes int
+	for e := range output {
+		if e.IsSpike {
+			spikes++
+		}
+	}
+	assert.Equal(t, 2, spikes)
+}

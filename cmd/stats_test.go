@@ -262,7 +262,7 @@ func TestStatsOutput(t *testing.T) {
 			// --- Detailed Breakdown section ---
 			assert.Contains(t, output, "--- Detailed Breakdown ---")
 			assert.Contains(t, output, "Dropped by level:")
-			assert.Contains(t, output, "Dropped by dedup:")
+			assert.Contains(t, output, "Merged duplicates:")
 
 			// --- Sources section ---
 			assert.Contains(t, output, "--- Sources ---")
