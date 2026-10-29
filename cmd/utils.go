@@ -74,10 +74,10 @@ func isTerminal(f *os.File) bool {
 	return fi.Mode()&os.ModeCharDevice != 0
 }
 
-// parseTimeFlag parses a relative duration ("2h") or ISO 8601 timestamp.
-func parseTimeFlag(s string, now time.Time) (time.Time, error) {
-	d, err := time.ParseDuration(s)
-	if err == nil {
+// parseTimeFlag parses a relative duration ("2h", before now) or a timestamp;
+// a timestamp without a zone is read in loc, as log timestamps are.
+func parseTimeFlag(s string, now time.Time, loc *time.Location) (time.Time, error) {
+	if d, err := time.ParseDuration(s); err == nil {
 		return now.Add(-d), nil
 	}
 
@@ -88,13 +88,7 @@ func parseTimeFlag(s string, now time.Time) (time.Time, error) {
 		"2006-01-02",
 	}
 	for _, layout := range layouts {
-		var t time.Time
-		if layout == time.RFC3339 {
-			t, err = time.Parse(layout, s)
-		} else {
-			t, err = time.ParseInLocation(layout, s, time.Local)
-		}
-		if err == nil {
+		if t, err := time.ParseInLocation(layout, s, loc); err == nil {
 			return t, nil
 		}
 	}

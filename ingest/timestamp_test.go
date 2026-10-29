@@ -2,8 +2,10 @@ package ingest
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseTimestamp(t *testing.T) {
@@ -34,7 +36,7 @@ func TestParseTimestamp(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ts, _, ok := parseTimestamp(tt.input)
+			ts, _, ok := parseTimestamp(tt.input, time.UTC)
 			assert.Equal(t, tt.wantOK, ok)
 			if tt.wantOK && tt.wantYear > 0 {
 				assert.Equal(t, tt.wantYear, ts.Year())
@@ -57,4 +59,23 @@ func TestTimestampFormatCache(t *testing.T) {
 	ts3, ok := cache.Parse("2024-01-15 12:00:00")
 	assert.True(t, ok)
 	assert.Equal(t, 12, ts3.Hour())
+}
+
+func TestFormatCacheZonelessTimestampsUseItsZone(t *testing.T) {
+	tokyo, err := time.LoadLocation("Asia/Tokyo")
+	require.NoError(t, err)
+
+	inTokyo := formatCache{loc: tokyo}
+	got, ok := inTokyo.Parse("2024-01-15 10:00:00")
+	require.True(t, ok)
+	assert.True(t, time.Date(2024, 1, 15, 1, 0, 0, 0, time.UTC).Equal(got), "got %s", got)
+
+	withOffset, ok := inTokyo.Parse("2024-01-15T10:00:00Z")
+	require.True(t, ok)
+	assert.True(t, time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC).Equal(withOffset), "got %s", withOffset)
+
+	var defaultZone formatCache
+	got, ok = defaultZone.Parse("2024-01-15 10:00:00")
+	require.True(t, ok)
+	assert.True(t, time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC).Equal(got), "got %s", got)
 }

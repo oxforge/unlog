@@ -22,7 +22,7 @@ func TestParseTimeFlag(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := parseTimeFlag(tt.input, now)
+			got, err := parseTimeFlag(tt.input, now, time.UTC)
 			require.NoError(t, err)
 			assert.True(t, tt.want.Equal(got), "want %s, got %s", tt.want, got)
 		})
@@ -32,8 +32,32 @@ func TestParseTimeFlag(t *testing.T) {
 func TestParseTimeFlagRejectsGarbage(t *testing.T) {
 	for _, input := range []string{"", "yesterday", "2024-13-45", "10:00"} {
 		t.Run(input, func(t *testing.T) {
-			_, err := parseTimeFlag(input, time.Now())
+			_, err := parseTimeFlag(input, time.Now(), time.UTC)
 			assert.Error(t, err)
+		})
+	}
+}
+
+func TestParseTimeFlagZonelessValues(t *testing.T) {
+	tokyo, err := time.LoadLocation("Asia/Tokyo")
+	require.NoError(t, err)
+	tests := []struct {
+		name  string
+		input string
+		loc   *time.Location
+		want  time.Time
+	}{
+		{"space-separated in UTC", "2024-01-15 10:30:00", time.UTC, time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC)},
+		{"T-separated in UTC", "2024-01-15T10:30:00", time.UTC, time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC)},
+		{"date only in UTC", "2024-01-15", time.UTC, time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC)},
+		{"space-separated in Tokyo", "2024-01-15 10:30:00", tokyo, time.Date(2024, 1, 15, 1, 30, 0, 0, time.UTC)},
+		{"an explicit offset ignores the zone", "2024-01-15T10:30:00+02:00", tokyo, time.Date(2024, 1, 15, 8, 30, 0, 0, time.UTC)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseTimeFlag(tt.input, time.Now(), tt.loc)
+			require.NoError(t, err)
+			assert.True(t, tt.want.Equal(got), "want %s, got %s", tt.want, got)
 		})
 	}
 }

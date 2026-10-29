@@ -31,8 +31,26 @@ func resolveFormat(cmd *cobra.Command) (string, error) {
 	return ef, nil
 }
 
-// buildFilterOpts merges CLI flags over config and returns pipeline-ready filter options.
-func buildFilterOpts(cmd *cobra.Command) (filter.FilterOptions, error) {
+// resolveLocation returns the zone for timestamps that carry none (--tz,
+// UNLOG_TZ, config tz); UTC by default.
+func resolveLocation(cmd *cobra.Command) (*time.Location, error) {
+	name := cfg.TZ
+	if cmd.Flags().Changed("tz") {
+		name = tzFlag
+	}
+	if name == "" {
+		return time.UTC, nil
+	}
+	loc, err := time.LoadLocation(name)
+	if err != nil {
+		return nil, fmt.Errorf("cmd: invalid --tz value: %w", err)
+	}
+	return loc, nil
+}
+
+// buildFilterOpts merges CLI flags over config and returns pipeline-ready
+// filter options; zone-less --since/--until values are read in loc.
+func buildFilterOpts(cmd *cobra.Command, loc *time.Location) (filter.FilterOptions, error) {
 	effectiveLevel := cfg.Level
 	if cmd.Flags().Changed("level") {
 		effectiveLevel = levelFlag
@@ -63,14 +81,14 @@ func buildFilterOpts(cmd *cobra.Command) (filter.FilterOptions, error) {
 
 	var since, until time.Time
 	if effectiveSince != "" {
-		t, err := parseTimeFlag(effectiveSince, time.Now())
+		t, err := parseTimeFlag(effectiveSince, time.Now(), loc)
 		if err != nil {
 			return filter.FilterOptions{}, fmt.Errorf("cmd: invalid --since value: %w", err)
 		}
 		since = t
 	}
 	if effectiveUntil != "" {
-		t, err := parseTimeFlag(effectiveUntil, time.Now())
+		t, err := parseTimeFlag(effectiveUntil, time.Now(), loc)
 		if err != nil {
 			return filter.FilterOptions{}, fmt.Errorf("cmd: invalid --until value: %w", err)
 		}
