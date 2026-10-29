@@ -40,7 +40,9 @@ const maxMessageBytes = 2000
 const estimatedHeaderTokens = 5
 
 // formatSummary produces the structured text summary from scored and grouped entries.
-// Sections are mutually exclusive; priority: Error Chains > Rate Anomalies > Critical Errors > Context.
+// Each entry is shown once, except that a chain lists all its members (an
+// entry in two chains in both), Deployments lists every deployment, and an
+// ERROR-level deployment also stays in Critical Errors.
 func formatSummary(all []scoredEntry, bursts []types.Burst, tokenBudget int) string {
 	var sb strings.Builder
 

@@ -16,7 +16,7 @@ type dedupKey struct {
 	sig     string
 }
 
-// dedupRecord accumulates every occurrence of one error in one source.
+// dedupRecord accumulates every occurrence of one error in one source and service.
 type dedupRecord struct {
 	exemplar types.LogEntry
 	sig      string
@@ -35,7 +35,8 @@ type dedupShard struct {
 	ids     map[dedupKey]uint32
 }
 
-// DedupFilter merges log entries into one record per (source, fuzzy signature).
+// DedupFilter merges log entries into one record per (source, service, fuzzy
+// signature).
 // The result does not depend on the order entries arrive in.
 type DedupFilter struct {
 	shards []*dedupShard

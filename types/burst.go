@@ -2,7 +2,8 @@ package types
 
 import "time"
 
-// Burst is a run of seconds in which one source logged far above its normal rate.
+// Burst is a run of seconds in which one source (and service, when its lines
+// name one) logged far above its normal rate.
 type Burst struct {
 	Source    string       `json:"source"`
 	Service   string       `json:"service,omitempty"`
