@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"os"
 	"os/exec"
@@ -24,6 +25,8 @@ import (
 )
 
 var unlogBin string
+
+var update = flag.Bool("update", false, "rewrite testdata/golden from the current output")
 
 func TestMain(m *testing.M) {
 	dir, err := os.MkdirTemp("", "unlog-e2e-")
@@ -493,4 +496,41 @@ func TestE2EExcerptHasNoBurst(t *testing.T) {
 	critical := sectionOf(summary, "## Critical Errors")
 	assert.Contains(t, critical, "2024-01-15T10:05:00Z–10:05:09Z [ERROR]")
 	assert.Contains(t, critical, "{×400}")
+}
+
+// TestE2EGoldenSummaries pins whole summaries, so any change to what reaches
+// the reader shows up as a reviewable diff. After an intended change, run
+// `just golden` and review the diff of testdata/golden/. Fixtures with
+// year-less syslog lines are left out: their year comes from the file's mtime,
+// which differs per checkout.
+func TestE2EGoldenSummaries(t *testing.T) {
+	tests := []struct {
+		name    string
+		sources []string
+	}{
+		{"db_connection", []string{"testdata/incidents/db_connection/"}},
+		{"deploy_failure", []string{"testdata/incidents/deploy_failure/"}},
+		{"formats", []string{
+			"testdata/formats/apache_clf.log", "testdata/formats/cloudwatch.log",
+			"testdata/formats/csv_kibana.csv", "testdata/formats/docker_compose.log",
+			"testdata/formats/docker_mixed_streams.log", "testdata/formats/generic_with_brackets.log",
+			"testdata/formats/json_epoch.json", "testdata/formats/json_multiline_stack.log",
+			"testdata/formats/k8s_deployment.log", "testdata/formats/kubernetes_multiline.log",
+			"testdata/formats/logfmt_varied.log", "testdata/formats/syslog_rfc5424.log",
+			"testdata/formats/syslog_rsyslog_iso.log", "testdata/formats/unstructured.log",
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := runJSON(t, tt.sources...).CompactedSummary + "\n"
+			golden := filepath.Join("testdata", "golden", tt.name+".txt")
+			if *update {
+				require.NoError(t, os.WriteFile(golden, []byte(got), 0o644))
+				return
+			}
+			want, err := os.ReadFile(golden)
+			require.NoError(t, err, "missing golden file; run `just golden`")
+			assert.Equal(t, string(want), got)
+		})
+	}
 }

@@ -14,6 +14,10 @@ install:
 test:
     go test ./... -race -count=1
 
+# Rewrite testdata/golden/ from the current output; review the diff after
+golden:
+    go test -count=1 -run TestE2EGoldenSummaries . -update
+
 # Run golangci-lint
 lint:
     golangci-lint run
