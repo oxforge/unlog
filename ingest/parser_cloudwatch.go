@@ -1,7 +1,6 @@
 package ingest
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -17,8 +16,8 @@ func (p *cloudwatchParser) Name() string { return "cloudwatch" }
 // Parse extracts a LogEntry from a single AWS CloudWatch JSON log line.
 // CloudWatch JSON format uses @timestamp and @message fields.
 func (p *cloudwatchParser) Parse(line string, lineNum int64, source string) (types.LogEntry, bool) {
-	var obj map[string]interface{}
-	if err := json.Unmarshal([]byte(line), &obj); err != nil {
+	obj, ok := decodeJSONObject(line)
+	if !ok {
 		return types.LogEntry{}, false
 	}
 

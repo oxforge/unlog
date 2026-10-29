@@ -24,6 +24,11 @@ func TestParseTimestamp(t *testing.T) {
 		{"Syslog", "Jan 15 10:30:45", 0, true},
 		{"Unix epoch seconds", "1705312245", 2024, true},
 		{"Unix epoch millis", "1705312245000", 2024, true},
+		{"Unix epoch micros", "1705312245000000", 2024, true},
+		{"Unix epoch nanos", "1705312245000000000", 2024, true},
+		{"Fractional epoch seconds", "1705312245.25", 2024, true},
+		{"Too small for an epoch", "123456", 0, false},
+		{"Signed fraction", "1705312245.+5", 0, false},
 		{"Empty", "", 0, false},
 		{"Garbage", "not a timestamp", 0, false},
 	}

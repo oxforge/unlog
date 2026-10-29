@@ -2,6 +2,7 @@ package ingest
 
 import (
 	"testing"
+	"time"
 
 	"github.com/oxforge/unlog/types"
 	"github.com/stretchr/testify/assert"
@@ -47,4 +48,12 @@ func TestCloudWatchParser(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCloudWatchParserEpochMillisTimestamp(t *testing.T) {
+	p := &cloudwatchParser{}
+	entry, ok := p.Parse(`{"@timestamp":1705312801250,"@message":"Task timed out after 30.00 seconds"}`, 1, "lambda.log")
+	assert.True(t, ok)
+	want := time.Date(2024, 1, 15, 10, 0, 1, 250000000, time.UTC)
+	assert.True(t, want.Equal(entry.Timestamp), "want %s, got %s", want, entry.Timestamp)
 }

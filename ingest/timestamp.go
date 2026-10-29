@@ -42,22 +42,39 @@ func parseTimestamp(s string) (time.Time, string, bool) {
 	return time.Time{}, "", false
 }
 
-// tryUnixEpoch attempts to interpret s as a Unix epoch value (seconds or millis).
+// tryUnixEpoch attempts to interpret s as a Unix epoch value in seconds,
+// milliseconds, microseconds or nanoseconds, chosen by magnitude. Seconds may
+// carry a fractional part ("1705312801.123456", as zap writes them); it is
+// parsed from the digits, not through a float, so it stays exact.
 func tryUnixEpoch(s string) (time.Time, bool) {
-	n, err := strconv.ParseInt(s, 10, 64)
-	if err != nil {
+	intPart, fracPart, hasFrac := strings.Cut(s, ".")
+	n, err := strconv.ParseInt(intPart, 10, 64)
+	if err != nil || n <= 1e9 {
 		return time.Time{}, false
 	}
+	var nanos int64
+	if hasFrac {
+		if fracPart == "" || len(fracPart) > 9 || n > 1e11 {
+			return time.Time{}, false
+		}
+		frac, err := strconv.ParseUint(fracPart, 10, 64)
+		if err != nil {
+			return time.Time{}, false
+		}
+		for i := len(fracPart); i < 9; i++ {
+			frac *= 10
+		}
+		nanos = int64(frac)
+	}
 	switch {
-	case n > 1e15:
-		// Too large to be a plausible epoch value.
-		return time.Time{}, false
-	case n > 1e12:
+	case n > 1e17:
+		return time.Unix(0, n), true
+	case n > 1e14:
+		return time.UnixMicro(n), true
+	case n > 1e11:
 		return time.UnixMilli(n), true
-	case n > 1e9:
-		return time.Unix(n, 0), true
 	default:
-		return time.Time{}, false
+		return time.Unix(n, nanos), true
 	}
 }
 

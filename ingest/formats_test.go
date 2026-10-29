@@ -3,7 +3,9 @@ package ingest
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/oxforge/unlog/types"
 	"github.com/stretchr/testify/assert"
@@ -18,13 +20,18 @@ func TestAllFormats(t *testing.T) {
 		format string
 		count  int
 		levels map[types.Level]int
+		// firstTS is the first entry's timestamp in RFC 3339, hand-read from
+		// the fixture; "" means the format carries none, and a 0000 year
+		// means the format has no year (RFC 3164 syslog).
+		firstTS string
 	}{
 		// --- JSON variants ---
 		{
-			name:   "json structured",
-			file:   "../testdata/formats/json_structured.log",
-			format: "json",
-			count:  7,
+			name:    "json structured",
+			file:    "../testdata/formats/json_structured.log",
+			firstTS: "2024-01-15T10:00:00Z",
+			format:  "json",
+			count:   7,
 			levels: map[types.Level]int{
 				types.LevelInfo:  2,
 				types.LevelWarn:  1,
@@ -33,10 +40,11 @@ func TestAllFormats(t *testing.T) {
 			},
 		},
 		{
-			name:   "json severity field",
-			file:   "../testdata/formats/json_severity.json",
-			format: "json",
-			count:  7,
+			name:    "json severity field",
+			file:    "../testdata/formats/json_severity.json",
+			firstTS: "2024-01-15T10:00:00Z",
+			format:  "json",
+			count:   7,
 			levels: map[types.Level]int{
 				types.LevelDebug: 1,
 				types.LevelInfo:  2,
@@ -46,10 +54,11 @@ func TestAllFormats(t *testing.T) {
 			},
 		},
 		{
-			name:   "json epoch timestamps",
-			file:   "../testdata/formats/json_epoch.json",
-			format: "json",
-			count:  6,
+			name:    "json epoch timestamps",
+			file:    "../testdata/formats/json_epoch.json",
+			firstTS: "2024-01-15T10:00:00Z",
+			format:  "json",
+			count:   6,
 			levels: map[types.Level]int{
 				types.LevelInfo:  2,
 				types.LevelWarn:  1,
@@ -58,10 +67,11 @@ func TestAllFormats(t *testing.T) {
 			},
 		},
 		{
-			name:   "json with stacktrace in field",
-			file:   "../testdata/formats/json_multiline_stack.log",
-			format: "json",
-			count:  6,
+			name:    "json with stacktrace in field",
+			file:    "../testdata/formats/json_multiline_stack.log",
+			firstTS: "2024-01-15T10:00:00Z",
+			format:  "json",
+			count:   6,
 			levels: map[types.Level]int{
 				types.LevelInfo:  2,
 				types.LevelWarn:  1,
@@ -72,10 +82,11 @@ func TestAllFormats(t *testing.T) {
 
 		// --- CSV variants ---
 		{
-			name:   "csv with level column (.csv ext)",
-			file:   "../testdata/formats/csv_with_levels.csv",
-			format: "csv",
-			count:  8,
+			name:    "csv with level column (.csv ext)",
+			file:    "../testdata/formats/csv_with_levels.csv",
+			firstTS: "2024-01-15T10:00:00Z",
+			format:  "csv",
+			count:   8,
 			levels: map[types.Level]int{
 				types.LevelDebug: 1,
 				types.LevelInfo:  3,
@@ -85,10 +96,11 @@ func TestAllFormats(t *testing.T) {
 			},
 		},
 		{
-			name:   "csv structured (.log ext, content detection)",
-			file:   "../testdata/formats/csv_structured.log",
-			format: "csv",
-			count:  6,
+			name:    "csv structured (.log ext, content detection)",
+			file:    "../testdata/formats/csv_structured.log",
+			firstTS: "2024-01-15T10:00:00Z",
+			format:  "csv",
+			count:   6,
 			levels: map[types.Level]int{
 				types.LevelInfo:  2,
 				types.LevelWarn:  1,
@@ -97,10 +109,11 @@ func TestAllFormats(t *testing.T) {
 			},
 		},
 		{
-			name:   "csv inferred levels (.csv ext)",
-			file:   "../testdata/formats/csv_inferred_levels.csv",
-			format: "csv",
-			count:  10,
+			name:    "csv inferred levels (.csv ext)",
+			file:    "../testdata/formats/csv_inferred_levels.csv",
+			firstTS: "2024-01-15T10:00:00Z",
+			format:  "csv",
+			count:   10,
 			levels: map[types.Level]int{
 				types.LevelDebug:   1,
 				types.LevelInfo:    2,
@@ -116,10 +129,11 @@ func TestAllFormats(t *testing.T) {
 			// embedded in Java-style messages like "[Thread-1] INFO com.example...".
 			// Extension .csv triggers CSV format. @timestamp parsed via Kibana
 			// timestamp format. Levels inferred from message body.
-			name:   "csv kibana export (quoted, @timestamp, no level column)",
-			file:   "../testdata/formats/csv_kibana.csv",
-			format: "csv",
-			count:  20,
+			name:    "csv kibana export (quoted, @timestamp, no level column)",
+			file:    "../testdata/formats/csv_kibana.csv",
+			firstTS: "2024-01-15T10:00:00Z",
+			format:  "csv",
+			count:   20,
 			levels: map[types.Level]int{
 				types.LevelFatal:   1, // FATAL in message
 				types.LevelError:   4, // ERROR ×3 + [error] ×1
@@ -134,10 +148,11 @@ func TestAllFormats(t *testing.T) {
 		{
 			// Docker parser: stdout → Info, stderr → Error, then first-word scan.
 			// WARN:/ERROR:/FATAL: in first word override the stream default.
-			name:   "docker json",
-			file:   "../testdata/formats/docker_json.log",
-			format: "docker-json",
-			count:  7,
+			name:    "docker json",
+			file:    "../testdata/formats/docker_json.log",
+			firstTS: "2024-01-15T10:00:00Z",
+			format:  "docker-json",
+			count:   7,
 			levels: map[types.Level]int{
 				types.LevelInfo:  3, // Starting, Listening, Connected (stdout)
 				types.LevelWarn:  1, // "WARN:" overrides stderr→Error
@@ -148,10 +163,11 @@ func TestAllFormats(t *testing.T) {
 		{
 			// Docker parser: messages start with "[2024-..." so first-word scan
 			// finds "[2024-01-15" not a level keyword. Stream defaults apply.
-			name:   "docker mixed streams with timestamps in message",
-			file:   "../testdata/formats/docker_mixed_streams.log",
-			format: "docker-json",
-			count:  9,
+			name:    "docker mixed streams with timestamps in message",
+			file:    "../testdata/formats/docker_mixed_streams.log",
+			firstTS: "2024-01-15T10:00:00Z",
+			format:  "docker-json",
+			count:   9,
 			levels: map[types.Level]int{
 				types.LevelInfo:  3, // 3 stdout lines
 				types.LevelError: 6, // 6 stderr lines (first word is timestamp or traceback, not level keyword)
@@ -163,10 +179,11 @@ func TestAllFormats(t *testing.T) {
 			// Docker compose: container prefix stripped, timestamp + level from remainder.
 			// 12 lines total, 3 are stack trace continuations merged into 1 error entry = 9 entries.
 			// 1 line has no timestamp ("Ready to accept connections") → still parsed with Unknown level.
-			name:   "docker compose",
-			file:   "../testdata/formats/docker_compose.log",
-			format: "docker-compose",
-			count:  9,
+			name:    "docker compose",
+			file:    "../testdata/formats/docker_compose.log",
+			firstTS: "2024-01-15T10:00:00.1Z",
+			format:  "docker-compose",
+			count:   9,
 			levels: map[types.Level]int{
 				types.LevelInfo:    3, // Starting, Connected, Retrying
 				types.LevelWarn:    3, // High memory, Client connection, 502 Bad Gateway
@@ -178,10 +195,11 @@ func TestAllFormats(t *testing.T) {
 		// --- Kubernetes ---
 		{
 			// Kube parser: stdout → Info, stderr → Error, then first-word scan.
-			name:   "kubernetes",
-			file:   "../testdata/formats/kubernetes.log",
-			format: "kubernetes",
-			count:  6,
+			name:    "kubernetes",
+			file:    "../testdata/formats/kubernetes.log",
+			firstTS: "2024-01-15T10:00:00Z",
+			format:  "kubernetes",
+			count:   6,
 			levels: map[types.Level]int{
 				types.LevelInfo:  3, // stdout: Starting, Listening, Health
 				types.LevelWarn:  1, // "WARN:" overrides stderr
@@ -192,10 +210,11 @@ func TestAllFormats(t *testing.T) {
 		{
 			// Prefixed kube format: [pod/name/container] timestamp level message.
 			// Java-style comma milliseconds. 13 lines, all are entries.
-			name:   "kubernetes prefixed deployment",
-			file:   "../testdata/formats/k8s_deployment.log",
-			format: "kubernetes",
-			count:  13,
+			name:    "kubernetes prefixed deployment",
+			file:    "../testdata/formats/k8s_deployment.log",
+			firstTS: "2026-03-19T14:05:10.112Z",
+			format:  "kubernetes",
+			count:   13,
 			levels: map[types.Level]int{
 				types.LevelInfo:  4, // Processing, Calling, Processing refund, ACCESS_LOG
 				types.LevelWarn:  7, // Gateway slow, retries, 503s, refund cap
@@ -204,10 +223,11 @@ func TestAllFormats(t *testing.T) {
 		},
 		{
 			// All lines match kube regex (including P=partial lines), each is an entry.
-			name:   "kubernetes multiline (partial lines are entries)",
-			file:   "../testdata/formats/kubernetes_multiline.log",
-			format: "kubernetes",
-			count:  10,
+			name:    "kubernetes multiline (partial lines are entries)",
+			file:    "../testdata/formats/kubernetes_multiline.log",
+			firstTS: "2024-01-15T10:00:00Z",
+			format:  "kubernetes",
+			count:   10,
 			levels: map[types.Level]int{
 				types.LevelInfo:  2, // stdout: Starting, Health
 				types.LevelWarn:  1, // "WARN:" on stderr
@@ -218,10 +238,11 @@ func TestAllFormats(t *testing.T) {
 
 		// --- Logfmt ---
 		{
-			name:   "logfmt",
-			file:   "../testdata/formats/logfmt.log",
-			format: "logfmt",
-			count:  6,
+			name:    "logfmt",
+			file:    "../testdata/formats/logfmt.log",
+			firstTS: "2024-01-15T10:00:00Z",
+			format:  "logfmt",
+			count:   6,
 			levels: map[types.Level]int{
 				types.LevelInfo:  2,
 				types.LevelWarn:  1,
@@ -229,10 +250,11 @@ func TestAllFormats(t *testing.T) {
 			},
 		},
 		{
-			name:   "logfmt varied keys (time/lvl instead of ts/level)",
-			file:   "../testdata/formats/logfmt_varied.log",
-			format: "logfmt",
-			count:  7,
+			name:    "logfmt varied keys (time/lvl instead of ts/level)",
+			file:    "../testdata/formats/logfmt_varied.log",
+			firstTS: "2024-01-15T10:00:00Z",
+			format:  "logfmt",
+			count:   7,
 			levels: map[types.Level]int{
 				types.LevelDebug: 1,
 				types.LevelInfo:  2,
@@ -244,10 +266,11 @@ func TestAllFormats(t *testing.T) {
 
 		// --- Syslog ---
 		{
-			name:   "syslog rfc3164",
-			file:   "../testdata/formats/syslog.log",
-			format: "syslog-rfc3164",
-			count:  6,
+			name:    "syslog rfc3164",
+			file:    "../testdata/formats/syslog.log",
+			firstTS: "0000-01-15T10:00:00Z",
+			format:  "syslog-rfc3164",
+			count:   6,
 			levels: map[types.Level]int{
 				types.LevelInfo:  2, // priority 134 → severity 6 → Info
 				types.LevelWarn:  1, // priority 132 → severity 4 → Warn
@@ -257,10 +280,11 @@ func TestAllFormats(t *testing.T) {
 		},
 		{
 			// Syslog 5424 severity = priority % 8
-			name:   "syslog rfc5424",
-			file:   "../testdata/formats/syslog_rfc5424.log",
-			format: "syslog-rfc5424",
-			count:  6,
+			name:    "syslog rfc5424",
+			file:    "../testdata/formats/syslog_rfc5424.log",
+			firstTS: "2024-01-15T10:00:00Z",
+			format:  "syslog-rfc5424",
+			count:   6,
 			levels: map[types.Level]int{
 				types.LevelWarn:  3, // 165%8=5, 165%8=5, 164%8=4 → Warn
 				types.LevelError: 1, // 163%8=3 → Error
@@ -271,10 +295,11 @@ func TestAllFormats(t *testing.T) {
 		// --- CLF ---
 		{
 			// CLF maps HTTP status: 2xx → Info, 4xx → Warn, 5xx → Error
-			name:   "apache clf",
-			file:   "../testdata/formats/apache_clf.log",
-			format: "clf",
-			count:  6,
+			name:    "apache clf",
+			file:    "../testdata/formats/apache_clf.log",
+			firstTS: "2024-01-15T17:00:00Z",
+			format:  "clf",
+			count:   6,
 			levels: map[types.Level]int{
 				types.LevelInfo:  2, // 200, 200
 				types.LevelWarn:  1, // 404
@@ -287,10 +312,11 @@ func TestAllFormats(t *testing.T) {
 			// CloudWatch parser does first-word scan on @message.
 			// "WARN:", "ERROR:" match. Others stay Unknown → InferLevel runs
 			// but finds no level keywords.
-			name:   "cloudwatch json",
-			file:   "../testdata/formats/cloudwatch.log",
-			format: "cloudwatch",
-			count:  6,
+			name:    "cloudwatch json",
+			file:    "../testdata/formats/cloudwatch.log",
+			firstTS: "2024-01-15T10:00:00Z",
+			format:  "cloudwatch",
+			count:   6,
 			levels: map[types.Level]int{
 				types.LevelUnknown: 3, // Starting, Processing, Retrying
 				types.LevelWarn:    1, // "WARN:"
@@ -300,10 +326,11 @@ func TestAllFormats(t *testing.T) {
 
 		// --- Generic timestamps ---
 		{
-			name:   "generic timestamps",
-			file:   "../testdata/formats/generic_timestamp.log",
-			format: "generic",
-			count:  6,
+			name:    "generic timestamps",
+			file:    "../testdata/formats/generic_timestamp.log",
+			firstTS: "2024-01-15T10:00:00Z",
+			format:  "generic",
+			count:   6,
 			levels: map[types.Level]int{
 				types.LevelInfo:  2,
 				types.LevelWarn:  1,
@@ -314,10 +341,11 @@ func TestAllFormats(t *testing.T) {
 		{
 			// Timestamps with bracketed levels like "[INFO]". The generic parser's
 			// first-word check doesn't strip brackets, but InferLevel does.
-			name:   "generic with brackets",
-			file:   "../testdata/formats/generic_with_brackets.log",
-			format: "generic",
-			count:  10,
+			name:    "generic with brackets",
+			file:    "../testdata/formats/generic_with_brackets.log",
+			firstTS: "2024-01-15T10:00:00.123Z",
+			format:  "generic",
+			count:   10,
 			levels: map[types.Level]int{
 				types.LevelInfo:  2,
 				types.LevelDebug: 1,
@@ -332,10 +360,11 @@ func TestAllFormats(t *testing.T) {
 			// Raw parser sets LevelUnknown → InferLevel scans messages.
 			// "Warning:" → Warn, "Error:" → Error ×2, "Fatal:" → Fatal.
 			// Numeric tokens like "5" in "in 5 seconds" are skipped.
-			name:   "unstructured raw",
-			file:   "../testdata/formats/unstructured.log",
-			format: "raw",
-			count:  8,
+			name:    "unstructured raw",
+			file:    "../testdata/formats/unstructured.log",
+			firstTS: "",
+			format:  "raw",
+			count:   8,
 			levels: map[types.Level]int{
 				types.LevelUnknown: 4, // no keywords found
 				types.LevelWarn:    1, // "Warning:"
@@ -344,10 +373,11 @@ func TestAllFormats(t *testing.T) {
 			},
 		},
 		{
-			name:   "raw with level keywords",
-			file:   "../testdata/formats/raw_with_levels.log",
-			format: "raw",
-			count:  9,
+			name:    "raw with level keywords",
+			file:    "../testdata/formats/raw_with_levels.log",
+			firstTS: "",
+			format:  "raw",
+			count:   9,
 			levels: map[types.Level]int{
 				types.LevelInfo:    1,
 				types.LevelWarn:    1,
@@ -394,6 +424,31 @@ func TestAllFormats(t *testing.T) {
 				gotLevels[e.Level]++
 			}
 			assert.Equal(t, tt.levels, gotLevels, "level counts for %s", tt.file)
+
+			// Verify the first timestamp, so a parser that drops timestamps fails.
+			if len(entries) > 0 {
+				assertFirstTimestamp(t, tt.firstTS, entries[0].Timestamp)
+			}
 		})
 	}
+}
+
+// assertFirstTimestamp compares got with want (RFC 3339, see firstTS).
+func assertFirstTimestamp(t *testing.T, want string, got time.Time) {
+	t.Helper()
+	if want == "" {
+		assert.True(t, got.IsZero(), "want no timestamp, got %s", got)
+		return
+	}
+	if strings.HasPrefix(want, "0000-") {
+		// No year in the format: compare everything after the year.
+		want = strings.TrimPrefix(want, "0000")
+		assert.Equal(t, want, got.UTC().Format("-01-02T15:04:05.999999999Z07:00"))
+		return
+	}
+	wantTime, err := time.Parse(time.RFC3339Nano, want)
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.True(t, wantTime.Equal(got), "want first timestamp %s, got %s", wantTime, got)
 }
