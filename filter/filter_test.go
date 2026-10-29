@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -341,4 +342,34 @@ func TestFilterPipelineReportsBursts(t *testing.T) {
 		}
 	}
 	assert.Equal(t, 2, spikes)
+}
+
+func TestUndatedEntriesNeverFormABurst(t *testing.T) {
+	input := make(chan types.LogEntry, 1000)
+	output := make(chan types.FilteredEntry, 1000)
+	base := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+	for i := 0; i < 400; i++ {
+		input <- types.LogEntry{Timestamp: base.Add(5*time.Minute + time.Duration(i)*25*time.Millisecond),
+			Level: types.LevelError, Source: "same.log",
+			Message: fmt.Sprintf("payment gateway refused connection from 10.0.3.%d", i)}
+	}
+	input <- types.LogEntry{Timestamp: base, Level: types.LevelError, Source: "same.log", Message: "cache miss for key user:0"}
+	input <- types.LogEntry{Timestamp: base.Add(time.Hour), Level: types.LevelError, Source: "same.log", Message: "cache miss for key user:1"}
+	for i := 0; i < 25; i++ {
+		input <- types.LogEntry{Level: types.LevelError, Source: "same.log", Message: fmt.Sprintf("worker %d crashed", i)}
+	}
+	close(input)
+
+	p := NewFilterPipeline(input, output, DefaultFilterOptions(), nil)
+	_, _, err := p.Run(context.Background())
+	require.NoError(t, err)
+
+	require.Len(t, p.Bursts(), 1)
+	assert.Equal(t, 2024, p.Bursts()[0].Start.Year())
+	for e := range output {
+		if strings.HasPrefix(e.Message, "worker") {
+			assert.False(t, e.IsSpike, "undated record marked as spike")
+			assert.Equal(t, 25, e.OccurrenceCount)
+		}
+	}
 }

@@ -70,9 +70,10 @@ func sourceBursts(src string, notes []occurrence, d *DedupFilter, multiplier flo
 
 	span := counts[len(counts)-1].second - counts[0].second + 1
 	baseline := medianCount(counts, span)
-	// A second is hot above multiplier x baseline, but never below multiplier
-	// events: with a baseline of 0, single stray errors must not extend a burst.
-	threshold := multiplier * max(baseline, 1)
+	// A second is hot above multiplier x baseline, and always needs at least
+	// two events: with a baseline of 0, a lone stray error must not start or
+	// extend a burst.
+	threshold := max(multiplier*baseline, 1)
 
 	var bursts []types.Burst
 	runStart, runEnd := int64(0), int64(0)
