@@ -55,8 +55,8 @@ deployment-failure: 2 of 3 steps, 2024-01-15T10:00:00Z–10:00:15Z
   1. 2024-01-15T10:00:00Z [INFO] testdata/formats/kubernetes_multiline.log: Starting application v2.5.0 {deploy}
   1. 2024-01-15T10:00:00Z [INFO] testdata/formats/docker_compose.log[web]: INFO Starting application on port 8080 {deploy}
   1. 2024-01-15T10:00:01Z [INFO] testdata/formats/csv_kibana.csv: [Thread-1] INFO com.example.Application - Listening on port 8080 {deploy}
-  1. 2024-01-15T10:00:01Z [INFO] testdata/formats/json_multiline_stack.log: Database migration complete {deploy}
   2. 2024-01-15T10:00:15Z [FATAL] testdata/formats/docker_mixed_streams.log: [2024-01-15 10:00:15] FATAL: Healthcheck failed 3 times, shutting down {err=Healthcheck with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
+  … and 1 more at step 1
 oom-cascade: 2 of 3 steps, 2024-01-15T10:00:15Z–10:00:30Z
   2. 2024-01-15T10:00:15Z [FATAL] testdata/formats/json_epoch.json: OOM killer invoked {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
   3. 2024-01-15T10:00:15Z [FATAL] testdata/formats/syslog_rfc5424.log[myapp]: Service unavailable, shutting down {with=testdata/formats/cloudwatch.log,testdata/formats/csv_kibana.csv,+7}
