@@ -278,22 +278,6 @@ func TestRun_ChainDeduplication(t *testing.T) {
 	assert.Equal(t, 1, count, "chain ID should appear exactly once in Error Chains section")
 }
 
-func TestRun_SpikeInRateAnomalies(t *testing.T) {
-	base := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
-
-	spike := makeEntry(types.LevelWarn, "error rate spike detected", "api", base)
-	spike.IsSpike = true
-
-	ch := make(chan types.EnrichedEntry, 1)
-	sendAndClose(ch, []types.EnrichedEntry{spike})
-
-	summary, err := Run(context.Background(), ch, Options{})
-	require.NoError(t, err)
-
-	anomalySection := extractSection(summary, "## Rate Anomalies", "## Context")
-	assert.Contains(t, anomalySection, "error rate spike detected")
-}
-
 func TestRun_DeploymentFlagInOutput(t *testing.T) {
 	base := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
 
@@ -464,8 +448,9 @@ func TestRun_OverviewContent(t *testing.T) {
 	// Chain detection
 	assert.Contains(t, overview, "cascade-1", "should report chain ID")
 
-	// Spike count
-	assert.Contains(t, overview, "Rate spikes: 1", "should report spike count")
+	// Spike-flagged entries are not bursts; the overview counts bursts only.
+	assert.NotContains(t, overview, "Rate spikes")
+	assert.NotContains(t, overview, "Bursts:")
 }
 
 // ─── truncateToTokens ────────────────────────────────────────────────────────
@@ -719,4 +704,73 @@ func TestRun_OverviewDistinctOnlyWhenRepeated(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Contains(t, summary, "Events: 1 fatal, 3000 error (2 distinct), 7 warn\n")
+}
+
+// ─── Bursts ─────────────────────────────────────────────────────────────────
+
+func exampleBurst() types.Burst {
+	return types.Burst{
+		Source: "same.log",
+		Start:  time.Date(2024, 1, 15, 10, 5, 0, 0, time.UTC),
+		End:    time.Date(2024, 1, 15, 10, 5, 9, 0, time.UTC),
+		Events: 401,
+		TopErrors: []types.BurstError{
+			{Message: "payment gateway refused connection from 10.0.3.0", Level: types.LevelError, Count: 400},
+			{Message: "cache miss for key user:30", Level: types.LevelError, Count: 1},
+		},
+	}
+}
+
+func runWithBursts(t *testing.T, entries []types.EnrichedEntry, bursts []types.Burst) string {
+	t.Helper()
+	ch := make(chan types.EnrichedEntry, len(entries))
+	sendAndClose(ch, entries)
+	summary, err := Run(context.Background(), ch, Options{Bursts: func() []types.Burst { return bursts }})
+	require.NoError(t, err)
+	return summary
+}
+
+func TestRun_RateAnomaliesListsBursts(t *testing.T) {
+	at := time.Date(2024, 1, 15, 10, 5, 0, 0, time.UTC)
+	summary := runWithBursts(t,
+		[]types.EnrichedEntry{makeEntry(types.LevelError, "payment gateway refused connection from 10.0.3.0", "same.log", at)},
+		[]types.Burst{exampleBurst()})
+
+	assert.Equal(t, "\n"+
+		"2024-01-15T10:05:00Z–10:05:09Z same.log: 401 events in 10s (normally quiet)\n"+
+		"  payment gateway refused connection from 10.0.3.0 {×400}\n"+
+		"  cache miss for key user:30\n\n",
+		extractSection(summary, "## Rate Anomalies", "## Context"))
+}
+
+func TestRun_BurstWithBaselineShowsRatio(t *testing.T) {
+	b := exampleBurst()
+	b.Events = 300
+	b.Baseline = 2.0
+	summary := runWithBursts(t,
+		[]types.EnrichedEntry{makeEntry(types.LevelError, "x", "same.log", b.Start)}, []types.Burst{b})
+
+	assert.Contains(t, summary, "same.log: 300 events in 10s (normal ~2.0/s, 15× above)\n")
+}
+
+func TestRun_SpikeEntriesStayInCriticalErrors(t *testing.T) {
+	e := makeEntry(types.LevelError, "payment gateway refused connection", "same.log", time.Date(2024, 1, 15, 10, 5, 0, 0, time.UTC))
+	e.IsSpike = true
+	summary := runWithBursts(t, []types.EnrichedEntry{e}, nil)
+
+	assert.Contains(t, extractSection(summary, "## Critical Errors", "## Error Chains"), "payment gateway refused connection {spike}")
+	assert.Equal(t, "\n(none)\n\n", extractSection(summary, "## Rate Anomalies", "## Context"))
+}
+
+func TestRun_OverviewCountsBursts(t *testing.T) {
+	at := time.Date(2024, 1, 15, 10, 5, 0, 0, time.UTC)
+	entries := []types.EnrichedEntry{makeEntry(types.LevelError, "x", "same.log", at)}
+	second := exampleBurst()
+	second.Source = "other.log"
+
+	withBursts := runWithBursts(t, entries, []types.Burst{exampleBurst(), second})
+	assert.Contains(t, extractSection(withBursts, "## Incident Overview", "## Critical Errors"), "Bursts: 2")
+
+	without := runWithBursts(t, entries, nil)
+	assert.NotContains(t, without, "Bursts:")
 }

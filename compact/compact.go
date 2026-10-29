@@ -42,6 +42,9 @@ type Options struct {
 	// TokenBudget is the maximum estimated token count for the summary output.
 	// Default: DefaultTokenBudget.
 	TokenBudget int
+	// Bursts returns the bursts to list under Rate Anomalies. Run calls it
+	// once, after the entries channel is closed; nil means none.
+	Bursts func() []types.Burst
 }
 
 // withDefaults returns o with zero-value fields replaced by defaults.
@@ -84,6 +87,11 @@ drain:
 	}
 	slog.Debug("compact: collected entries", "count", len(all))
 
+	var bursts []types.Burst
+	if opts.Bursts != nil {
+		bursts = opts.Bursts()
+	}
+
 	if len(all) == 0 {
 		return buildEmptySummary(), nil
 	}
@@ -95,7 +103,7 @@ drain:
 		return all[i].entry.Timestamp.Before(all[j].entry.Timestamp)
 	})
 
-	summary := formatSummary(all, opts.TokenBudget)
+	summary := formatSummary(all, bursts, opts.TokenBudget)
 
 	actual := EstimateTokens(summary)
 	slog.Debug("compact: summary generated",
