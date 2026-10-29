@@ -27,13 +27,10 @@ func (p *cloudwatchParser) Parse(line string, lineNum int64, source string) (typ
 		return types.LogEntry{}, false
 	}
 
-	msg := strings.TrimSpace(fmt.Sprint(atMsg))
-
 	entry := types.LogEntry{
 		RawLine:    line,
 		LineNumber: lineNum,
 		Source:     source,
-		Message:    msg,
 		Metadata:   make(map[string]string),
 	}
 
@@ -45,12 +42,7 @@ func (p *cloudwatchParser) Parse(line string, lineNum int64, source string) (typ
 		entry.Metadata["logStream"] = fmt.Sprint(logStream)
 	}
 
-	if spaceIdx := strings.IndexByte(msg, ' '); spaceIdx > 0 {
-		candidate := strings.TrimRight(msg[:spaceIdx], ":")
-		if level := types.ParseLevel(candidate); level != types.LevelUnknown {
-			entry.Level = level
-		}
-	}
+	applyInnerLine(&entry, strings.TrimSpace(fmt.Sprint(atMsg)), &p.tsCache)
 
 	return entry, true
 }

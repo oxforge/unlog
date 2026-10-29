@@ -119,7 +119,7 @@ func TestStatsOutput(t *testing.T) {
 			ingested:      7,
 			sourceFormat:  "format=docker-json",
 			sourceEntries: 7,
-			sourceLevels:  []string{"FATAL=1", "ERROR=2", "WARN=1", "INFO=3"},
+			sourceLevels:  []string{"FATAL=1", "ERROR=1", "WARN=1", "INFO=3", "unknown=1"},
 		},
 		{
 			name:          "docker compose",
@@ -135,7 +135,7 @@ func TestStatsOutput(t *testing.T) {
 			ingested:      9,
 			sourceFormat:  "format=docker-json",
 			sourceEntries: 9,
-			sourceLevels:  []string{"ERROR=6", "INFO=3"},
+			sourceLevels:  []string{"FATAL=1", "ERROR=1", "WARN=1", "INFO=2", "unknown=4"},
 		},
 		{
 			name:          "kubernetes",
@@ -159,7 +159,7 @@ func TestStatsOutput(t *testing.T) {
 			ingested:      10,
 			sourceFormat:  "format=kubernetes",
 			sourceEntries: 10,
-			sourceLevels:  []string{"FATAL=1", "ERROR=6", "WARN=1", "INFO=2"},
+			sourceLevels:  []string{"FATAL=1", "ERROR=2", "WARN=1", "INFO=2", "unknown=4"},
 		},
 		{
 			name:          "logfmt",

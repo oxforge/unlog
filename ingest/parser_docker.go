@@ -31,13 +31,10 @@ func (p *dockerParser) Parse(line string, lineNum int64, source string) (types.L
 		return types.LogEntry{}, false
 	}
 
-	msg := strings.TrimRight(obj.Log, "\n")
-
 	entry := types.LogEntry{
 		RawLine:    line,
 		LineNumber: lineNum,
 		Source:     source,
-		Message:    msg,
 		Metadata: map[string]string{
 			"stream": obj.Stream,
 		},
@@ -47,17 +44,9 @@ func (p *dockerParser) Parse(line string, lineNum int64, source string) (types.L
 		entry.Timestamp = ts
 	}
 
-	if obj.Stream == "stderr" {
-		entry.Level = types.LevelError
-	} else {
-		entry.Level = types.LevelInfo
-	}
-
-	if spaceIdx := strings.IndexByte(msg, ' '); spaceIdx > 0 {
-		candidate := strings.TrimRight(msg[:spaceIdx], ":")
-		if level := types.ParseLevel(candidate); level != types.LevelUnknown {
-			entry.Level = level
-		}
+	applyInnerLine(&entry, strings.TrimRight(obj.Log, "\n"), &p.tsCache)
+	if entry.Level == types.LevelUnknown {
+		entry.Level = streamLevel(obj.Stream)
 	}
 
 	return entry, true

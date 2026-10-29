@@ -297,3 +297,18 @@ func TestE2ENoisePatternsDoNotDropErrors(t *testing.T) {
 	assert.Contains(t, critical, "failed to push /metrics to gateway")
 	assert.Contains(t, critical, "retrying request failed permanently")
 }
+
+func TestE2EDockerStderrIsNotAnError(t *testing.T) {
+	logPath := writeFile(t, t.TempDir(), "container.log",
+		`{"log":"2024/01/15 10:00:00 server listening on :8080\n","stream":"stderr","time":"2024-01-15T10:00:00Z"}
+{"log":"{\"level\":\"info\",\"msg\":\"cache warmed\"}\n","stream":"stderr","time":"2024-01-15T10:00:01Z"}
+{"log":"{\"level\":\"error\",\"msg\":\"payment provider declined the charge\",\"provider\":\"acme\"}\n","stream":"stderr","time":"2024-01-15T10:00:02Z"}
+`)
+
+	report := runJSON(t, logPath)
+
+	critical := sectionOf(report.CompactedSummary, "## Critical Errors")
+	assert.Contains(t, critical, "payment provider declined the charge")
+	assert.NotContains(t, critical, "server listening")
+	assert.NotContains(t, critical, "cache warmed")
+}

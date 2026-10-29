@@ -44,7 +44,6 @@ func (p *kubeParser) parseCRI(line string, lineNum int64, source string) (types.
 		RawLine:    line,
 		LineNumber: lineNum,
 		Source:     source,
-		Message:    msg,
 		Metadata: map[string]string{
 			"stream": stream,
 		},
@@ -54,17 +53,9 @@ func (p *kubeParser) parseCRI(line string, lineNum int64, source string) (types.
 		entry.Timestamp = ts
 	}
 
-	if stream == "stderr" {
-		entry.Level = types.LevelError
-	} else {
-		entry.Level = types.LevelInfo
-	}
-
-	if spaceIdx := strings.IndexByte(msg, ' '); spaceIdx > 0 {
-		candidate := strings.TrimRight(msg[:spaceIdx], ":")
-		if level := types.ParseLevel(candidate); level != types.LevelUnknown {
-			entry.Level = level
-		}
+	applyInnerLine(&entry, msg, &p.tsCache)
+	if entry.Level == types.LevelUnknown {
+		entry.Level = streamLevel(stream)
 	}
 
 	return entry, true
@@ -85,26 +76,16 @@ func (p *kubeParser) parsePrefixed(line string, lineNum int64, source string) (t
 		return types.LogEntry{}, false
 	}
 
-	msg := strings.TrimSpace(rest[msgStart:])
-
 	entry := types.LogEntry{
 		RawLine:    line,
 		LineNumber: lineNum,
 		Source:     source,
-		Message:    msg,
 		Timestamp:  ts,
 		Metadata: map[string]string{
 			"resource": resource,
 		},
 	}
-
-	// Extract level from the first word of the message.
-	if spaceIdx := strings.IndexByte(msg, ' '); spaceIdx > 0 {
-		candidate := strings.TrimRight(msg[:spaceIdx], ":")
-		if level := types.ParseLevel(candidate); level != types.LevelUnknown {
-			entry.Level = level
-		}
-	}
+	applyInnerLine(&entry, strings.TrimSpace(rest[msgStart:]), &p.tsCache)
 
 	return entry, true
 }

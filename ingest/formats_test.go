@@ -146,31 +146,36 @@ func TestAllFormats(t *testing.T) {
 
 		// --- Docker JSON ---
 		{
-			// Docker parser: stdout → Info, stderr → Error, then first-word scan.
-			// WARN:/ERROR:/FATAL: in first word override the stream default.
+			// Docker parser: the level comes from the message (first word, then
+			// the first five); without one, stdout is Info and stderr unknown.
 			name:    "docker json",
 			file:    "../testdata/formats/docker_json.log",
 			firstTS: "2024-01-15T10:00:00Z",
 			format:  "docker-json",
 			count:   7,
 			levels: map[types.Level]int{
-				types.LevelInfo:  3, // Starting, Listening, Connected (stdout)
-				types.LevelWarn:  1, // "WARN:" overrides stderr→Error
-				types.LevelError: 2, // "ERROR:", "Attempting..." (stderr default)
-				types.LevelFatal: 1, // "FATAL:" overrides stderr→Error
+				types.LevelInfo:    3, // Starting, Listening, Connected (stdout)
+				types.LevelWarn:    1, // "WARN:"
+				types.LevelError:   1, // "ERROR:"
+				types.LevelFatal:   1, // "FATAL:"
+				types.LevelUnknown: 1, // "Attempting reconnection..." on stderr
 			},
 		},
 		{
-			// Docker parser: messages start with "[2024-..." so first-word scan
-			// finds "[2024-01-15" not a level keyword. Stream defaults apply.
+			// Docker parser: messages start with "[2024-...", so the level is
+			// found after the bracketed timestamp; the Python traceback lines
+			// carry none and are unknown on stderr.
 			name:    "docker mixed streams with timestamps in message",
 			file:    "../testdata/formats/docker_mixed_streams.log",
 			firstTS: "2024-01-15T10:00:00Z",
 			format:  "docker-json",
 			count:   9,
 			levels: map[types.Level]int{
-				types.LevelInfo:  3, // 3 stdout lines
-				types.LevelError: 6, // 6 stderr lines (first word is timestamp or traceback, not level keyword)
+				types.LevelInfo:    2, // "INFO:" ×2 on stdout
+				types.LevelWarn:    1, // "WARN:" on stdout
+				types.LevelUnknown: 4, // traceback lines on stderr
+				types.LevelError:   1, // "ERROR:"
+				types.LevelFatal:   1, // "FATAL:"
 			},
 		},
 
@@ -194,7 +199,8 @@ func TestAllFormats(t *testing.T) {
 
 		// --- Kubernetes ---
 		{
-			// Kube parser: stdout → Info, stderr → Error, then first-word scan.
+			// Kube parser: the level comes from the message; without one,
+			// stdout is Info and stderr unknown.
 			name:    "kubernetes",
 			file:    "../testdata/formats/kubernetes.log",
 			firstTS: "2024-01-15T10:00:00Z",
@@ -229,10 +235,11 @@ func TestAllFormats(t *testing.T) {
 			format:  "kubernetes",
 			count:   10,
 			levels: map[types.Level]int{
-				types.LevelInfo:  2, // stdout: Starting, Health
-				types.LevelWarn:  1, // "WARN:" on stderr
-				types.LevelError: 6, // stderr default: ERROR:, panic:, [signal, goroutine, main.(*), \t/app/
-				types.LevelFatal: 1, // "FATAL:" on stderr
+				types.LevelInfo:    2, // stdout: Starting, Health
+				types.LevelWarn:    1, // "WARN:" on stderr
+				types.LevelError:   2, // "ERROR:", and "panic: runtime error:"
+				types.LevelUnknown: 4, // goroutine dump lines: [signal, goroutine, main.(*), \t/app/
+				types.LevelFatal:   1, // "FATAL:" on stderr
 			},
 		},
 
