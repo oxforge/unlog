@@ -78,12 +78,109 @@ func formatSummary(all []scoredEntry, tokenBudget int) string {
 	overviewBudget := sectionBudget(tokenBudget, budgetOverview)
 	overviewText := buildOverview(all)
 	writeSection(&sb, sectionOverview, truncateToTokens(overviewText, overviewBudget))
-	writeEntriesSection(&sb, sectionCritical, criticals, sectionBudget(tokenBudget, budgetCritical))
-	writeEntriesSection(&sb, sectionChains, chains, sectionBudget(tokenBudget, budgetChains))
-	writeEntriesSection(&sb, sectionAnomalies, anomalies, sectionBudget(tokenBudget, budgetAnomalies))
-	writeEntriesSection(&sb, sectionContext, contextEntries, sectionBudget(tokenBudget, budgetContext))
+
+	// Listed in the order leftover budget is handed out.
+	sections := []*entrySection{
+		newEntrySection(sectionCritical, criticals, sectionBudget(tokenBudget, budgetCritical)),
+		newEntrySection(sectionChains, chains, sectionBudget(tokenBudget, budgetChains)),
+		newEntrySection(sectionAnomalies, anomalies, sectionBudget(tokenBudget, budgetAnomalies)),
+		newEntrySection(sectionContext, contextEntries, sectionBudget(tokenBudget, budgetContext)),
+	}
+	shareUnusedBudget(sections)
+	for _, sec := range sections {
+		sec.write(&sb)
+	}
 
 	return strings.TrimRight(sb.String(), "\n")
+}
+
+// entrySection is one section of entries with its rendered lines and budget.
+type entrySection struct {
+	title  string
+	items  []scoredEntry // highest score first
+	lines  []string      // lines[i] renders items[i]
+	tokens []int         // tokens[i] is the cost of lines[i] with its newline
+	budget int
+}
+
+func newEntrySection(title string, items []scoredEntry, budget int) *entrySection {
+	sec := &entrySection{title: title, items: items, budget: budget}
+	for _, se := range items {
+		line := formatEntry(se.entry)
+		sec.lines = append(sec.lines, line)
+		sec.tokens = append(sec.tokens, EstimateTokens(line+"\n"))
+	}
+	return sec
+}
+
+// need is the token cost of listing every entry in the section.
+func (sec *entrySection) need() int {
+	total := 0
+	for _, t := range sec.tokens {
+		total += t
+	}
+	return total
+}
+
+// shareUnusedBudget caps each section's budget at what it needs and hands the
+// rest, in section order, to sections that would otherwise be truncated.
+func shareUnusedBudget(sections []*entrySection) {
+	leftover := 0
+	for _, sec := range sections {
+		if need := sec.need(); need < sec.budget {
+			leftover += sec.budget - need
+			sec.budget = need
+		}
+	}
+	for _, sec := range sections {
+		if leftover == 0 {
+			return
+		}
+		extra := min(sec.need()-sec.budget, leftover)
+		if extra > 0 {
+			sec.budget += extra
+			leftover -= extra
+		}
+	}
+}
+
+// write renders the section: the highest-scored entries that fit the budget
+// (always at least one), listed in time order with undated entries last.
+func (sec *entrySection) write(sb *strings.Builder) {
+	sb.WriteString("## ")
+	sb.WriteString(sec.title)
+	sb.WriteString("\n")
+
+	if len(sec.items) == 0 {
+		sb.WriteString("(none)\n\n")
+		return
+	}
+
+	var chosen []int
+	used := 0
+	for i := range sec.items {
+		if used+sec.tokens[i] > sec.budget && len(chosen) > 0 {
+			break
+		}
+		chosen = append(chosen, i)
+		used += sec.tokens[i]
+	}
+
+	sort.SliceStable(chosen, func(a, b int) bool {
+		ta, tb := sec.items[chosen[a]].entry.Timestamp, sec.items[chosen[b]].entry.Timestamp
+		if ta.IsZero() != tb.IsZero() {
+			return tb.IsZero()
+		}
+		return ta.Before(tb)
+	})
+	for _, i := range chosen {
+		sb.WriteString(sec.lines[i])
+		sb.WriteString("\n")
+	}
+	if omitted := len(sec.items) - len(chosen); omitted > 0 {
+		fmt.Fprintf(sb, "... (%d more entries omitted)\n", omitted)
+	}
+	sb.WriteString("\n")
 }
 
 // sectionBudget computes the token budget for a section, subtracting the
@@ -111,15 +208,13 @@ func buildOverview(all []scoredEntry) string {
 
 	for _, se := range all {
 		e := se.entry
-		t := e.Timestamp
-		if t.IsZero() {
-			continue
-		}
-		if earliest.IsZero() || t.Before(earliest) {
-			earliest = t
-		}
-		if latest.IsZero() || t.After(latest) {
-			latest = t
+		if t := e.Timestamp; !t.IsZero() {
+			if earliest.IsZero() || t.Before(earliest) {
+				earliest = t
+			}
+			if latest.IsZero() || t.After(latest) {
+				latest = t
+			}
 		}
 		switch e.Level {
 		case types.LevelFatal:
@@ -143,13 +238,15 @@ func buildOverview(all []scoredEntry) string {
 		}
 	}
 
-	duration := latest.Sub(earliest).Round(time.Second)
-
 	var parts []string
-	parts = append(parts, fmt.Sprintf("Window: %s — %s (%s)",
-		earliest.UTC().Format(time.RFC3339),
-		latest.UTC().Format(time.RFC3339),
-		duration))
+	if earliest.IsZero() {
+		parts = append(parts, "Window: unknown (no timestamps)")
+	} else {
+		parts = append(parts, fmt.Sprintf("Window: %s — %s (%s)",
+			earliest.UTC().Format(time.RFC3339),
+			latest.UTC().Format(time.RFC3339),
+			latest.Sub(earliest).Round(time.Second)))
+	}
 	parts = append(parts, fmt.Sprintf("Sources: %d (%s)", len(sources), joinedSources(sources)))
 	parts = append(parts, fmt.Sprintf("Events: %d fatal, %d error, %d warn", fatalCount, errorCount, warnCount))
 
@@ -188,45 +285,15 @@ func writeSection(sb *strings.Builder, title, body string) {
 	sb.WriteString("\n")
 }
 
-// writeEntriesSection renders a capped set of entries into a section.
-// The tokenBudget accounts for entry content only (header overhead is pre-subtracted).
-func writeEntriesSection(sb *strings.Builder, title string, entries []scoredEntry, tokenBudget int) {
-	sb.WriteString("## ")
-	sb.WriteString(title)
-	sb.WriteString("\n")
-
-	if len(entries) == 0 {
-		sb.WriteString("(none)\n\n")
-		return
-	}
-
-	used := 0
-	written := 0
-	for _, se := range entries {
-		line := formatEntry(se.entry)
-		tokens := EstimateTokens(line)
-		if used+tokens > tokenBudget && written > 0 {
-			remaining := len(entries) - written
-			if remaining > 0 {
-				truncLine := fmt.Sprintf("... (%d more entries omitted)\n", remaining)
-				sb.WriteString(truncLine)
-			}
-			break
-		}
-		sb.WriteString(line)
-		sb.WriteString("\n")
-		used += tokens
-		written++
-	}
-
-	sb.WriteString("\n")
-}
-
 // formatEntry renders a single EnrichedEntry as a log-like line.
 func formatEntry(e types.EnrichedEntry) string {
 	var sb strings.Builder
 
-	sb.WriteString(e.Timestamp.UTC().Format("2006-01-02T15:04:05Z"))
+	if e.Timestamp.IsZero() {
+		sb.WriteString("-")
+	} else {
+		sb.WriteString(e.Timestamp.UTC().Format("2006-01-02T15:04:05Z"))
+	}
 	sb.WriteString(" [")
 	sb.WriteString(e.Level.String())
 	sb.WriteString("] ")

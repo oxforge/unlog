@@ -265,3 +265,24 @@ func TestMaxSurvivorsOverflow(t *testing.T) {
 	// The key assertion is that all entries made it to output.
 	assert.Equal(t, 100, len(results), "all entries should reach output despite overflow")
 }
+
+func TestTimeWindowIgnoresEntriesWithoutTimestamps(t *testing.T) {
+	input := make(chan types.LogEntry, 3)
+	output := make(chan types.FilteredEntry, 10)
+	first := time.Date(2024, 1, 15, 10, 31, 0, 0, time.UTC)
+	last := time.Date(2024, 1, 15, 10, 32, 25, 0, time.UTC)
+	input <- types.LogEntry{Level: types.LevelError, Source: "db.log", Message: "undated failure"}
+	input <- types.LogEntry{Timestamp: first, Level: types.LevelError, Source: "app.log", Message: "request failed"}
+	input <- types.LogEntry{Timestamp: last, Level: types.LevelFatal, Source: "app.log", Message: "shutting down"}
+	close(input)
+
+	opts := DefaultFilterOptions()
+	opts.AutoWindow = false
+	fs, _, err := NewFilterPipeline(input, output, opts, nil).Run(context.Background())
+	require.NoError(t, err)
+	for range output {
+	}
+
+	assert.True(t, first.Equal(fs.TimeWindowStart), "start: got %s", fs.TimeWindowStart)
+	assert.True(t, last.Equal(fs.TimeWindowEnd), "end: got %s", fs.TimeWindowEnd)
+}
