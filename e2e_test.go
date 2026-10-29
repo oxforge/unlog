@@ -91,6 +91,20 @@ func TestE2EIncidentDBConnection(t *testing.T) {
 	assert.Contains(t, report.CompactedSummary, "app.log")
 	assert.Contains(t, report.CompactedSummary, "connection pool exhausted, shutting down")
 	assert.Contains(t, report.CompactedSummary, "circuit breaker open")
+	// db.log holds the root cause; it must reach the summary.
+	assert.Contains(t, report.CompactedSummary, "db_connection/db.log")
+	assert.Contains(t, report.CompactedSummary, "max_connections limit reached")
+}
+
+func TestE2EDebugLevelReachesSummary(t *testing.T) {
+	logPath := writeFile(t, t.TempDir(), "app.log",
+		`{"level":"debug","msg":"retry budget at 3 of 5","time":"2024-01-15T10:00:00Z"}
+{"level":"error","msg":"payment declined","time":"2024-01-15T10:00:01Z"}
+`)
+
+	report := runJSON(t, "--level", "debug", logPath)
+
+	assert.Contains(t, report.CompactedSummary, "retry budget at 3 of 5")
 }
 
 func TestE2EIncidentDeployFailure(t *testing.T) {

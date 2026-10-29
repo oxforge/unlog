@@ -55,8 +55,10 @@ type scoredEntry struct {
 }
 
 // Run consumes all EnrichedEntry values from entries, scores them, and returns
-// a structured text summary within the token budget. Entries below LevelInfo
-// are silently dropped. Blocks until entries is closed or ctx is cancelled.
+// a structured text summary within the token budget. Every entry is kept: the
+// filter stage has already applied the minimum level, and entries whose level
+// is unknown land in Context with the lowest score. Blocks until entries is
+// closed or ctx is cancelled.
 func Run(ctx context.Context, entries <-chan types.EnrichedEntry, opts Options) (string, error) {
 	opts = opts.withDefaults()
 
@@ -69,9 +71,6 @@ drain:
 		case entry, ok := <-entries:
 			if !ok {
 				break drain
-			}
-			if entry.Level < types.LevelInfo {
-				continue
 			}
 			all = append(all, scoredEntry{
 				entry: entry,

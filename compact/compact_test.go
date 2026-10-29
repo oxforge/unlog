@@ -373,15 +373,18 @@ func TestRun_MutuallyExclusiveSections(t *testing.T) {
 		"entry should NOT appear in Rate Anomalies (claimed by chains)")
 }
 
-// ─── Debug/Trace filtering ──────────────────────────────────────────────────
+// ─── Levels below warn ──────────────────────────────────────────────────────
 
-func TestRun_DebugTraceFiltered(t *testing.T) {
+// The filter stage applies --level; compact must not drop what it let through,
+// and entries whose level is unknown are kept by the filter on purpose.
+func TestRun_KeepsLowAndUnknownLevelsInContext(t *testing.T) {
 	base := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
 
 	entries := []types.EnrichedEntry{
-		makeEntry(types.LevelDebug, "debug noise", "svc", base),
-		makeEntry(types.LevelTrace, "trace noise", "svc", base.Add(time.Second)),
-		makeEntry(types.LevelError, "real error", "svc", base.Add(2*time.Second)),
+		makeEntry(types.LevelUnknown, "LOG:  checkpoint starting", "db.log", base),
+		makeEntry(types.LevelDebug, "cache lookup for key 42", "svc", base.Add(time.Second)),
+		makeEntry(types.LevelTrace, "entering handler", "svc", base.Add(2*time.Second)),
+		makeEntry(types.LevelError, "real error", "svc", base.Add(3*time.Second)),
 	}
 
 	ch := make(chan types.EnrichedEntry, len(entries))
@@ -390,9 +393,29 @@ func TestRun_DebugTraceFiltered(t *testing.T) {
 	summary, err := Run(context.Background(), ch, Options{})
 	require.NoError(t, err)
 
-	assert.NotContains(t, summary, "debug noise")
-	assert.NotContains(t, summary, "trace noise")
-	assert.Contains(t, summary, "real error")
+	contextSection := extractSection(summary, "## Context", "\x00")
+	assert.Contains(t, contextSection, "LOG:  checkpoint starting")
+	assert.Contains(t, contextSection, "cache lookup for key 42")
+	assert.Contains(t, contextSection, "entering handler")
+	assert.Contains(t, extractSection(summary, "## Critical Errors", "## Error Chains"), "real error")
+}
+
+func TestRun_UnknownLevelRanksBelowWarn(t *testing.T) {
+	base := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
+
+	entries := []types.EnrichedEntry{
+		makeEntry(types.LevelUnknown, "unclassified line", "db.log", base),
+		makeEntry(types.LevelWarn, "queue depth rising", "svc", base.Add(time.Second)),
+	}
+
+	ch := make(chan types.EnrichedEntry, len(entries))
+	sendAndClose(ch, entries)
+
+	summary, err := Run(context.Background(), ch, Options{})
+	require.NoError(t, err)
+
+	contextSection := extractSection(summary, "## Context", "\x00")
+	assert.Less(t, strings.Index(contextSection, "queue depth rising"), strings.Index(contextSection, "unclassified line"))
 }
 
 // ─── Overview content ────────────────────────────────────────────────────────

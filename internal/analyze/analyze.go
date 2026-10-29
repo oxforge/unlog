@@ -14,7 +14,7 @@ const DefaultSystemPrompt = `You are a senior SRE performing post-incident analy
 - **Critical Errors**: FATAL and ERROR entries, deduplicated with occurrence counts and tags (chain IDs, spike flags, HTTP status, error types).
 - **Error Chains**: entries grouped by detected causal chain (e.g. DB exhaustion → connection refused → circuit breaker open).
 - **Rate Anomalies**: entries from sources that experienced sudden rate spikes.
-- **Context**: surrounding WARN/INFO entries that provide additional clues.
+- **Context**: surrounding entries below ERROR (WARN, INFO, DEBUG, and UNKNOWN when the source has no level) that provide additional clues.
 
 Each log entry follows this format:
   TIMESTAMP [LEVEL] source: message {tags}

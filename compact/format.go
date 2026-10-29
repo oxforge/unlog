@@ -64,7 +64,7 @@ func formatSummary(all []scoredEntry, tokenBudget int) string {
 
 	var contextEntries []scoredEntry
 	for i, se := range all {
-		if !claimed[i] && (se.entry.Level == types.LevelWarn || se.entry.Level == types.LevelInfo) {
+		if !claimed[i] {
 			contextEntries = append(contextEntries, se)
 		}
 	}
