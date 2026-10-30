@@ -7,16 +7,26 @@
 
 **Unravel your logs.** A fast CLI tool that reads raw log files at disk speed and turns them into a short incident summary: what failed, where, how often, in what order, and what was deployed just before. People read it directly; AI agents read it instead of grepping through the logs (see [For agents](#for-agents)).
 
-unlog processes logs through a 5-stage streaming pipeline via Go channels with back-pressure:
-
-![Pipeline](docs/pipeline.png)
-
-unlog makes no network calls and never needs an API key.
-
+```text
+$ unlog logs/
+## Incident Overview
+Window: 2024-01-15T14:01:55Z — 2024-01-15T14:03:00Z (1m5s)
+Sources: 2 (logs/app.log, logs/deploy.log)
+Events: 0 fatal, 13 error (8 distinct), 4 warn
+Last deployment: 2024-01-15T14:02:00Z, 15s before the first error
+Error chains detected: deployment-failure
+…
+## Error Chains
+deployment-failure: 3 of 3 steps, 2024-01-15T14:01:55Z–14:02:35Z
+  1. 2024-01-15T14:01:55Z [INFO] logs/deploy.log: INFO  deployment started: app-deployment to version 3.3.0 {deploy}
+  …
+  2. 2024-01-15T14:02:15Z–14:02:16Z [ERROR] logs/app.log[app-pod]: health check failed: connection refused {×2 with=logs/deploy.log}
+  2. 2024-01-15T14:02:25Z [ERROR] logs/deploy.log: ERROR deployment health check failed: insufficient healthy pods {with=logs/app.log,logs/app.log[app-pod]}
+  3. 2024-01-15T14:02:35Z [ERROR] logs/deploy.log: ERROR deployment failure threshold exceeded: initiating rollback {with=logs/app.log[app-pod]}
+…
 ```
-cat /var/log/app/*.log | unlog
-unlog logs/
-```
+
+That's the bundled `testdata/incidents/deploy_failure/` example, trimmed. unlog makes no network calls and never needs an API key; [Architecture](#architecture) shows how it works.
 
 ## Features
 
