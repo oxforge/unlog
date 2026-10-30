@@ -92,6 +92,19 @@ unlog --format json logs/
 unlog --format markdown --output report.md logs/
 ```
 
+## For agents
+
+This repository is also a Claude Code plugin. Its `analyzing-logs` skill makes an agent that is asked to analyze logs run unlog on them first, instead of grepping them or writing a script to read them. The agent then reads the summary, looks at the raw logs only where the summary raises a question, and answers with the facts, adding a conclusion only when the order of events supports one. A SessionStart hook puts that rule in every session.
+
+```bash
+claude plugin marketplace add oxforge/unlog
+claude plugin install unlog@unlog
+```
+
+On Claude Code 2.1.275 or later, `/plugin install unlog --marketplace oxforge/unlog` does both in one step. The plugin follows unlog's releases and needs the `unlog` binary itself ([Installation](#installation)); when the binary is missing, the agent says so and asks before installing it.
+
+Any other agent with a shell (Codex, Cursor, Gemini CLI and others) can use the same skill: add [`skills/analyzing-logs/SKILL.md`](skills/analyzing-logs/SKILL.md) and its reference, [`reading-the-summary.md`](skills/analyzing-logs/reading-the-summary.md), to the agent's instructions or skills folder. Neither file relies on anything specific to Claude Code.
+
 ## Flags
 
 | Flag | Description |
@@ -245,8 +258,9 @@ Every key is always present. `analysis_duration_ms` is how long the whole run to
 
 ## Development
 
-Needs [just](https://just.systems) (bare `just` lists every recipe) and
-optionally [golangci-lint](https://golangci-lint.run).
+Needs [just](https://just.systems) (bare `just` lists every recipe),
+optionally [golangci-lint](https://golangci-lint.run), and
+[jq](https://jqlang.org) for `just plugin-version`.
 
 ```bash
 just build           # bin/unlog
@@ -258,10 +272,21 @@ just smoke           # build, then run against testdata/incidents/
 just bench           # all benchmarks
 just bench-compare   # benchmarks x6 into bench-new.txt, for benchstat
 just bigdata         # 100MB synthetic logs in testdata/big/
+just plugin-version 0.4.0  # set the plugin's version and marketplace pin
 just clean           # remove bin/ and generated test data
 ```
 
 To run one package or test: `go test ./ingest/ -run TestIngester`.
+
+### Releasing
+
+A release is a pushed `vX.Y.Z` tag; `.github/workflows/release.yml` builds and publishes it with GoReleaser.
+
+1. Run `just plugin-version X.Y.Z` and commit. The marketplace entry on `main` now points at the new tag, so the plugin can't be installed until the tag is pushed: tag right after.
+2. Write the release notes to a file whose first line is the title (`unlog vX.Y.Z`), then a blank line, then the notes.
+3. Run `git tag -a vX.Y.Z -F notes.md`, then push the commit and the tag.
+
+The workflow fails before publishing when the tag, the plugin's version and the marketplace pin disagree (`scripts/check-plugin-version`), and it uses the tag's message, minus its first line, as the release notes.
 
 ### Generating test data
 

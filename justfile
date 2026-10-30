@@ -42,6 +42,14 @@ bigdata:
     go run testdata/big/generate.go --size 100MB --format json --error-rate 0.05 --output testdata/big/test.log
     go run testdata/big/generate.go --size 100MB --format json --error-rate 0.05 --output testdata/big/test.tar.gz
 
+# Set the plugin's version and the marketplace pin to X.Y.Z (needs jq), then check them
+plugin-version version:
+    jq --arg v "{{version}}" '.version = $v' .claude-plugin/plugin.json > .claude-plugin/plugin.json.tmp
+    mv .claude-plugin/plugin.json.tmp .claude-plugin/plugin.json
+    jq --arg v "v{{version}}" '.plugins[0].source.ref = $v' .claude-plugin/marketplace.json > .claude-plugin/marketplace.json.tmp
+    mv .claude-plugin/marketplace.json.tmp .claude-plugin/marketplace.json
+    scripts/check-plugin-version v{{version}}
+
 # Remove build output and generated test data
 clean:
     rm -rf bin/

@@ -8,5 +8,11 @@
   "homepage": "https://github.com/oxforge/unlog",
   "repository": "https://github.com/oxforge/unlog",
   "license": "MIT",
-  "keywords": ["logs", "incident", "triage", "debugging", "sre"]
+  "keywords": [
+    "logs",
+    "incident",
+    "triage",
+    "debugging",
+    "sre"
+  ]
 }

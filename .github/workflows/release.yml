@@ -16,11 +16,23 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: ${{ github.event.inputs.tag || github.ref }}
+
+      # The checkout leaves the pushed annotated tag as a lightweight one, and
+      # the tag's message is the release notes.
+      - run: git fetch --force --tags
+
+      - name: Check the tag against the plugin's version
+        run: scripts/check-plugin-version "$TAG"
+
+      - name: Write the release notes from the tag's message
+        run: git tag -l --format='%(contents:body)' "$TAG" > "$RUNNER_TEMP/notes.md"
 
       - uses: actions/setup-go@v6
         with:
@@ -29,6 +41,6 @@ jobs:
       - uses: goreleaser/goreleaser-action@v7
         with:
           version: "~> v2"
-          args: release --clean
+          args: release --clean --release-notes ${{ runner.temp }}/notes.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

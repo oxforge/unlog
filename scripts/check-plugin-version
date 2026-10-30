@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# check-plugin-version TAG: exits 0 when TAG is v<version> of
+# .claude-plugin/plugin.json and the marketplace pins the plugin to TAG, so a
+# release never ships a plugin that points at another version. Run from the
+# repository root; the release workflow runs it before publishing.
+set -euo pipefail
+
+tag=${1:?usage: check-plugin-version TAG}
+version=$(jq -r .version .claude-plugin/plugin.json)
+pin=$(jq -r '.plugins[0].source.ref' .claude-plugin/marketplace.json)
+if [ "$tag" != "v$version" ] || [ "$pin" != "$tag" ]; then
+  echo "tag $tag, plugin.json $version and the marketplace pin $pin must agree" >&2
+  exit 1
+fi
