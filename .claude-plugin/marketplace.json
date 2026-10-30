@@ -14,7 +14,7 @@
         "repo": "oxforge/unlog",
         "ref": "v0.4.0"
       },
-      "description": "Turns raw logs into a compact incident summary with the unlog CLI (a SessionStart hook and, soon, a skill)"
+      "description": "Agents analyze logs with the unlog CLI: run it first, read its incident summary, answer with the facts (a skill and a SessionStart hook)"
     }
   ]
 }

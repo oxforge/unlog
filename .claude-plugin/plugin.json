@@ -1,6 +1,6 @@
 {
   "name": "unlog",
-  "description": "Turns raw logs into a compact incident summary with the unlog CLI, and teaches the agent to run it before any grep, with a SessionStart hook that adds the rule to every session",
+  "description": "Agents analyze logs with the unlog CLI: the analyzing-logs skill runs unlog before any grep, reads its incident summary and answers with the facts, and a SessionStart hook adds the rule to every session",
   "version": "0.4.0",
   "author": {
     "name": "oxforge"
