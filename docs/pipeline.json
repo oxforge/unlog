@@ -7,7 +7,7 @@
       "id": "input",
       "label": "Files / stdin",
       "shape": "rounded",
-      "color": "#2a9d8f"
+      "color": "gray"
     },
     {
       "id": "ingest",
@@ -33,7 +33,7 @@
       "id": "output",
       "label": "stdout / file",
       "shape": "rounded",
-      "color": "#2a9d8f"
+      "color": "gray"
     }
   ],
   "edges": [
@@ -78,7 +78,7 @@
     {
       "id": "core",
       "label": "processing",
-      "color": "#8ab17d",
+      "color": "#5fbf6a",
       "contains": [
         "ingest",
         "filter",
