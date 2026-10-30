@@ -1,23 +1,90 @@
 {
   "type": "flow",
-  "direction": "RIGHT",
+  "direction": "DOWN",
   "theme": "dark",
   "nodes": [
-    { "id": "input", "label": "Files / stdin", "shape": "rounded" },
-    { "id": "ingest", "label": "Ingest" },
-    { "id": "filter", "label": "Filter\n(N workers)" },
-    { "id": "enrich", "label": "Enrich" },
-    { "id": "compact", "label": "Compact" },
-    { "id": "render", "label": "Render" }
+    {
+      "id": "input",
+      "label": "Files / stdin",
+      "shape": "rounded",
+      "color": "#2a9d8f"
+    },
+    {
+      "id": "ingest",
+      "label": "Ingest"
+    },
+    {
+      "id": "filter",
+      "label": "Filter\n(N workers)"
+    },
+    {
+      "id": "enrich",
+      "label": "Enrich"
+    },
+    {
+      "id": "compact",
+      "label": "Compact"
+    },
+    {
+      "id": "render",
+      "label": "Render"
+    },
+    {
+      "id": "output",
+      "label": "stdout / file",
+      "shape": "rounded",
+      "color": "#2a9d8f"
+    }
   ],
   "edges": [
-    { "id": "e-input-ingest", "from": "input", "to": "ingest" },
-    { "id": "e-ingest-filter", "from": "ingest", "to": "filter" },
-    { "id": "e-filter-enrich", "from": "filter", "to": "enrich" },
-    { "id": "e-enrich-compact", "from": "enrich", "to": "compact" },
-    { "id": "e-compact-render", "from": "compact", "to": "render" }
+    {
+      "id": "e-input-ingest",
+      "from": "input",
+      "to": "ingest",
+      "label": "raw lines, any format"
+    },
+    {
+      "id": "e-ingest-filter",
+      "from": "ingest",
+      "to": "filter",
+      "label": "parsed entries"
+    },
+    {
+      "id": "e-filter-enrich",
+      "from": "filter",
+      "to": "enrich",
+      "label": "one line per error, bursts"
+    },
+    {
+      "id": "e-enrich-compact",
+      "from": "enrich",
+      "to": "compact",
+      "label": "chains, deploys, co-failures"
+    },
+    {
+      "id": "e-compact-render",
+      "from": "compact",
+      "to": "render",
+      "label": "fixed-size summary"
+    },
+    {
+      "id": "e-render-output",
+      "from": "render",
+      "to": "output",
+      "label": "text, JSON, Markdown"
+    }
   ],
   "groups": [
-    { "id": "core", "label": "no network", "contains": ["ingest", "filter", "enrich", "compact", "render"] }
+    {
+      "id": "core",
+      "label": "processing",
+      "color": "#8ab17d",
+      "contains": [
+        "ingest",
+        "filter",
+        "enrich",
+        "compact"
+      ]
+    }
   ]
 }
