@@ -1,0 +1,20 @@
+{
+  "name": "unlog",
+  "owner": {
+    "name": "oxforge"
+  },
+  "metadata": {
+    "description": "The unlog plugin, pinned to the latest unlog release"
+  },
+  "plugins": [
+    {
+      "name": "unlog",
+      "source": {
+        "source": "github",
+        "repo": "oxforge/unlog",
+        "ref": "v0.4.0"
+      },
+      "description": "Turns raw logs into a compact incident summary with the unlog CLI (a SessionStart hook and, soon, a skill)"
+    }
+  ]
+}

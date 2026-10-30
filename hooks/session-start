@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# SessionStart hook of the unlog plugin: puts the standing rule for log
+# analysis in the session's context. Uses bash builtins only and exits 0
+# whatever happens, so it never blocks a session. The texts hold no double
+# quote or backslash, so they need no JSON escaping.
+
+text='The unlog plugin is active. When you are asked to analyze, triage or find errors in logs (files, directories, archives, or output from kubectl logs, docker compose logs or journalctl), run unlog on them first, following the unlog:analyzing-logs skill, before any grep or ad-hoc script.'
+if ! command -v unlog >/dev/null 2>&1; then
+  text="$text The hook did not find the unlog CLI on its PATH; if command -v unlog fails in your shell too, tell the user how to install it (https://github.com/oxforge/unlog#installation) and ask before installing anything."
+fi
+
+printf '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"%s"}}\n' "$text"
+exit 0

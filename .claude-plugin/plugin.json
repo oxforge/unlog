@@ -1,0 +1,12 @@
+{
+  "name": "unlog",
+  "description": "Turns raw logs into a compact incident summary with the unlog CLI, and teaches the agent to run it before any grep, with a SessionStart hook that adds the rule to every session",
+  "version": "0.4.0",
+  "author": {
+    "name": "oxforge"
+  },
+  "homepage": "https://github.com/oxforge/unlog",
+  "repository": "https://github.com/oxforge/unlog",
+  "license": "MIT",
+  "keywords": ["logs", "incident", "triage", "debugging", "sre"]
+}
