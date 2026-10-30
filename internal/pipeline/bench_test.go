@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/oxforge/unlog/compact"
-	"github.com/oxforge/unlog/enrich"
-	"github.com/oxforge/unlog/filter"
-	"github.com/oxforge/unlog/types"
+	"github.com/oxforge/unlog/internal/compact"
+	"github.com/oxforge/unlog/internal/enrich"
+	"github.com/oxforge/unlog/internal/filter"
+	"github.com/oxforge/unlog/internal/types"
 )
 
 // generateEntries creates n synthetic LogEntry values with mixed levels and

@@ -5,7 +5,7 @@ import (
 	// minimal containers).
 	_ "time/tzdata"
 
-	"github.com/oxforge/unlog/cmd"
+	"github.com/oxforge/unlog/internal/cmd"
 )
 
 func main() {

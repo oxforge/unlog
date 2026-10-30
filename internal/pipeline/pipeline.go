@@ -10,11 +10,11 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/oxforge/unlog/compact"
-	"github.com/oxforge/unlog/enrich"
-	"github.com/oxforge/unlog/filter"
-	"github.com/oxforge/unlog/ingest"
-	"github.com/oxforge/unlog/types"
+	"github.com/oxforge/unlog/internal/compact"
+	"github.com/oxforge/unlog/internal/enrich"
+	"github.com/oxforge/unlog/internal/filter"
+	"github.com/oxforge/unlog/internal/ingest"
+	"github.com/oxforge/unlog/internal/types"
 )
 
 // ingestBuffer lets ingest run ahead of the filter workers. The filter and

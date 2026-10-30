@@ -32,7 +32,6 @@ unlog logs/
 - **Agent plugin** -- A Claude Code plugin whose skill makes agents run unlog first when they analyze logs, then answer with the facts and a conclusion only where the evidence supports one (see [For agents](#for-agents)).
 - **Multiple output formats** -- Colored terminal, JSON, and Markdown.
 - **Stdin support** -- Pipe logs from any source.
-- **Importable as a library** -- `types/`, `ingest/`, `filter/`, `enrich/`, and `compact/` are public packages.
 
 ## Installation
 
@@ -200,13 +199,13 @@ unlog uses a 5-stage streaming pipeline connected by buffered Go channels:
 
 | Stage | Package | Description |
 |-------|---------|-------------|
-| 1. Ingest | `ingest/` | Read files, detect format, parse into structured entries |
-| 2. Filter | `filter/` | Level filter, time window, noise removal, one record per error, burst detection |
-| 3. Enrich | `enrich/` | Error chain detection, deployment events, cross-source correlation, field extraction |
-| 4. Compact | `compact/` | Priority scoring, token-budgeted compaction |
+| 1. Ingest | `internal/ingest/` | Read files, detect format, parse into structured entries |
+| 2. Filter | `internal/filter/` | Level filter, time window, noise removal, one record per error, burst detection |
+| 3. Enrich | `internal/enrich/` | Error chain detection, deployment events, cross-source correlation, field extraction |
+| 4. Compact | `internal/compact/` | Priority scoring, token-budgeted compaction |
 | 5. Render | `internal/render/` | Terminal, JSON, and Markdown output |
 
-No stage makes a network call. Stages 1-4 are public packages importable as a Go library.
+No stage makes a network call. All Go code lives under `internal/` (the CLI commands in `internal/cmd/`, shared types in `internal/types/`); unlog is a tool, not a Go library. The repository root holds `main.go`, the end-to-end tests and `testdata/`, plus the agent plugin (`.claude-plugin/`, `skills/`, `hooks/`) and the release scripts (`scripts/`).
 
 ## Custom noise patterns
 
@@ -276,7 +275,7 @@ just plugin-version 0.4.0  # set the plugin's version and marketplace pin
 just clean           # remove bin/ and generated test data
 ```
 
-To run one package or test: `go test ./ingest/ -run TestIngester`.
+To run one package or test: `go test ./internal/ingest/ -run TestIngester`.
 
 ### Releasing
 

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/oxforge/unlog/internal/pipeline"
-	"github.com/oxforge/unlog/types"
+	"github.com/oxforge/unlog/internal/types"
 )
 
 type JSONRenderer struct{}
