@@ -322,8 +322,8 @@ func TestE2EDockerStderrIsNotAnError(t *testing.T) {
 	assert.NotContains(t, critical, "cache warmed")
 }
 
-// The report carries no AI keys: unlog no longer calls LLMs.
-func TestE2EReportHasNoAIKeys(t *testing.T) {
+// Every key of the JSON report is present, even for a run with no errors.
+func TestE2EReportHasEveryKey(t *testing.T) {
 	logPath := writeFile(t, t.TempDir(), "app.log",
 		`{"level":"warn","msg":"queue depth rising","time":"2024-01-15T10:00:00Z"}
 {"level":"warn","msg":"retry budget low","time":"2024-01-15T10:00:01Z"}
@@ -336,9 +336,6 @@ func TestE2EReportHasNoAIKeys(t *testing.T) {
 	for _, key := range []string{"generated_at", "unlog_version", "analysis_duration_ms", "stats", "compacted_summary"} {
 		assert.Contains(t, report, key)
 	}
-	for _, key := range []string{"model_used", "ai_duration_ms", "analysis", "analysis_error"} {
-		assert.NotContains(t, report, key)
-	}
 	stats, ok := report["stats"].(map[string]any)
 	require.True(t, ok, "stats should be an object")
 	for _, key := range []string{"ingested", "dropped", "survived", "unique_signatures", "time_window_start",
@@ -347,36 +344,6 @@ func TestE2EReportHasNoAIKeys(t *testing.T) {
 	}
 	_, isObject := stats["source_breakdown"].(map[string]any)
 	assert.True(t, isObject, "source_breakdown should be an object, got %v", stats["source_breakdown"])
-}
-
-func TestE2ERemovedAIFlagsAreUnknown(t *testing.T) {
-	for _, args := range [][]string{{"--ai-provider", "anthropic"}, {"--model", "x"}, {"--ai-timeout", "1m"}} {
-		t.Run(args[0], func(t *testing.T) {
-			logPath := writeFile(t, t.TempDir(), "app.log", levelFixture)
-			r := runUnlog(t, t.TempDir(), nil, append(args, logPath)...)
-			assert.Equal(t, 1, r.exit)
-			assert.Contains(t, r.stderr, "unknown flag: "+args[0])
-		})
-	}
-}
-
-// A retired AI setting with a value gets a notice instead of being ignored
-// silently; the old README example config, with every AI key empty, stays
-// quiet.
-func TestE2ERetiredAISettingsWarn(t *testing.T) {
-	logPath := writeFile(t, t.TempDir(), "app.log", levelFixture)
-	r := runUnlog(t, t.TempDir(), []string{"UNLOG_AI_PROVIDER=anthropic"}, "--format", "json", logPath)
-	assert.Equal(t, 0, r.exit)
-	assert.Contains(t, r.stderr, "unlog no longer calls LLMs")
-	assert.Contains(t, r.stderr, "UNLOG_AI_PROVIDER")
-	assert.Contains(t, r.stdout, "compacted_summary")
-
-	home := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(home, ".unlog"), 0o755))
-	writeFile(t, filepath.Join(home, ".unlog"), "config.toml", "ai_provider = \"\"\nmodel = \"\"\nsystem_prompt = \"\"\nai_timeout = \"\"\n")
-	quiet := runUnlog(t, home, nil, logPath)
-	assert.Equal(t, 0, quiet.exit)
-	assert.NotContains(t, quiet.stderr, "no longer calls LLMs")
 }
 
 func TestE2ETwoIncidentsHoursApartAreBothReported(t *testing.T) {

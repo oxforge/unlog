@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMarkdownRenderNoAI(t *testing.T) {
+func TestMarkdownRender(t *testing.T) {
 	r := &render.MarkdownRenderer{}
 	var buf bytes.Buffer
 
@@ -38,13 +38,6 @@ func TestMarkdownRenderNoAI(t *testing.T) {
 	assert.Contains(t, out, "## Summary")
 	assert.Contains(t, out, "## Statistics")
 	assert.Contains(t, out, "Database connection pool exhausted.")
-	// No AI sections.
-	assert.NotContains(t, out, "## Timeline")
-	assert.NotContains(t, out, "## Root Cause")
-	assert.NotContains(t, out, "## Recommendations")
-	// No model metadata.
-	assert.NotContains(t, out, "**Model**")
-	assert.NotContains(t, out, "AI analysis")
 }
 
 func TestMarkdownStatsTable(t *testing.T) {

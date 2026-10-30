@@ -34,7 +34,7 @@ func makeResult() *pipeline.Result {
 	}
 }
 
-func TestRenderersNoAI(t *testing.T) {
+func TestRenderersRenderAResult(t *testing.T) {
 	renderers := map[string]render.Renderer{
 		"json":     &render.JSONRenderer{},
 		"terminal": &render.TerminalRenderer{},

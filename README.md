@@ -82,7 +82,7 @@ kubectl logs deployment/api --since=1h | unlog
 
 ### With an AI agent
 
-unlog itself calls no LLM. Hand its summary to the agent you already use, or install the plugin from [For agents](#for-agents) so the agent runs unlog on its own whenever it analyzes logs:
+Hand unlog's summary to the agent you already use, or install the plugin from [For agents](#for-agents) so the agent runs unlog on its own whenever it analyzes logs:
 
 ```bash
 unlog logs/ | claude -p "What went wrong in these logs?"
@@ -171,8 +171,6 @@ Every config option can be set via `UNLOG_*` environment variables:
 | `UNLOG_TZ` | Zone of timestamps that carry none |
 | `UNLOG_NO_COLOR` | Disable color (`true`/`false`) |
 | `NO_COLOR` | Disable color (any value, per [no-color.org](https://no-color.org)) |
-
-The settings of the LLM stage removed in v0.4.0 (`ai_provider`, `model`, `system_prompt` and `ai_timeout` in the config file, and `UNLOG_AI_PROVIDER`, `UNLOG_MODEL`, `UNLOG_SYSTEM_PROMPT` and `UNLOG_AI_TIMEOUT`) have no effect; when one is set to a value, unlog says so on stderr.
 
 ## Supported log formats
 
@@ -263,7 +261,7 @@ When using `--format json`, the output includes:
 }
 ```
 
-Every key is always present. `analysis_duration_ms` is how long the whole run took. `survived` counts the distinct errors (one per source and service) that reach the summary, and `dropped` includes the merged repeats, so `ingested = dropped + survived`. `source_breakdown` counts ERROR and FATAL occurrences per source. `auto_detected_window` is always `false` (unlog never narrows the time range on its own; use `--since`/`--until`). The `--output` path is checked before any log is read. The AI keys `model_used`, `ai_duration_ms`, `analysis` and `analysis_error` were removed in v0.4.0, along with the LLM stage that filled them.
+Every key is always present. `analysis_duration_ms` is how long the whole run took. `survived` counts the distinct errors (one per source and service) that reach the summary, and `dropped` includes the merged repeats, so `ingested = dropped + survived`. `source_breakdown` counts ERROR and FATAL occurrences per source. `auto_detected_window` is always `false` (unlog never narrows the time range on its own; use `--since`/`--until`). The `--output` path is checked before any log is read.
 
 ## Development
 

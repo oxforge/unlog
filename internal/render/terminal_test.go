@@ -28,7 +28,7 @@ func sampleResult() *pipeline.Result {
 	}
 }
 
-func TestTerminalRenderNoAI(t *testing.T) {
+func TestTerminalRender(t *testing.T) {
 	r := &render.TerminalRenderer{}
 	var buf bytes.Buffer
 
