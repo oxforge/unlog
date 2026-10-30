@@ -5,17 +5,17 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/oxforge/unlog)](https://goreportcard.com/report/github.com/oxforge/unlog)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**Unravel your logs.** A fast CLI tool that ingests raw log files, extracts signal from noise at disk speed, and optionally uses LLMs to produce incident timelines and root cause analysis.
+**Unravel your logs.** A fast CLI tool that reads raw log files at disk speed and turns them into a short incident summary: what failed, where, how often, in what order, and what was deployed just before. People read it directly; AI agents read it instead of grepping through the logs (see [For agents](#for-agents)).
 
-unlog processes logs through a 6-stage streaming pipeline via Go channels with back-pressure:
+unlog processes logs through a 5-stage streaming pipeline via Go channels with back-pressure:
 
 ![Pipeline](docs/pipeline.png)
 
-Stages 1-4 are pure Go with zero network calls, making the core useful without any AI provider. Stage 5 adds optional LLM analysis via OpenAI, Anthropic, Google Gemini, or Ollama.
+unlog makes no network calls and never needs an API key.
 
 ```
 cat /var/log/app/*.log | unlog
-unlog --ai-provider openai logs/
+unlog logs/
 ```
 
 ## Features
@@ -28,9 +28,8 @@ unlog --ai-provider openai logs/
 - **Burst detection** -- Finds stretches where a source or service logged far above its normal rate, counted on real event volume, and lists the errors behind each burst.
 - **Error chain detection** -- 10 built-in patterns (DB exhaustion, OOM cascade, circuit breaker, deployment failure, disk full, cert expiry, DNS failure, etc.); a chain is reported when at least two of its steps occur in order (any two: a log that skips a step, or starts after the first one, still counts), with its errors in order; an error can belong to more than one chain.
 - **Deployment markers** -- Deploy, restart, scaling and rollback lines are kept at any `--level` and listed before the errors, each version on its own line (they merge only when identical), with how long before the first error the last deploy happened.
-- **Token-budgeted compaction** -- Priority-scored entries fit within LLM context windows.
-- **LLM analysis** -- Timeline, root cause, and recommendations in a single pass via OpenAI, Anthropic, Google Gemini, or Ollama.
-- **Streaming output** -- LLM responses stream to the terminal token-by-token.
+- **Token-budgeted compaction** -- Priority-scored entries fit a fixed size, small enough for an AI agent's context window whatever the size of the input.
+- **Agent plugin** -- A Claude Code plugin whose skill makes agents run unlog first when they analyze logs, then answer with the facts and a conclusion only where the evidence supports one (see [For agents](#for-agents)).
 - **Multiple output formats** -- Colored terminal, JSON, and Markdown.
 - **Stdin support** -- Pipe logs from any source.
 - **Importable as a library** -- `types/`, `ingest/`, `filter/`, `enrich/`, and `compact/` are public packages.
@@ -58,8 +57,6 @@ go install github.com/oxforge/unlog@latest
 
 ## Quick start
 
-### Without AI (stages 1-4 only)
-
 Analyze a directory of log files and print a structured summary:
 
 ```bash
@@ -74,26 +71,12 @@ Pipe from another command:
 kubectl logs deployment/api --since=1h | unlog
 ```
 
-### With AI
+### With an AI agent
 
-Set your API key and run:
-
-```bash
-export OPENAI_API_KEY=sk-...
-unlog --ai-provider openai /var/log/app/
-```
-
-Use a different provider:
+unlog itself calls no LLM. Hand its summary to the agent you already use, or install the plugin from [For agents](#for-agents) so the agent runs unlog on its own whenever it analyzes logs:
 
 ```bash
-export ANTHROPIC_API_KEY=sk-ant-...
-unlog --ai-provider anthropic logs/
-
-export GEMINI_API_KEY=AIza...
-unlog --ai-provider gemini logs/
-
-# Local models via Ollama (no API key needed)
-unlog --ai-provider ollama --model llama3 logs/
+unlog logs/ | claude -p "What went wrong in these logs?"
 ```
 
 ### Output formats
@@ -106,16 +89,13 @@ unlog logs/
 unlog --format json logs/
 
 # Markdown for reports
-unlog --ai-provider openai --format markdown --output report.md logs/
+unlog --format markdown --output report.md logs/
 ```
 
 ## Flags
 
 | Flag | Description |
 |------|-------------|
-| `--ai-provider` | Enable LLM analysis with provider: `openai`, `anthropic`, `gemini`, `ollama` |
-| `--model` | Override the default model for the chosen provider |
-| `--ai-timeout` | Timeout for LLM API calls (e.g. `2m`, `30s`; default: `5m`) |
 | `--format` | Output format: `text`, `json`, `markdown` |
 | `--output` | Write output to a file instead of stdout |
 | `--level` | Minimum log level: `trace`, `debug`, `info`, `warn`, `error`, `fatal` (default: `warn`) |
@@ -133,8 +113,7 @@ unlog --ai-provider openai --format markdown --output report.md logs/
 |------|---------|
 | `0` | The report was written |
 | `1` | An error (bad flag, missing or unreadable input, unwritable `--output`); no report |
-| `3` | The report was written, but the AI analysis failed; the error is in `analysis_error` and on stderr |
-| `130` | Interrupted (when that happens during the AI call, the report is still written, with `analysis_error` set) |
+| `130` | Interrupted; no report |
 
 ## Configuration
 
@@ -147,10 +126,6 @@ Create `~/.unlog/config.toml`:
 ```toml
 level = "warn"
 format = "text"
-ai_provider = ""       # set to "openai", "anthropic", "gemini", or "ollama" to enable AI
-model = ""
-system_prompt = ""     # custom LLM system prompt (empty = built-in default)
-ai_timeout = ""        # timeout for LLM API calls (e.g. "2m", "30s"; default: 5m)
 since = ""             # start time filter (ISO 8601 or relative, e.g. "2h")
 until = ""             # end time filter
 tz = ""                # zone of timestamps that carry none (default: UTC)
@@ -167,10 +142,6 @@ Every config option can be set via `UNLOG_*` environment variables:
 |----------|-------------|
 | `UNLOG_LEVEL` | Minimum log level |
 | `UNLOG_FORMAT` | Output format |
-| `UNLOG_AI_PROVIDER` | LLM provider (empty = no AI) |
-| `UNLOG_MODEL` | Model override |
-| `UNLOG_SYSTEM_PROMPT` | Custom LLM system prompt |
-| `UNLOG_AI_TIMEOUT` | Timeout for LLM API calls (e.g. `2m`, `30s`) |
 | `UNLOG_NOISE_FILE` | Custom noise patterns path |
 | `UNLOG_VERBOSE` | Verbose output (`true`/`false`) |
 | `UNLOG_SINCE` | Start time filter |
@@ -179,14 +150,7 @@ Every config option can be set via `UNLOG_*` environment variables:
 | `UNLOG_NO_COLOR` | Disable color (`true`/`false`) |
 | `NO_COLOR` | Disable color (any value, per [no-color.org](https://no-color.org)) |
 
-### LLM provider API keys
-
-| Provider | Environment variable |
-|----------|---------------------|
-| OpenAI | `OPENAI_API_KEY` |
-| Anthropic | `ANTHROPIC_API_KEY` |
-| Gemini | `GEMINI_API_KEY` |
-| Ollama | None required (connects to `localhost:11434`) |
+The settings of the LLM stage removed in v0.4.0 (`ai_provider`, `model`, `system_prompt` and `ai_timeout` in the config file, and `UNLOG_AI_PROVIDER`, `UNLOG_MODEL`, `UNLOG_SYSTEM_PROMPT` and `UNLOG_AI_TIMEOUT`) have no effect; when one is set to a value, unlog says so on stderr.
 
 ## Supported log formats
 
@@ -217,7 +181,7 @@ unlog auto-detects the format of each input file by sampling lines and using maj
 
 ## Architecture
 
-unlog uses a 6-stage streaming pipeline connected by buffered Go channels:
+unlog uses a 5-stage streaming pipeline connected by buffered Go channels:
 
 ![Pipeline](docs/pipeline.png)
 
@@ -227,10 +191,9 @@ unlog uses a 6-stage streaming pipeline connected by buffered Go channels:
 | 2. Filter | `filter/` | Level filter, time window, noise removal, one record per error, burst detection |
 | 3. Enrich | `enrich/` | Error chain detection, deployment events, cross-source correlation, field extraction |
 | 4. Compact | `compact/` | Priority scoring, token-budgeted compaction |
-| 5. Analyze | `internal/analyze/` | Optional single-pass LLM analysis |
-| 6. Render | `internal/render/` | Terminal, JSON, and Markdown output |
+| 5. Render | `internal/render/` | Terminal, JSON, and Markdown output |
 
-Stages 1-4 are pure Go with no network calls. Stage 5 is optional (enabled with `--ai-provider`). Stages 1-4 are public packages importable as a Go library.
+No stage makes a network call. Stages 1-4 are public packages importable as a Go library.
 
 ## Custom noise patterns
 
@@ -260,9 +223,7 @@ When using `--format json`, the output includes:
 {
   "generated_at": "2024-01-15T12:00:00Z",
   "unlog_version": "1.0.0",
-  "model_used": "",
   "analysis_duration_ms": 1234,
-  "ai_duration_ms": 0,
   "stats": {
     "ingested": 50000,
     "dropped": 49958,
@@ -276,13 +237,11 @@ When using `--format json`, the output includes:
     "bytes_processed": 0,
     "duration_ms": 310
   },
-  "analysis": "",
-  "analysis_error": "",
   "compacted_summary": "## Incident Overview\n..."
 }
 ```
 
-Every key is always present. `survived` counts the distinct errors (one per source and service) that reach the summary, and `dropped` includes the merged repeats, so `ingested = dropped + survived`. `source_breakdown` counts ERROR and FATAL occurrences per source. `auto_detected_window` is always `false` (unlog never narrows the time range on its own; use `--since`/`--until`). With `--ai-provider`, `model_used`, `analysis` and `ai_duration_ms` are filled in. If the AI call fails, the report is still written, with the reason in `analysis_error` (and any partial `analysis`), and unlog exits with code 3. The provider name, API key and `--output` path are checked before any log is read.
+Every key is always present. `analysis_duration_ms` is how long the whole run took. `survived` counts the distinct errors (one per source and service) that reach the summary, and `dropped` includes the merged repeats, so `ingested = dropped + survived`. `source_breakdown` counts ERROR and FATAL occurrences per source. `auto_detected_window` is always `false` (unlog never narrows the time range on its own; use `--since`/`--until`). The `--output` path is checked before any log is read. The AI keys `model_used`, `ai_duration_ms`, `analysis` and `analysis_error` were removed in v0.4.0, along with the LLM stage that filled them.
 
 ## Development
 

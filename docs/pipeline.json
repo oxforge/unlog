@@ -1,0 +1,23 @@
+{
+  "type": "flow",
+  "direction": "RIGHT",
+  "theme": "dark",
+  "nodes": [
+    { "id": "input", "label": "Files / stdin", "shape": "rounded" },
+    { "id": "ingest", "label": "Ingest" },
+    { "id": "filter", "label": "Filter\n(N workers)" },
+    { "id": "enrich", "label": "Enrich" },
+    { "id": "compact", "label": "Compact" },
+    { "id": "render", "label": "Render" }
+  ],
+  "edges": [
+    { "id": "e-input-ingest", "from": "input", "to": "ingest" },
+    { "id": "e-ingest-filter", "from": "ingest", "to": "filter" },
+    { "id": "e-filter-enrich", "from": "filter", "to": "enrich" },
+    { "id": "e-enrich-compact", "from": "enrich", "to": "compact" },
+    { "id": "e-compact-render", "from": "compact", "to": "render" }
+  ],
+  "groups": [
+    { "id": "core", "label": "no network", "contains": ["ingest", "filter", "enrich", "compact", "render"] }
+  ]
+}
