@@ -27,7 +27,7 @@ func runPipeline(t *testing.T, sources []string) *pipeline.Result {
 // renderStats calls printStats with showDetailed=true and returns the output.
 func renderStats(result *pipeline.Result) string {
 	var buf bytes.Buffer
-	printStats(&buf, result, nil, true)
+	printStats(&buf, result, true)
 	return buf.String()
 }
 

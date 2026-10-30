@@ -2,21 +2,20 @@ package types
 
 import "time"
 
-// AnalysisReport is the final output of the full pipeline. Every field is
-// always present in the JSON, empty when there is nothing to report: report
-// consumers (the enterprise app's schema) require them.
+// AnalysisReport is the final output of the full pipeline.
 type AnalysisReport struct {
-	GeneratedAt        time.Time   `json:"generated_at"`
-	UnlogVersion       string      `json:"unlog_version"`
-	ModelUsed          string      `json:"model_used"`
-	AnalysisDurationMs int64       `json:"analysis_duration_ms"`
-	AIDurationMs       int64       `json:"ai_duration_ms"`
-	Stats              FilterStats `json:"stats"`
-	Analysis           string      `json:"analysis"`
-	// AnalysisError says why the AI analysis failed (Analysis then holds
-	// whatever arrived before the failure); empty when it succeeded or did not
-	// run.
-	AnalysisError    string `json:"analysis_error"`
+	GeneratedAt  time.Time `json:"generated_at"`
+	UnlogVersion string    `json:"unlog_version"`
+	// Deprecated: unlog no longer calls LLMs (v0.4.0); always empty and left out of the JSON.
+	ModelUsed          string `json:"model_used,omitempty"`
+	AnalysisDurationMs int64  `json:"analysis_duration_ms"`
+	// Deprecated: unlog no longer calls LLMs (v0.4.0); always empty and left out of the JSON.
+	AIDurationMs int64       `json:"ai_duration_ms,omitempty"`
+	Stats        FilterStats `json:"stats"`
+	// Deprecated: unlog no longer calls LLMs (v0.4.0); always empty and left out of the JSON.
+	Analysis string `json:"analysis,omitempty"`
+	// Deprecated: unlog no longer calls LLMs (v0.4.0); always empty and left out of the JSON.
+	AnalysisError    string `json:"analysis_error,omitempty"`
 	CompactedSummary string `json:"compacted_summary"`
 }
 

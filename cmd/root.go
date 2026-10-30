@@ -21,22 +21,19 @@ var (
 	cfg        config.Config
 
 	// Analyze flags.
-	levelFlag      string
-	sinceFlag      string
-	untilFlag      string
-	noiseFileFlag  string
-	formatFlag     string
-	outputFlag     string
-	aiProviderFlag string
-	modelFlag      string
-	aiTimeoutFlag  string
-	tzFlag         string
+	levelFlag     string
+	sinceFlag     string
+	untilFlag     string
+	noiseFileFlag string
+	formatFlag    string
+	outputFlag    string
+	tzFlag        string
 )
 
 var rootCmd = &cobra.Command{
 	Use:   "unlog [files...]",
 	Short: "Unravel your logs",
-	Long:  "CLI tool that ingests raw log files, preprocesses them to extract signal from noise,\nthen optionally uses LLM APIs to produce incident timelines and root cause analysis.",
+	Long:  "CLI tool that ingests raw log files, preprocesses them to extract signal from noise,\nthen compacts them into a deterministic incident summary.",
 	Args:  cobra.ArbitraryArgs,
 	RunE:  runAnalyze,
 	// Execute prints the error once; usage is for --help.
@@ -81,19 +78,8 @@ var rootCmd = &cobra.Command{
 	},
 }
 
-// Exit codes: 0 the report was written, 1 an error and no report, 3 the
-// report was written but the AI analysis failed, 130 interrupted.
-const exitAIFailed = 3
-
-// exitError is an error that ends the run with a code other than 1.
-type exitError struct {
-	code int
-	err  error
-}
-
-func (e *exitError) Error() string { return e.err.Error() }
-func (e *exitError) Unwrap() error { return e.err }
-
+// Exit codes: 0 the report was written, 1 an error and no report, 130
+// interrupted.
 func Execute() {
 	err := rootCmd.Execute()
 	if err == nil {
@@ -103,10 +89,6 @@ func Execute() {
 		os.Exit(130)
 	}
 	_, _ = fmt.Fprintln(os.Stderr, "Error:", err)
-	var ee *exitError
-	if errors.As(err, &ee) {
-		os.Exit(ee.code)
-	}
 	os.Exit(1)
 }
 
@@ -123,10 +105,7 @@ func init() {
 	rootCmd.Flags().StringVar(&noiseFileFlag, "noise-file", "", "Path to custom noise patterns file")
 	rootCmd.Flags().StringVar(&formatFlag, "format", "", "Output format: text, json, markdown (default: text)")
 	rootCmd.Flags().StringVar(&outputFlag, "output", "", "Write output to file instead of stdout")
-	rootCmd.Flags().StringVar(&aiProviderFlag, "ai-provider", "", "Enable LLM analysis with provider: openai, anthropic, gemini, ollama")
-	rootCmd.Flags().StringVar(&modelFlag, "model", "", "LLM model override (default per provider)")
 	rootCmd.Flags().StringVar(&tzFlag, "tz", "", "Time zone of timestamps that carry none, e.g. \"Europe/Berlin\" or \"Local\" (default: UTC); also applies to --since/--until")
-	rootCmd.Flags().StringVar(&aiTimeoutFlag, "ai-timeout", "", "Timeout for LLM API calls (e.g. \"2m\", \"30s\"; default: 5m)")
 
 	rootCmd.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
 		return fmt.Errorf("%w (see '%s --help')", err, c.CommandPath())

@@ -7,12 +7,12 @@ import (
 	"sort"
 	"time"
 
-	"github.com/oxforge/unlog/internal/analyze"
 	"github.com/oxforge/unlog/internal/pipeline"
+	"github.com/oxforge/unlog/internal/render"
 	"github.com/oxforge/unlog/types"
 )
 
-func printStats(w io.Writer, result *pipeline.Result, ar *analyze.AnalysisResult, showDetailed bool) {
+func printStats(w io.Writer, result *pipeline.Result, showDetailed bool) {
 	fs := result.Stats
 	_, _ = fmt.Fprintln(w, "\n--- Filter Stats ---")
 	_, _ = fmt.Fprintf(w, "Ingested:           %d\n", fs.TotalIngested)
@@ -20,13 +20,6 @@ func printStats(w io.Writer, result *pipeline.Result, ar *analyze.AnalysisResult
 	_, _ = fmt.Fprintf(w, "Survived:           %d\n", fs.TotalSurvived)
 	_, _ = fmt.Fprintf(w, "Unique signatures:  %d\n", fs.UniqueSignatures)
 	_, _ = fmt.Fprintf(w, "Duration:           %dms\n", fs.FilterDurationMs)
-	switch {
-	case ar == nil:
-	case ar.Error != "":
-		_, _ = fmt.Fprintf(w, "AI analysis:        failed after %.1fs\n", ar.Duration.Seconds())
-	default:
-		_, _ = fmt.Fprintf(w, "AI analysis:        %.1fs\n", ar.Duration.Seconds())
-	}
 
 	if showDetailed {
 		ds := result.DetailedStats
@@ -98,4 +91,16 @@ func parseTimeFlag(s string, now time.Time, loc *time.Location) (time.Time, erro
 	}
 
 	return time.Time{}, fmt.Errorf("cannot parse %q as duration or timestamp", s)
+}
+
+// newRenderer returns a renderer for the given format.
+func newRenderer(format string) render.Renderer {
+	switch format {
+	case "json":
+		return &render.JSONRenderer{}
+	case "markdown":
+		return &render.MarkdownRenderer{}
+	default:
+		return &render.TerminalRenderer{}
+	}
 }

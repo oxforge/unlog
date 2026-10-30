@@ -210,8 +210,6 @@ func TestE2EInvalidFlagValues(t *testing.T) {
 		{"unknown format", []string{"--format", "yaml"}, `unsupported output format: "yaml"`},
 		{"unparseable since", []string{"--since", "yesterday"}, "invalid --since value"},
 		{"unparseable until", []string{"--until", "tomorrow"}, "invalid --until value"},
-		{"negative ai timeout", []string{"--ai-timeout", "-1s"}, "--ai-timeout must be positive"},
-		{"unparseable ai timeout", []string{"--ai-timeout", "soon"}, "invalid --ai-timeout value"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -324,10 +322,8 @@ func TestE2EDockerStderrIsNotAnError(t *testing.T) {
 	assert.NotContains(t, critical, "cache warmed")
 }
 
-// The enterprise app validates the report with a Zod schema
-// (unlog-enterprise/packages/shared/src/report-schema.ts) that requires these
-// keys even when there is no AI analysis and no error.
-func TestE2EReportHasEveryKeyTheEnterpriseSchemaRequires(t *testing.T) {
+// The report carries no AI keys: unlog no longer calls LLMs.
+func TestE2EReportHasNoAIKeys(t *testing.T) {
 	logPath := writeFile(t, t.TempDir(), "app.log",
 		`{"level":"warn","msg":"queue depth rising","time":"2024-01-15T10:00:00Z"}
 {"level":"warn","msg":"retry budget low","time":"2024-01-15T10:00:01Z"}
@@ -337,9 +333,11 @@ func TestE2EReportHasEveryKeyTheEnterpriseSchemaRequires(t *testing.T) {
 
 	var report map[string]any
 	require.NoError(t, json.Unmarshal([]byte(r.stdout), &report))
-	for _, key := range []string{"generated_at", "unlog_version", "model_used", "analysis_duration_ms",
-		"ai_duration_ms", "stats", "analysis", "compacted_summary"} {
+	for _, key := range []string{"generated_at", "unlog_version", "analysis_duration_ms", "stats", "compacted_summary"} {
 		assert.Contains(t, report, key)
+	}
+	for _, key := range []string{"model_used", "ai_duration_ms", "analysis", "analysis_error"} {
+		assert.NotContains(t, report, key)
 	}
 	stats, ok := report["stats"].(map[string]any)
 	require.True(t, ok, "stats should be an object")
@@ -349,9 +347,17 @@ func TestE2EReportHasEveryKeyTheEnterpriseSchemaRequires(t *testing.T) {
 	}
 	_, isObject := stats["source_breakdown"].(map[string]any)
 	assert.True(t, isObject, "source_breakdown should be an object, got %v", stats["source_breakdown"])
-	assert.Equal(t, "", report["model_used"])
-	assert.Equal(t, "", report["analysis"])
-	assert.Equal(t, 0.0, report["ai_duration_ms"])
+}
+
+func TestE2ERemovedAIFlagsAreUnknown(t *testing.T) {
+	for _, args := range [][]string{{"--ai-provider", "anthropic"}, {"--model", "x"}, {"--ai-timeout", "1m"}} {
+		t.Run(args[0], func(t *testing.T) {
+			logPath := writeFile(t, t.TempDir(), "app.log", levelFixture)
+			r := runUnlog(t, t.TempDir(), nil, append(args, logPath)...)
+			assert.Equal(t, 1, r.exit)
+			assert.Contains(t, r.stderr, "unknown flag: "+args[0])
+		})
+	}
 }
 
 func TestE2ETwoIncidentsHoursApartAreBothReported(t *testing.T) {
@@ -654,59 +660,6 @@ func TestE2EInvalidTZNamesWhereItCameFrom(t *testing.T) {
 	}
 }
 
-// A misconfigured provider fails before any log is read: the input path
-// below does not exist, and the error is about the provider, not the file.
-func TestE2EProviderIsCheckedBeforeReadingInput(t *testing.T) {
-	tests := []struct {
-		name       string
-		env        []string
-		provider   string
-		wantStderr string
-	}{
-		{"unknown provider", nil, "antropic", `unknown AI provider: "antropic"`},
-		{"missing API key", nil, "anthropic", "ANTHROPIC_API_KEY not set"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			r := runUnlog(t, t.TempDir(), tt.env, "--ai-provider", tt.provider, "nope.log")
-			assert.Equal(t, 1, r.exit)
-			assert.Contains(t, r.stderr, tt.wantStderr)
-			assert.NotContains(t, r.stderr, "nope.log")
-		})
-	}
-}
-
-// An AI failure still delivers the report, and exits 3 so a caller can tell
-// it from a run with no report (1). The proxy points at a closed local port,
-// so the call fails at once without touching the network.
-func TestE2EFailedAnalysisStillWritesTheReport(t *testing.T) {
-	logPath := writeFile(t, t.TempDir(), "app.log", levelFixture)
-	env := []string{"HTTPS_PROXY=http://127.0.0.1:1", "ANTHROPIC_API_KEY=test-key"}
-	args := []string{"--ai-provider", "anthropic", "--ai-timeout", "5s"}
-
-	t.Run("json", func(t *testing.T) {
-		r := runUnlog(t, t.TempDir(), env, append(args, "--format", "json", logPath)...)
-
-		assert.Equal(t, 3, r.exit)
-		var report map[string]any
-		require.NoError(t, json.Unmarshal([]byte(r.stdout), &report), "stdout: %s", r.stdout)
-		assert.Contains(t, report["compacted_summary"], "disk controller lost")
-		assert.Contains(t, report["analysis_error"], "proxyconnect")
-		assert.Equal(t, 1, strings.Count(r.stderr, "proxyconnect"), "the error is printed once: %s", r.stderr)
-	})
-
-	t.Run("text to a file", func(t *testing.T) {
-		out := filepath.Join(t.TempDir(), "report.txt")
-		r := runUnlog(t, t.TempDir(), env, append(args, "--output", out, logPath)...)
-
-		assert.Equal(t, 3, r.exit)
-		written, err := os.ReadFile(out)
-		require.NoError(t, err)
-		assert.Contains(t, string(written), "disk controller lost")
-		assert.Contains(t, string(written), "AI analysis failed:")
-	})
-}
-
 // Errors print once, without the usage text, and without each layer naming
 // the one below twice ("pipeline: pipeline: ingest: ingest: ...").
 func TestE2EErrorsPrintOnceWithoutUsage(t *testing.T) {
@@ -751,7 +704,7 @@ func TestE2EBadConfigErrorNamesEachLayerOnce(t *testing.T) {
 	assert.NotContains(t, r.stderr, "config: config")
 }
 
-// --output is checked before any input is read or any AI call is paid for,
+// --output is checked before any input is read,
 // and a failed run leaves an existing output file as it was.
 func TestE2EOutputFileIsCheckedFirstAndKeptOnFailure(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "nope.log")
@@ -772,16 +725,6 @@ func TestE2EOutputFileIsCheckedFirstAndKeptOnFailure(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "last week's report\n", string(kept))
 	assert.NoFileExists(t, fresh)
-}
-
-func TestE2EReportHasAnEmptyAnalysisErrorWithoutAI(t *testing.T) {
-	logPath := writeFile(t, t.TempDir(), "app.log", levelFixture)
-	r := runUnlog(t, t.TempDir(), nil, "--format", "json", logPath)
-	require.Equal(t, 0, r.exit)
-
-	var report map[string]any
-	require.NoError(t, json.Unmarshal([]byte(r.stdout), &report))
-	assert.Equal(t, "", report["analysis_error"])
 }
 
 func TestE2EServicesInOneFileAreToldApart(t *testing.T) {

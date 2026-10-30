@@ -6,16 +6,13 @@ import (
 	"io"
 	"math"
 
-	"github.com/oxforge/unlog/internal/analyze"
 	"github.com/oxforge/unlog/internal/pipeline"
 )
 
 type Options struct {
-	Result     *pipeline.Result
-	Analysis   *analyze.AnalysisResult
-	Version    string
-	NoColor    bool
-	AIStreamed bool // AI output was already streamed to stdout; skip rendering it again.
+	Result  *pipeline.Result
+	Version string
+	NoColor bool
 }
 
 type Renderer interface {

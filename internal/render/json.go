@@ -6,7 +6,6 @@ import (
 	"io"
 	"time"
 
-	"github.com/oxforge/unlog/internal/analyze"
 	"github.com/oxforge/unlog/internal/pipeline"
 	"github.com/oxforge/unlog/types"
 )
@@ -14,11 +13,11 @@ import (
 type JSONRenderer struct{}
 
 func (r *JSONRenderer) Render(w io.Writer, opts Options) error {
-	return RenderJSON(w, opts.Result, opts.Analysis, opts.Version)
+	return RenderJSON(w, opts.Result, opts.Version)
 }
 
 // RenderJSON writes a complete AnalysisReport as indented JSON to w.
-func RenderJSON(w io.Writer, result *pipeline.Result, ar *analyze.AnalysisResult, version string) error {
+func RenderJSON(w io.Writer, result *pipeline.Result, version string) error {
 	report := types.AnalysisReport{
 		GeneratedAt:        time.Now().UTC(),
 		UnlogVersion:       version,
@@ -29,13 +28,6 @@ func RenderJSON(w io.Writer, result *pipeline.Result, ar *analyze.AnalysisResult
 
 	if report.Stats.SourceBreakdown == nil {
 		report.Stats.SourceBreakdown = map[string]int64{}
-	}
-
-	if ar != nil {
-		report.Analysis = ar.Analysis
-		report.ModelUsed = ar.ModelUsed
-		report.AIDurationMs = ar.Duration.Milliseconds()
-		report.AnalysisError = ar.Error
 	}
 
 	enc := json.NewEncoder(w)

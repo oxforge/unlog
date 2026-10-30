@@ -3,7 +3,6 @@ package render
 import (
 	"fmt"
 	"io"
-	"strings"
 	"time"
 )
 
@@ -17,18 +16,7 @@ func (r *MarkdownRenderer) Render(w io.Writer, opts Options) error {
 
 	meta := fmt.Sprintf("**Generated**: %s | **Version**: %s",
 		time.Now().UTC().Format(time.RFC3339), opts.Version)
-	if opts.Analysis != nil && opts.Analysis.ModelUsed != "" {
-		meta += fmt.Sprintf(" | **Model**: %s", opts.Analysis.ModelUsed)
-	}
 	_, _ = fmt.Fprintln(ew, meta)
-
-	if opts.Analysis != nil {
-		body := opts.Analysis.Analysis
-		if opts.Analysis.Error != "" {
-			body = strings.TrimSpace(body + "\n\n**AI analysis failed:** " + opts.Analysis.Error)
-		}
-		writeMDSection(ew, "Analysis", body)
-	}
 
 	if opts.Result != nil && opts.Result.Summary != "" {
 		writeMDSection(ew, "Summary", opts.Result.Summary)
@@ -61,7 +49,4 @@ func (r *MarkdownRenderer) renderStatsTable(w io.Writer, opts Options) {
 	_, _ = fmt.Fprintf(w, "| Survived | %s |\n", FmtIntComma(fs.TotalSurvived))
 	_, _ = fmt.Fprintf(w, "| Unique signatures | %d |\n", fs.UniqueSignatures)
 	_, _ = fmt.Fprintf(w, "| Duration | %dms |\n", opts.Result.Duration.Milliseconds())
-	if opts.Analysis != nil {
-		_, _ = fmt.Fprintf(w, "| AI analysis | %.1fs |\n", opts.Analysis.Duration.Seconds())
-	}
 }

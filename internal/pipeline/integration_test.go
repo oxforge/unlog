@@ -84,7 +84,7 @@ func TestIntegrationJSONOutput(t *testing.T) {
 	require.NotNil(t, result)
 
 	var buf bytes.Buffer
-	err = render.RenderJSON(&buf, result, nil, "test-version")
+	err = render.RenderJSON(&buf, result, "test-version")
 	require.NoError(t, err, "RenderJSON should not fail")
 
 	// Must be valid JSON.

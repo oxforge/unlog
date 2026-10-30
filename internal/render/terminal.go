@@ -31,14 +31,6 @@ func (r *TerminalRenderer) Render(w io.Writer, opts Options) error {
 	c := colorizer{enabled: !opts.NoColor}
 
 	r.renderSummary(ew, opts, c)
-	switch {
-	case opts.Analysis == nil:
-	case !opts.AIStreamed:
-		r.renderAI(ew, opts, c)
-	case opts.Analysis.Error != "":
-		// The analysis was streamed above; say that it was cut short.
-		_, _ = fmt.Fprintf(ew, "\nAI analysis failed: %s\n", opts.Analysis.Error)
-	}
 
 	return ew.err
 }
@@ -56,19 +48,6 @@ func (r *TerminalRenderer) renderSummary(w io.Writer, opts Options, c colorizer)
 			_, _ = fmt.Fprintln(w, c.highlightLevels(line))
 		}
 	}
-}
-
-func (r *TerminalRenderer) renderAI(w io.Writer, opts Options, c colorizer) {
-	body := strings.TrimRight(opts.Analysis.Analysis, "\n")
-	if opts.Analysis.Error != "" {
-		body = strings.TrimSpace(body + "\n\nAI analysis failed: " + opts.Analysis.Error)
-	}
-	if body == "" {
-		return
-	}
-	_, _ = fmt.Fprintf(w, "\n%s\n", c.wrap(ansiBoldCyan, "--- Analysis ---"))
-	_, _ = fmt.Fprintln(w, c.highlightLevels(body))
-	_, _ = fmt.Fprintln(w)
 }
 
 type colorizer struct {

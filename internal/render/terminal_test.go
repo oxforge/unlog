@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/oxforge/unlog/internal/analyze"
 	"github.com/oxforge/unlog/internal/pipeline"
 	"github.com/oxforge/unlog/internal/render"
 	"github.com/oxforge/unlog/types"
@@ -26,13 +25,6 @@ func sampleResult() *pipeline.Result {
 			FilterDurationMs: 50,
 		},
 		Duration: 200 * time.Millisecond,
-	}
-}
-
-func sampleAnalysis() *analyze.AnalysisResult {
-	return &analyze.AnalysisResult{
-		Analysis:  "10:00 — DB connection pool saturated\n10:01 — Requests started timing out\nConnection leak in payment service caused pool exhaustion\n1. Add connection pool monitoring\n2. Set max connection lifetime",
-		ModelUsed: "gpt-4o",
 	}
 }
 
@@ -55,27 +47,6 @@ func TestTerminalRenderNoAI(t *testing.T) {
 	assert.NotContains(t, out, "Filter Stats")
 	// No ANSI escapes when NoColor is true.
 	assert.NotContains(t, out, "\033[")
-}
-
-func TestTerminalRenderWithAI(t *testing.T) {
-	r := &render.TerminalRenderer{}
-	var buf bytes.Buffer
-
-	err := r.Render(&buf, render.Options{
-		Result:   sampleResult(),
-		Analysis: sampleAnalysis(),
-		NoColor:  true,
-		Version:  "1.0.0",
-	})
-	require.NoError(t, err)
-
-	out := buf.String()
-	// AI mode should also render the compacted summary.
-	assert.Contains(t, out, "## Incident Overview")
-	assert.Contains(t, out, "--- Analysis ---")
-	assert.Contains(t, out, "DB connection pool saturated")
-	assert.Contains(t, out, "Connection leak")
-	assert.Contains(t, out, "connection pool monitoring")
 }
 
 func TestTerminalRenderColored(t *testing.T) {
@@ -105,18 +76,16 @@ func TestTerminalRenderNoColor(t *testing.T) {
 	var buf bytes.Buffer
 
 	err := r.Render(&buf, render.Options{
-		Result:   sampleResult(),
-		Analysis: sampleAnalysis(),
-		NoColor:  true,
-		Version:  "1.0.0",
+		Result:  sampleResult(),
+		NoColor: true,
+		Version: "1.0.0",
 	})
 	require.NoError(t, err)
 
 	out := buf.String()
 	assert.NotContains(t, out, "\033[", "expected no ANSI escape codes when NoColor is true")
 	// Content should still be present.
-	assert.Contains(t, out, "--- Analysis ---")
-	assert.Contains(t, out, "DB connection pool saturated")
+	assert.Contains(t, out, "Database connection pool exhausted.")
 }
 
 // failWriter is an io.Writer that always returns an error.
@@ -143,35 +112,4 @@ func TestMarkdownRenderWriteError(t *testing.T) {
 		Version: "1.0.0",
 	})
 	assert.Error(t, err, "should propagate write errors")
-}
-
-func TestTerminalRenderNamesAFailedAnalysis(t *testing.T) {
-	for name, body := range map[string]string{"partial analysis": "10:00 — pool saturated", "nothing streamed": ""} {
-		t.Run(name, func(t *testing.T) {
-			var buf bytes.Buffer
-			err := (&render.TerminalRenderer{}).Render(&buf, render.Options{
-				Result:   sampleResult(),
-				Analysis: &analyze.AnalysisResult{Analysis: body, Error: "analyze: anthropic: HTTP 529: overloaded", ModelUsed: "m"},
-				NoColor:  true,
-			})
-			require.NoError(t, err)
-			assert.Contains(t, buf.String(), "AI analysis failed: analyze: anthropic: HTTP 529: overloaded")
-			assert.Contains(t, buf.String(), body)
-		})
-	}
-}
-
-// With the analysis streamed to stdout ahead of the summary, a failure is
-// still named at the end, so a redirected report says the analysis is cut.
-func TestTerminalRenderNamesAFailedStreamedAnalysis(t *testing.T) {
-	var buf bytes.Buffer
-	err := (&render.TerminalRenderer{}).Render(&buf, render.Options{
-		Result:     sampleResult(),
-		Analysis:   &analyze.AnalysisResult{Analysis: "partial", Error: "analyze: anthropic: stream ended early", ModelUsed: "m"},
-		NoColor:    true,
-		AIStreamed: true,
-	})
-	require.NoError(t, err)
-	assert.Contains(t, buf.String(), "AI analysis failed: analyze: anthropic: stream ended early")
-	assert.NotContains(t, buf.String(), "--- Analysis ---", "the streamed text isn't repeated")
 }

@@ -107,38 +107,3 @@ func buildFilterOpts(cmd *cobra.Command, loc *time.Location) (filter.FilterOptio
 
 	return opts, nil
 }
-
-// resolveProviderName returns the effective AI provider name (empty means no AI).
-func resolveProviderName(cmd *cobra.Command) string {
-	if cmd.Flags().Changed("ai-provider") {
-		return aiProviderFlag
-	}
-	return cfg.AIProvider
-}
-
-// resolveModelName returns the effective model name override.
-func resolveModelName(cmd *cobra.Command) string {
-	if cmd.Flags().Changed("model") {
-		return modelFlag
-	}
-	return cfg.Model
-}
-
-// resolveAITimeout returns the effective AI timeout duration.
-func resolveAITimeout(cmd *cobra.Command) (time.Duration, error) {
-	s := cfg.AITimeout
-	if cmd.Flags().Changed("ai-timeout") {
-		s = aiTimeoutFlag
-	}
-	if s == "" {
-		return 0, nil // 0 signals providers to use their default
-	}
-	d, err := time.ParseDuration(s)
-	if err != nil {
-		return 0, fmt.Errorf("cmd: invalid --ai-timeout value: %w", err)
-	}
-	if d <= 0 {
-		return 0, fmt.Errorf("cmd: --ai-timeout must be positive")
-	}
-	return d, nil
-}

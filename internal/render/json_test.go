@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/oxforge/unlog/internal/analyze"
 	"github.com/oxforge/unlog/internal/pipeline"
 	"github.com/oxforge/unlog/internal/render"
 	"github.com/oxforge/unlog/types"
@@ -28,7 +27,7 @@ func TestRenderJSON(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err := render.RenderJSON(&buf, result, nil, "1.0.0")
+	err := render.RenderJSON(&buf, result, "1.0.0")
 	require.NoError(t, err)
 
 	// Output must be valid JSON.
@@ -41,8 +40,6 @@ func TestRenderJSON(t *testing.T) {
 	assert.Equal(t, result.Stats.TotalSurvived, report.Stats.TotalSurvived)
 	assert.Equal(t, result.Stats.UniqueSignatures, report.Stats.UniqueSignatures)
 	assert.Equal(t, result.Duration.Milliseconds(), report.AnalysisDurationMs)
-	assert.Empty(t, report.ModelUsed, "no AI result, model_used should be empty")
-	assert.Empty(t, report.Analysis)
 	assert.False(t, report.GeneratedAt.IsZero(), "GeneratedAt should be set")
 }
 
@@ -53,7 +50,7 @@ func TestRenderJSONEmptySummary(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err := render.RenderJSON(&buf, result, nil, "dev")
+	err := render.RenderJSON(&buf, result, "dev")
 	require.NoError(t, err)
 
 	var report types.AnalysisReport
@@ -66,7 +63,7 @@ func TestRenderJSONEmptySummary(t *testing.T) {
 func TestRenderJSONIndented(t *testing.T) {
 	result := &pipeline.Result{Summary: "test", Stats: types.FilterStats{}}
 	var buf bytes.Buffer
-	require.NoError(t, render.RenderJSON(&buf, result, nil, "dev"))
+	require.NoError(t, render.RenderJSON(&buf, result, "dev"))
 
 	// Verify indented output (contains newlines and spaces).
 	out := buf.String()
@@ -83,24 +80,17 @@ func TestJSONRendererInterface(t *testing.T) {
 		},
 		Duration: 100 * time.Millisecond,
 	}
-	ar := &analyze.AnalysisResult{
-		Analysis:  "timeline text\nroot cause text\nrecommendations text",
-		ModelUsed: "gpt-4o",
-	}
 
 	var r render.Renderer = &render.JSONRenderer{}
 	var buf bytes.Buffer
 	err := r.Render(&buf, render.Options{
-		Result:   result,
-		Analysis: ar,
-		Version:  "1.0.0",
+		Result:  result,
+		Version: "1.0.0",
 	})
 	require.NoError(t, err)
 
 	var report types.AnalysisReport
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &report))
 
-	assert.Contains(t, report.Analysis, "timeline text")
-	assert.Equal(t, "gpt-4o", report.ModelUsed)
 	assert.Equal(t, "1.0.0", report.UnlogVersion)
 }

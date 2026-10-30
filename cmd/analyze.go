@@ -14,7 +14,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/oxforge/unlog/ingest"
-	"github.com/oxforge/unlog/internal/analyze"
 	"github.com/oxforge/unlog/internal/pipeline"
 	"github.com/oxforge/unlog/internal/render"
 )
@@ -61,11 +60,6 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 		return err
 	}
 
-	aiTimeout, err := resolveAITimeout(cmd)
-	if err != nil {
-		return err
-	}
-
 	loc, err := resolveLocation(cmd)
 	if err != nil {
 		return err
@@ -76,15 +70,7 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 		return err
 	}
 
-	// Check the AI provider (name, API key) before reading any input.
-	var provider analyze.Provider
-	if name := resolveProviderName(cmd); name != "" {
-		if provider, err = newProvider(name, resolveModelName(cmd), aiTimeout); err != nil {
-			return err
-		}
-	}
-
-	// Open --output before reading input or paying for an AI call. It is
+	// Open --output before reading input. It is
 	// truncated only when the report is written; a file this run created is
 	// removed if the run fails before that. It is never read as input.
 	var outFile *os.File
@@ -117,39 +103,6 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 		return fmt.Errorf("cmd: %w", err)
 	}
 
-	var ar *analyze.AnalysisResult
-	var aiErr error
-	if provider != nil {
-		var streamCB analyze.StreamCallback
-		if effectiveFormat == "text" {
-			streamW := os.Stdout
-			if outputFlag != "" {
-				streamW = os.Stderr
-			}
-			streamCB = func(token string) {
-				_, _ = fmt.Fprint(streamW, token)
-			}
-		}
-
-		// A failed analysis still gets the report written below, with the
-		// error in it; the run then exits with exitAIFailed.
-		ar, aiErr = analyze.Run(ctx, provider, result.Summary, cfg.SystemPrompt, streamCB)
-		if aiErr != nil {
-			if ar == nil {
-				ar = &analyze.AnalysisResult{ModelUsed: provider.Model()}
-			}
-			ar.Error = aiErr.Error()
-		}
-
-		if effectiveFormat == "text" {
-			streamW := os.Stdout
-			if outputFlag != "" {
-				streamW = os.Stderr
-			}
-			_, _ = fmt.Fprintln(streamW)
-		}
-	}
-
 	var out io.Writer = os.Stdout
 	if outFile != nil {
 		// Only a regular file has old content to drop; a device or a pipe
@@ -169,14 +122,11 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 		effectiveNoColor = !isTerminal(os.Stdout)
 	}
 
-	aiStreamed := effectiveFormat == "text" && ar != nil && outputFlag == ""
 	r := newRenderer(effectiveFormat)
 	renderOpts := render.Options{
-		Result:     result,
-		Analysis:   ar,
-		Version:    version(),
-		NoColor:    effectiveNoColor,
-		AIStreamed: aiStreamed,
+		Result:  result,
+		Version: version(),
+		NoColor: effectiveNoColor,
 	}
 
 	if err := r.Render(out, renderOpts); err != nil {
@@ -184,12 +134,9 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	if effectiveFormat == "text" {
-		printStats(os.Stderr, result, ar, verbose)
+		printStats(os.Stderr, result, verbose)
 	}
 
-	if aiErr != nil {
-		return &exitError{code: exitAIFailed, err: fmt.Errorf("cmd: %w", aiErr)}
-	}
 	return nil
 }
 

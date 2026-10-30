@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/oxforge/unlog/internal/analyze"
 	"github.com/oxforge/unlog/internal/pipeline"
 	"github.com/oxforge/unlog/internal/render"
 	"github.com/oxforge/unlog/types"
@@ -35,13 +34,6 @@ func makeResult() *pipeline.Result {
 	}
 }
 
-func makeAnalysis() *analyze.AnalysisResult {
-	return &analyze.AnalysisResult{
-		Analysis:  "## Timeline\n10:00 — DB pool saturated\n10:01 — Timeouts began\n\n## Root Cause\nConnection leak in payment service\n\n## Recommendations\n1. Add pool monitoring\n2. Set max lifetime",
-		ModelUsed: "gpt-4o",
-	}
-}
-
 func TestRenderersNoAI(t *testing.T) {
 	renderers := map[string]render.Renderer{
 		"json":     &render.JSONRenderer{},
@@ -59,74 +51,6 @@ func TestRenderersNoAI(t *testing.T) {
 			})
 			require.NoError(t, err)
 			assert.NotEmpty(t, buf.String(), "renderer %s produced empty output", name)
-		})
-	}
-}
-
-func TestRenderersWithAI(t *testing.T) {
-	result := makeResult()
-	ar := makeAnalysis()
-
-	tests := []struct {
-		name    string
-		r       render.Renderer
-		noColor bool
-		check   func(t *testing.T, out string)
-	}{
-		{
-			name:    "json",
-			r:       &render.JSONRenderer{},
-			noColor: true,
-			check: func(t *testing.T, out string) {
-				var report types.AnalysisReport
-				require.NoError(t, json.Unmarshal([]byte(out), &report), "output must be valid JSON")
-				assert.Contains(t, report.Analysis, "DB pool saturated")
-			},
-		},
-		{
-			name:    "terminal_no_color",
-			r:       &render.TerminalRenderer{},
-			noColor: true,
-			check: func(t *testing.T, out string) {
-				assert.Contains(t, out, "--- Analysis ---")
-				assert.NotContains(t, out, "\033[", "expected no ANSI escapes")
-			},
-		},
-		{
-			name:    "terminal_color",
-			r:       &render.TerminalRenderer{},
-			noColor: false,
-			check: func(t *testing.T, out string) {
-				assert.Contains(t, out, "\033[", "expected ANSI escapes in colored output")
-			},
-		},
-		{
-			name:    "markdown",
-			r:       &render.MarkdownRenderer{},
-			noColor: true,
-			check: func(t *testing.T, out string) {
-				assert.Contains(t, out, "## Analysis")
-				assert.Contains(t, out, "| Metric |")
-				// Verify no stray ANSI codes in markdown.
-				assert.NotContains(t, out, "\033[")
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			err := tt.r.Render(&buf, render.Options{
-				Result:   result,
-				Analysis: ar,
-				NoColor:  tt.noColor,
-				Version:  "1.0.0",
-			})
-			require.NoError(t, err)
-
-			out := buf.String()
-			assert.NotEmpty(t, out)
-			tt.check(t, out)
 		})
 	}
 }
@@ -179,10 +103,9 @@ func TestMarkdownNoANSICodes(t *testing.T) {
 	var buf bytes.Buffer
 	r := &render.MarkdownRenderer{}
 	err := r.Render(&buf, render.Options{
-		Result:   makeResult(),
-		Analysis: makeAnalysis(),
-		NoColor:  false, // even with color "enabled", markdown should never emit ANSI
-		Version:  "1.0.0",
+		Result:  makeResult(),
+		NoColor: false, // even with color "enabled", markdown should never emit ANSI
+		Version: "1.0.0",
 	})
 	require.NoError(t, err)
 	assert.NotContains(t, buf.String(), "\033[")
@@ -194,10 +117,9 @@ func TestJSONAlwaysValid(t *testing.T) {
 		var buf bytes.Buffer
 		r := &render.JSONRenderer{}
 		err := r.Render(&buf, render.Options{
-			Result:   makeResult(),
-			Analysis: makeAnalysis(),
-			NoColor:  nc,
-			Version:  "1.0.0",
+			Result:  makeResult(),
+			NoColor: nc,
+			Version: "1.0.0",
 		})
 		require.NoError(t, err)
 		assert.True(t, json.Valid(buf.Bytes()), "JSON output must be valid (noColor=%v)", nc)

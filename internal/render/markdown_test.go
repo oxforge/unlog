@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/oxforge/unlog/internal/analyze"
 	"github.com/oxforge/unlog/internal/pipeline"
 	"github.com/oxforge/unlog/internal/render"
 	"github.com/oxforge/unlog/types"
@@ -45,41 +44,7 @@ func TestMarkdownRenderNoAI(t *testing.T) {
 	assert.NotContains(t, out, "## Recommendations")
 	// No model metadata.
 	assert.NotContains(t, out, "**Model**")
-}
-
-func TestMarkdownRenderWithAI(t *testing.T) {
-	r := &render.MarkdownRenderer{}
-	var buf bytes.Buffer
-
-	err := r.Render(&buf, render.Options{
-		Result: &pipeline.Result{
-			Summary: "Summary text here.",
-			Stats: types.FilterStats{
-				TotalIngested:    10000,
-				TotalDropped:     8500,
-				TotalSurvived:    1500,
-				UniqueSignatures: 42,
-				FilterDurationMs: 100,
-			},
-			Duration: 1230 * time.Millisecond,
-		},
-		Analysis: &analyze.AnalysisResult{
-			Analysis:  "10:00 — Incident began\nConnection leak in service X\n1. Monitor pool usage",
-			ModelUsed: "gpt-4o",
-		},
-		Version: "1.0.0",
-	})
-	require.NoError(t, err)
-
-	out := buf.String()
-	assert.Contains(t, out, "# Incident Analysis")
-	assert.Contains(t, out, "## Analysis")
-	assert.Contains(t, out, "10:00 — Incident began")
-	assert.Contains(t, out, "Connection leak")
-	assert.Contains(t, out, "Monitor pool usage")
-	assert.Contains(t, out, "## Summary")
-	assert.Contains(t, out, "## Statistics")
-	assert.Contains(t, out, "**Model**: gpt-4o")
+	assert.NotContains(t, out, "AI analysis")
 }
 
 func TestMarkdownStatsTable(t *testing.T) {
