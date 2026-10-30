@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# release-notes TAG prints the release notes for TAG: its annotated message
+# minus the first line, which is the title. It fails on a lightweight tag,
+# whose notes would be the commit's body, and on a message with no notes.
+# Tag with `git tag -a --cleanup=whitespace TAG -F notes.md`: git's default
+# cleanup strips every line starting with #, Markdown headings included.
+set -euo pipefail
+
+tag=${1:?usage: release-notes TAG}
+if [ "$(git cat-file -t "$tag")" != tag ]; then
+  echo "$tag is not an annotated tag; its message must hold the release notes" >&2
+  exit 1
+fi
+notes=$(git tag -l --format='%(contents:body)' "$tag")
+if [ -z "${notes//[[:space:]]/}" ]; then
+  echo "$tag has no release notes: its message is only a title" >&2
+  exit 1
+fi
+printf '%s\n' "$notes"

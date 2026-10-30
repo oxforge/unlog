@@ -31,8 +31,9 @@ jobs:
       - name: Check the tag against the plugin's version
         run: scripts/check-plugin-version "$TAG"
 
+      # Fails on a lightweight tag or a message with no notes.
       - name: Write the release notes from the tag's message
-        run: git tag -l --format='%(contents:body)' "$TAG" > "$RUNNER_TEMP/notes.md"
+        run: scripts/release-notes "$TAG" > "$RUNNER_TEMP/notes.md"
 
       - uses: actions/setup-go@v6
         with:

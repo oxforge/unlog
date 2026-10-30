@@ -284,9 +284,9 @@ A release is a pushed `vX.Y.Z` tag; `.github/workflows/release.yml` builds and p
 
 1. Run `just plugin-version X.Y.Z` and commit. The marketplace entry on `main` now points at the new tag, so the plugin can't be installed until the tag is pushed: tag right after.
 2. Write the release notes to a file whose first line is the title (`unlog vX.Y.Z`), then a blank line, then the notes.
-3. Run `git tag -a vX.Y.Z -F notes.md`, then push the commit and the tag.
+3. Run `git tag -a --cleanup=whitespace vX.Y.Z -F notes.md`, then push the commit and the tag. Without `--cleanup=whitespace`, git drops every line that starts with `#`, Markdown headings included.
 
-The workflow fails before publishing when the tag, the plugin's version and the marketplace pin disagree (`scripts/check-plugin-version`), and it uses the tag's message, minus its first line, as the release notes.
+The workflow fails before publishing when the tag, the plugin's version and the marketplace pin disagree (`scripts/check-plugin-version`), or when the tag isn't annotated or its message has no notes (`scripts/release-notes`). It publishes the tag's message, minus its first line, as the release notes.
 
 ### Generating test data
 
