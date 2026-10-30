@@ -57,7 +57,7 @@ func TestRenderersNoAI(t *testing.T) {
 
 func TestRenderersOutputNonEmpty(t *testing.T) {
 	// Minimal result — verify no renderer panics or returns empty.
-	// Terminal renderer is excluded: with no summary and no analysis it
+	// Terminal renderer is excluded: with no summary it
 	// legitimately produces empty output (stats go to stderr in the cmd layer).
 	result := &pipeline.Result{
 		Stats:    types.FilterStats{},

@@ -55,8 +55,9 @@ Logs that come from a command go straight in through a pipe. Don't save them
 to a file first:
 
 ```bash
-kubectl logs deployment/api --since=1h | unlog -
-journalctl -u nginx --since "2024-01-15 10:00" | unlog -
+kubectl logs deployment/api --since=1h --timestamps | unlog -
+docker compose logs -t api | unlog -
+journalctl -u nginx --since "2024-01-15 10:00 UTC" | unlog --tz Local -
 ```
 
 - **Don't grep, filter, sample or `head` the input first.** unlog handles the
@@ -71,8 +72,15 @@ journalctl -u nginx --since "2024-01-15 10:00" | unlog -
   - Deployment lines are kept at any level.
 - **`--since` and `--until`** take a time (`2024-01-15T14:00:00Z`) or an age
   (`2h`, `30m`).
-- **`--tz Europe/Berlin`** sets the zone of timestamps that carry none. The
-  default is UTC.
+- **Time zones:** unlog reads a timestamp that carries no zone as UTC, and
+  prints every time in UTC.
+  - journalctl's default output, and classic syslog files, carry local time
+    with no zone. Add `--tz Local` when they come from this machine, or
+    `--tz Europe/Berlin` (or the like) when you know their zone. Otherwise
+    every time is off by the UTC offset.
+  - `kubectl logs --timestamps` and `docker compose logs -t` put a UTC time
+    on every line. Use them: lines without a time can't be placed in order,
+    and the drill-down below needs the times.
 - **Exit code 1** means there is no summary. Read the error: it names the path
   or flag that's wrong. `-v` lists the files that were skipped and why.
 
@@ -97,9 +105,9 @@ Logs that came from a command leave no file to grep. Run the command again with
 absolute time bounds taken from the summary, and pipe it into grep or unlog:
 
 ```bash
-kubectl logs deployment/api --since-time=2024-01-15T14:00:00Z | grep 7f3a9c
-journalctl -u nginx --since "2024-01-15 14:00" --until "2024-01-15 14:10" | unlog -
-docker compose logs --since 2024-01-15T14:00:00Z --until 2024-01-15T14:10:00Z api | unlog -
+kubectl logs deployment/api --timestamps --since-time=2024-01-15T14:00:00Z | grep 7f3a9c
+journalctl -u nginx --since "2024-01-15 14:00 UTC" --until "2024-01-15 14:10 UTC" | unlog --tz Local -
+docker compose logs -t --since 2024-01-15T14:00:00Z --until 2024-01-15T14:10:00Z api | unlog -
 ```
 
 Tell the user that the second fetch may differ from the first: logs rotate,

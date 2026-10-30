@@ -1,7 +1,7 @@
 // Package compact implements Stage 4 of the unlog pipeline: priority scoring
 // and token-budgeted compaction. It reads EnrichedEntry values, scores them by
-// importance, and produces a structured text summary that fits within an LLM
-// context window.
+// importance, and produces a structured text summary of a fixed size, small
+// enough for an AI agent's context window.
 //
 // The output is organized into six sections, each with a base share of the
 // token budget; what a section does not need goes to the sections that would
@@ -17,7 +17,7 @@
 //
 // A section keeps its highest-scored entries and lists them in time order.
 //
-// This package is public — it can be imported by the enterprise repo.
+// This package is public: other Go programs can import it.
 package compact
 
 import (
@@ -32,7 +32,7 @@ import (
 const (
 	// DefaultTokenBudget is the default maximum token count for the compacted
 	// summary. 8 192 fits comfortably in the context window of every major LLM
-	// while leaving room for system prompts and the response.
+	// while leaving the agent that reads it room for its own work.
 	DefaultTokenBudget = 8_192
 )
 

@@ -32,7 +32,7 @@ const (
 
 // maxMessageBytes caps how much of one entry's message the summary shows, so
 // a single huge line (a payload dump, a long stack trace) cannot fill a
-// section or the LLM prompt on its own.
+// section or the summary on its own.
 const maxMessageBytes = 2000
 
 // estimatedHeaderTokens is the approximate token cost of "## Section Name\n".

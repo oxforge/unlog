@@ -19,8 +19,8 @@ import (
 )
 
 // analyzeCmd is what bare unlog runs, under its own name: `unlog analyze
-// logs/` and `unlog logs/` are the same. Wrappers (the enterprise CLI) call it
-// by name. It shares the root command's flags, registered in root.go.
+// logs/` and `unlog logs/` are the same; scripts may call it by name. It
+// shares the root command's flags, registered in root.go.
 var analyzeCmd = &cobra.Command{
 	Use:   "analyze [files...]",
 	Short: "Analyze log files (the default command)",
@@ -70,9 +70,9 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 		return err
 	}
 
-	// Open --output before reading input. It is
-	// truncated only when the report is written; a file this run created is
-	// removed if the run fails before that. It is never read as input.
+	// Open --output before reading input. It is truncated only when the
+	// report is written; a file this run created is removed if the run fails
+	// before that. It is never read as input.
 	var outFile *os.File
 	written := false
 	if outputFlag != "" {
