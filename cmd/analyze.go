@@ -174,7 +174,7 @@ func runAnalyze(cmd *cobra.Command, args []string) (err error) {
 	renderOpts := render.Options{
 		Result:     result,
 		Analysis:   ar,
-		Version:    Version,
+		Version:    version(),
 		NoColor:    effectiveNoColor,
 		AIStreamed: aiStreamed,
 	}
