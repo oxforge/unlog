@@ -46,7 +46,6 @@ verbose     = true
 	assert.Equal(t, "/tmp/noise.txt", cfg.NoiseFile)
 	assert.Equal(t, "2h", cfg.Since)
 	assert.Equal(t, "1h", cfg.Until)
-	assert.Equal(t, "openai", cfg.AIProvider)
 	assert.True(t, cfg.Verbose)
 }
 
@@ -59,7 +58,6 @@ func TestLoadMissingFile(t *testing.T) {
 	// Zero-value config expected.
 	assert.Empty(t, cfg.Level)
 	assert.Empty(t, cfg.Format)
-	assert.Empty(t, cfg.AIProvider)
 }
 
 func TestLoadEmptyPath(t *testing.T) {
@@ -78,14 +76,35 @@ func TestEnvOverlay(t *testing.T) {
 	// Set env vars that should override the file.
 	t.Setenv("UNLOG_LEVEL", "error")
 	t.Setenv("UNLOG_FORMAT", "json")
-	t.Setenv("UNLOG_AI_PROVIDER", "anthropic")
 
 	cfg, err := config.Load(path)
 	require.NoError(t, err)
 
 	assert.Equal(t, "error", cfg.Level, "env should override file level")
 	assert.Equal(t, "json", cfg.Format, "env should override file format")
-	assert.Equal(t, "anthropic", cfg.AIProvider)
+}
+
+func TestLoadNamesRetiredAISettings(t *testing.T) {
+	clearAllEnv(t)
+	path := writeTempTOML(t, "level = \"warn\"\nai_provider = \"openai\"\nmodel = \"\"\nai_timeout = \"2m\"\n")
+	t.Setenv("UNLOG_SYSTEM_PROMPT", "be brief")
+
+	cfg, err := config.Load(path)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"ai_provider", "ai_timeout", "UNLOG_SYSTEM_PROMPT"}, cfg.Retired)
+	assert.Equal(t, "warn", cfg.Level)
+}
+
+// The README's example config used to list every AI key with an empty value.
+func TestLoadEmptyRetiredSettingsAreSilent(t *testing.T) {
+	clearAllEnv(t)
+	path := writeTempTOML(t, "ai_provider = \"\"\nmodel = \"\"\nsystem_prompt = \"\"\nai_timeout = \"\"\n")
+
+	cfg, err := config.Load(path)
+	require.NoError(t, err)
+
+	assert.Empty(t, cfg.Retired)
 }
 
 func TestEnvBoolParsing(t *testing.T) {

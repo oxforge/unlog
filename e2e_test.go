@@ -360,6 +360,25 @@ func TestE2ERemovedAIFlagsAreUnknown(t *testing.T) {
 	}
 }
 
+// A retired AI setting with a value gets a notice instead of being ignored
+// silently; the old README example config, with every AI key empty, stays
+// quiet.
+func TestE2ERetiredAISettingsWarn(t *testing.T) {
+	logPath := writeFile(t, t.TempDir(), "app.log", levelFixture)
+	r := runUnlog(t, t.TempDir(), []string{"UNLOG_AI_PROVIDER=anthropic"}, "--format", "json", logPath)
+	assert.Equal(t, 0, r.exit)
+	assert.Contains(t, r.stderr, "unlog no longer calls LLMs")
+	assert.Contains(t, r.stderr, "UNLOG_AI_PROVIDER")
+	assert.Contains(t, r.stdout, "compacted_summary")
+
+	home := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(home, ".unlog"), 0o755))
+	writeFile(t, filepath.Join(home, ".unlog"), "config.toml", "ai_provider = \"\"\nmodel = \"\"\nsystem_prompt = \"\"\nai_timeout = \"\"\n")
+	quiet := runUnlog(t, home, nil, logPath)
+	assert.Equal(t, 0, quiet.exit)
+	assert.NotContains(t, quiet.stderr, "no longer calls LLMs")
+}
+
 func TestE2ETwoIncidentsHoursApartAreBothReported(t *testing.T) {
 	logPath := writeFile(t, t.TempDir(), "app.log",
 		`{"level":"error","msg":"payment gateway refused card","time":"2024-01-15T10:00:01Z"}

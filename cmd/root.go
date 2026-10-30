@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -53,6 +54,9 @@ var rootCmd = &cobra.Command{
 			return fmt.Errorf("cmd: %w", err)
 		}
 		cfg = loaded
+		if len(cfg.Retired) > 0 {
+			slog.Warn("unlog no longer calls LLMs; ignoring " + strings.Join(cfg.Retired, ", ") + " (see \"For agents\" in the README)")
+		}
 
 		if cmd.Flags().Changed("verbose") {
 			cfg.Verbose = verbose
