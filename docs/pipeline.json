@@ -1,1 +1,25 @@
-{"type":"flow","direction":"DOWN","theme":"dark","nodes":[{"id":"input","label":"Files / stdin","shape":"rounded","color":"gray"},{"id":"ingest","label":"Ingest"},{"id":"filter","label":"Filter\n(N workers)"},{"id":"enrich","label":"Enrich"},{"id":"compact","label":"Compact"},{"id":"render","label":"Render"},{"id":"output","label":"stdout / file","shape":"rounded","color":"gray"}],"edges":[{"id":"e-input-ingest","from":"input","to":"ingest","label":"raw lines, any format"},{"id":"e-ingest-filter","from":"ingest","to":"filter","label":"parsed entries"},{"id":"e-filter-enrich","from":"filter","to":"enrich","label":"one line per error, bursts"},{"id":"e-enrich-compact","from":"enrich","to":"compact","label":"chains, deploys, co-failures"},{"id":"e-compact-render","from":"compact","to":"render","label":"fixed-size summary"},{"id":"e-render-output","from":"render","to":"output","label":"text, JSON, Markdown"}],"groups":[{"id":"core","label":"processing","color":"#5fbf6a","contains":["ingest","filter","enrich","compact"]}]}
+{
+  "type": "flow",
+  "direction": "DOWN",
+  "theme": "dark",
+  "nodes": [
+    {"id": "input", "label": "Files / stdin", "shape": "rounded", "color": "gray"},
+    {"id": "ingest", "label": "Ingest"},
+    {"id": "filter", "label": "Filter\n(N workers)"},
+    {"id": "enrich", "label": "Enrich"},
+    {"id": "compact", "label": "Compact"},
+    {"id": "render", "label": "Render"},
+    {"id": "output", "label": "stdout / file", "shape": "rounded", "color": "gray"}
+  ],
+  "edges": [
+    {"id": "e-input-ingest", "from": "input", "to": "ingest", "label": "raw lines, any format"},
+    {"id": "e-ingest-filter", "from": "ingest", "to": "filter", "label": "parsed entries"},
+    {"id": "e-filter-enrich", "from": "filter", "to": "enrich", "label": "one line per error, bursts"},
+    {"id": "e-enrich-compact", "from": "enrich", "to": "compact", "label": "chains, deploys, co-failures"},
+    {"id": "e-compact-render", "from": "compact", "to": "render", "label": "fixed-size summary"},
+    {"id": "e-render-output", "from": "render", "to": "output", "label": "text, JSON, Markdown"}
+  ],
+  "groups": [
+    {"id": "core", "label": "processing", "color": "#5fbf6a", "contains": ["ingest", "filter", "enrich", "compact"]}
+  ]
+}
