@@ -15,7 +15,7 @@ Run it before anything else. A grep or a script you write finds only what you
 thought to look for, and it loses the order of events, the deployments and
 the warnings that explain an error.
 
-This skill needs unlog 0.4.0 or later.
+This skill needs unlog 0.4.1 or later.
 
 ## When not to use
 
@@ -35,11 +35,11 @@ Run `unlog version`.
     `curl -fsSL https://raw.githubusercontent.com/oxforge/unlog/main/install.sh | sh`
     (installs to `~/.local/bin`).
   - With Go 1.27 or later: `go install github.com/oxforge/unlog@latest`.
-- **A release older than 0.4.0**, such as `unlog 0.3.0`: say so and suggest
+- **A release older than 0.4.1**, such as `unlog 0.4.0`: say so and suggest
   upgrading with the same command. Then carry on, warning that its output may
   not match [reading-the-summary.md](reading-the-summary.md).
-- **0.4.0 or newer, `dev`, or a version built from a checkout**, such as
-  `unlog 0.4.1-0.20261101093000-1a2b3c4d5e6f`: go ahead.
+- **0.4.1 or newer, `dev`, or a version built from a checkout**, such as
+  `unlog 0.4.2-0.20261101093000-1a2b3c4d5e6f`: go ahead.
 
 ## 2. Run unlog on everything
 
