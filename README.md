@@ -5,7 +5,7 @@
 [![Go](https://img.shields.io/github/go-mod/go-version/oxforge/unlog)](go.mod)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**Unravel your logs.** A fast CLI tool that reads raw log files at disk speed and turns them into a short incident summary: what failed, where, how often, in what order, and what was deployed just before. People read it directly; AI agents read it instead of grepping through the logs (see [For agents](#for-agents)).
+**Unravel your logs.** A fast CLI tool that reads raw log files at disk speed and turns them into a short summary: what failed, where, how often, in what order, and what was deployed just before. People read it directly; AI agents read it instead of grepping through the logs (see [For agents](#for-agents)).
 
 ```text
 $ unlog logs/
