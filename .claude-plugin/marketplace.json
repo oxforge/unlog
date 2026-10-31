@@ -12,7 +12,7 @@
       "source": {
         "source": "github",
         "repo": "oxforge/unlog",
-        "ref": "v0.4.0"
+        "ref": "v0.4.1"
       },
       "description": "Agents analyze logs with the unlog CLI: run it first, read its incident summary, answer with the facts (a skill and a SessionStart hook)"
     }
