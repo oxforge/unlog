@@ -11,7 +11,7 @@ type MarkdownRenderer struct{}
 func (r *MarkdownRenderer) Render(w io.Writer, opts Options) error {
 	ew := &errWriter{w: w}
 
-	_, _ = fmt.Fprintln(ew, "# Incident Analysis")
+	_, _ = fmt.Fprintln(ew, "# Log Summary")
 	_, _ = fmt.Fprintln(ew)
 
 	meta := fmt.Sprintf("**Generated**: %s | **Version**: %s",

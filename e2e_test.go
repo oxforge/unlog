@@ -196,7 +196,7 @@ func TestE2EFormatPrecedence(t *testing.T) {
 
 	fromFlag := runUnlog(t, home, nil, "--format", "markdown", logPath)
 	require.Equal(t, 0, fromFlag.exit, "stderr: %s", fromFlag.stderr)
-	assert.Contains(t, fromFlag.stdout, "# Incident Analysis")
+	assert.Contains(t, fromFlag.stdout, "# Log Summary")
 }
 
 func TestE2EInvalidFlagValues(t *testing.T) {

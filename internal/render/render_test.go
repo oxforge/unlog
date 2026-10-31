@@ -22,7 +22,7 @@ func TestAllRenderersImplementInterface(t *testing.T) {
 
 func makeResult() *pipeline.Result {
 	return &pipeline.Result{
-		Summary: "## Incident Overview\nDatabase connection pool exhausted.\n",
+		Summary: "## Overview\nDatabase connection pool exhausted.\n",
 		Stats: types.FilterStats{
 			TotalIngested:    1000,
 			TotalDropped:     800,

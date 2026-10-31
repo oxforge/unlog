@@ -22,7 +22,7 @@ const (
 )
 
 const (
-	sectionOverview    = "Incident Overview"
+	sectionOverview    = "Overview"
 	sectionDeployments = "Deployments"
 	sectionCritical    = "Critical Errors"
 	sectionChains      = "Error Chains"
@@ -306,7 +306,7 @@ func sectionBudget(totalBudget int, fraction float64) int {
 	return budget
 }
 
-// buildOverview produces a short incident summary paragraph from all entries.
+// buildOverview produces the short Overview paragraph from all entries.
 func buildOverview(all []scoredEntry, burstCount int) string {
 	if len(all) == 0 {
 		return "No significant log entries found."

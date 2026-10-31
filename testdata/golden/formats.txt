@@ -1,4 +1,4 @@
-## Incident Overview
+## Overview
 Window: 2024-01-15T10:00:00Z — 2026-03-19T14:05:12Z (19060h5m13s)
 Sources: 14 (testdata/formats/apache_clf.log, testdata/formats/cloudwatch.log, testdata/formats/csv_kibana.csv, testdata/formats/docker_compose.log, testdata/formats/docker_mixed_streams.log, +9 more)
 Events: 10 fatal, 29 error (28 distinct), 24 warn (21 distinct)

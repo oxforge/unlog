@@ -3,7 +3,7 @@
 The summary has six sections, always in this order. With the default text
 output, filter stats follow on stderr:
 
-1. Incident Overview
+1. Overview
 2. Deployments
 3. Critical Errors
 4. Error Chains
@@ -62,7 +62,7 @@ The tags in `{…}` appear in this order:
 | `trace=ID` | the trace or request id, from a field such as `trace_id` or `request_id` or from the message; grep the raw logs for it |
 | `with=A,B,+N` | other sources or services whose errors started within 5 seconds of this one, before or after: failures that happened together. It names two, then counts the rest |
 
-## Incident Overview
+## Overview
 
 - **`Window:`** the first and last time of the lines in this summary, and how
   long that is. It isn't the time range of the input: logs running from 08:00

@@ -16,7 +16,7 @@ import (
 
 func sampleResult() *pipeline.Result {
 	return &pipeline.Result{
-		Summary: "## Incident Overview\nDatabase connection pool exhausted.\n## Critical Errors\nERROR: pool timeout after 30s\nWARN: connection count high\nINFO: health check passed\n",
+		Summary: "## Overview\nDatabase connection pool exhausted.\n## Critical Errors\nERROR: pool timeout after 30s\nWARN: connection count high\nINFO: health check passed\n",
 		Stats: types.FilterStats{
 			TotalIngested:    1000,
 			TotalDropped:     800,
@@ -40,7 +40,7 @@ func TestTerminalRender(t *testing.T) {
 	require.NoError(t, err)
 
 	out := buf.String()
-	assert.Contains(t, out, "## Incident Overview")
+	assert.Contains(t, out, "## Overview")
 	assert.Contains(t, out, "## Critical Errors")
 	assert.Contains(t, out, "Database connection pool exhausted.")
 	// Stats are rendered by the cmd layer to stderr, not by the terminal renderer.

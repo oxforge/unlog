@@ -1,4 +1,4 @@
-## Incident Overview
+## Overview
 Window: 2024-01-15T14:01:55Z — 2024-01-15T14:03:00Z (1m5s)
 Sources: 2 (testdata/incidents/deploy_failure/app.log, testdata/incidents/deploy_failure/deploy.log)
 Events: 0 fatal, 13 error (8 distinct), 4 warn

@@ -1,4 +1,4 @@
-## Incident Overview
+## Overview
 Window: 2024-01-15T10:29:55Z — 2024-01-15T10:32:25Z (2m30s)
 Sources: 2 (testdata/incidents/db_connection/app.log, testdata/incidents/db_connection/db.log)
 Events: 3 fatal, 20 error (9 distinct), 7 warn (4 distinct)

@@ -8,7 +8,7 @@
 // otherwise be cut, in the order of this list (they print overview first,
 // then deployments, then the rest):
 //
-//	Incident Overview  5% (fixed)
+//	Overview           5% (fixed)
 //	Critical Errors   45%
 //	Error Chains      20%
 //	Deployments        5%
@@ -129,7 +129,7 @@ drain:
 
 // buildEmptySummary returns a minimal summary when no entries are provided.
 func buildEmptySummary() string {
-	return "## Incident Overview\nNo significant log entries found.\n\n" +
+	return "## Overview\nNo significant log entries found.\n\n" +
 		"## Deployments\n(none)\n\n" +
 		"## Critical Errors\n(none)\n\n" +
 		"## Error Chains\n(none)\n\n" +

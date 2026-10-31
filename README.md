@@ -9,7 +9,7 @@
 
 ```text
 $ unlog logs/
-## Incident Overview
+## Overview
 Window: 2024-01-15T14:01:55Z — 2024-01-15T14:03:00Z (1m5s)
 Sources: 2 (logs/app.log, logs/deploy.log)
 Events: 0 fatal, 13 error (8 distinct), 4 warn
@@ -257,7 +257,7 @@ When using `--format json`, the output includes:
     "bytes_processed": 0,
     "duration_ms": 310
   },
-  "compacted_summary": "## Incident Overview\n..."
+  "compacted_summary": "## Overview\n..."
 }
 ```
 

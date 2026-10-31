@@ -15,7 +15,7 @@ import (
 
 func TestRenderJSON(t *testing.T) {
 	result := &pipeline.Result{
-		Summary: "## Incident Overview\nDatabase connection pool exhausted.\n",
+		Summary: "## Overview\nDatabase connection pool exhausted.\n",
 		Stats: types.FilterStats{
 			TotalIngested:    100,
 			TotalDropped:     80,
@@ -72,7 +72,7 @@ func TestRenderJSONIndented(t *testing.T) {
 
 func TestJSONRendererInterface(t *testing.T) {
 	result := &pipeline.Result{
-		Summary: "## Incident Overview\nTest summary.\n",
+		Summary: "## Overview\nTest summary.\n",
 		Stats: types.FilterStats{
 			TotalIngested: 50,
 			TotalSurvived: 10,

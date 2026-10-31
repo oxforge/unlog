@@ -243,7 +243,7 @@ func TestRun_SectionsPresent(t *testing.T) {
 	summary, err := Run(context.Background(), ch, Options{})
 	require.NoError(t, err)
 
-	assert.Contains(t, summary, "## Incident Overview")
+	assert.Contains(t, summary, "## Overview")
 	assert.Contains(t, summary, "## Critical Errors")
 	assert.Contains(t, summary, "## Error Chains")
 	assert.Contains(t, summary, "## Rate Anomalies")
@@ -451,7 +451,7 @@ func TestRun_OverviewContent(t *testing.T) {
 	summary, err := Run(context.Background(), ch, Options{})
 	require.NoError(t, err)
 
-	overview := extractSection(summary, "## Incident Overview", "## Critical Errors")
+	overview := extractSection(summary, "## Overview", "## Critical Errors")
 
 	// Time window
 	assert.Contains(t, overview, "2025-01-01T12:00:00Z", "should contain start time")
@@ -592,7 +592,7 @@ func TestRun_OverviewCountsEntriesWithoutTimestamps(t *testing.T) {
 	summary, err := Run(context.Background(), ch, Options{})
 	require.NoError(t, err)
 
-	overview := extractSection(summary, "## Incident Overview", "## Critical Errors")
+	overview := extractSection(summary, "## Overview", "## Critical Errors")
 	assert.Contains(t, overview, "Window: 2025-01-01T12:00:00Z — 2025-01-01T12:00:00Z (0s)")
 	assert.Contains(t, overview, "Sources: 2 (app.log, db.log)")
 	assert.Contains(t, overview, "Events: 0 fatal, 2 error, 0 warn")
@@ -703,7 +703,7 @@ func TestRun_OverviewSpansAndOccurrences(t *testing.T) {
 	summary, err := Run(context.Background(), ch, Options{})
 	require.NoError(t, err)
 
-	overview := extractSection(summary, "## Incident Overview", "## Critical Errors")
+	overview := extractSection(summary, "## Overview", "## Critical Errors")
 	assert.Contains(t, overview, "Window: 2024-01-15T10:00:00Z — 2024-01-15T10:49:59Z (49m59s)")
 	assert.Contains(t, overview, "Events: 0 fatal, 3000 error (1 distinct), 0 warn")
 }
@@ -790,7 +790,7 @@ func TestRun_OverviewCountsBursts(t *testing.T) {
 	second.Source = "other.log"
 
 	withBursts := runWithBursts(t, entries, []types.Burst{exampleBurst(), second})
-	assert.Contains(t, extractSection(withBursts, "## Incident Overview", "## Critical Errors"), "Bursts: 2")
+	assert.Contains(t, extractSection(withBursts, "## Overview", "## Critical Errors"), "Bursts: 2")
 
 	without := runWithBursts(t, entries, nil)
 	assert.NotContains(t, without, "Bursts:")
@@ -853,7 +853,7 @@ func TestRun_DeploymentsComeBeforeTheErrors(t *testing.T) {
 		"2024-01-15T14:02:00Z [INFO] deploy.log: rolling update initiated: 3 pods {deploy}\n\n",
 		extractSection(summary, "## Deployments", "## Critical Errors"))
 	assert.Less(t, strings.Index(summary, "## Deployments"), strings.Index(summary, "## Critical Errors"))
-	assert.Contains(t, extractSection(summary, "## Incident Overview", "## Deployments"),
+	assert.Contains(t, extractSection(summary, "## Overview", "## Deployments"),
 		"Last deployment: 2024-01-15T14:02:00Z, 15s before the first error")
 	assert.NotContains(t, extractSection(summary, "## Context", "\x00"), "deploy.log")
 }
@@ -1039,7 +1039,7 @@ func TestRun_LastDeploymentIsNotAnError(t *testing.T) {
 func TestRun_EmptySummaryHasEverySection(t *testing.T) {
 	summary := runEntries(t, nil, Options{})
 
-	for _, header := range []string{"## Incident Overview", "## Deployments", "## Critical Errors", "## Error Chains", "## Rate Anomalies", "## Context"} {
+	for _, header := range []string{"## Overview", "## Deployments", "## Critical Errors", "## Error Chains", "## Rate Anomalies", "## Context"} {
 		assert.Contains(t, summary, header)
 	}
 }

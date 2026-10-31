@@ -34,7 +34,7 @@ func TestMarkdownRender(t *testing.T) {
 	require.NoError(t, err)
 
 	out := buf.String()
-	assert.Contains(t, out, "# Incident Analysis")
+	assert.Contains(t, out, "# Log Summary")
 	assert.Contains(t, out, "## Summary")
 	assert.Contains(t, out, "## Statistics")
 	assert.Contains(t, out, "Database connection pool exhausted.")
